@@ -8,8 +8,8 @@ describe('parseStreamLine', () => {
   })
 
   it('extracts usage from assistant messages', () => {
-    const line = JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 100, output_tokens: 50 } } })
-    expect(parseStreamLine(line)).toContainEqual({ type: 'usage', tokens: 150 })
+    const line = JSON.stringify({ type: 'assistant', message: { id: 'msg-1', usage: { input_tokens: 100, output_tokens: 50 } } })
+    expect(parseStreamLine(line)).toContainEqual({ type: 'usage', tokens: 150, messageId: 'msg-1' })
   })
 
   it('emits done for the result message without counting its cumulative usage', () => {
@@ -27,5 +27,17 @@ describe('parseStreamLine', () => {
     expect(parseStreamLine('null')).toEqual([{ type: 'log', line: 'null' }])
     expect(parseStreamLine('42')).toEqual([{ type: 'log', line: '42' }])
     expect(parseStreamLine('"hi"')).toEqual([{ type: 'log', line: '"hi"' }])
+  })
+
+  it('emits error (not done) for error results', () => {
+    const line = JSON.stringify({ type: 'result', subtype: 'error_during_execution', is_error: true })
+    const events = parseStreamLine(line)
+    expect(events).toContainEqual({ type: 'error', message: 'error_during_execution' })
+    expect(events.filter((e) => e.type === 'done')).toEqual([])
+  })
+
+  it('always yields the raw log event first', () => {
+    const line = JSON.stringify({ type: 'system', subtype: 'init', session_id: 's-1' })
+    expect(parseStreamLine(line)).toEqual([{ type: 'log', line }, { type: 'session', sessionId: 's-1' }])
   })
 })

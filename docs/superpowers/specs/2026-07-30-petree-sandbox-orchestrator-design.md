@@ -153,8 +153,10 @@ Task = prompt/spec + repo list + mode + limits. States:
 - **Timeout**: 30 min default. On expiry the task pauses (session kept) and
   the dashboard asks "continue?" — one click resumes.
 - **Token budget**: orchestrator accumulates per-message `usage` from the
-  event stream; at the budget it pauses the same way ("resume with another N
-  tokens?"). Both limits configurable in `defaults:` and per task.
+  event stream (deduped by message id; non-cached input+output tokens only —
+  cache read/creation tokens are deliberately excluded as they would dwarf
+  real work ~200x); at the budget it pauses the same way ("resume with
+  another N tokens?"). Both limits configurable in `defaults:` and per task.
 
 ## 5. Dashboard
 

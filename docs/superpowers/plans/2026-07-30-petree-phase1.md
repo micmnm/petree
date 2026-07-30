@@ -672,7 +672,7 @@ git commit -m "feat: host-side workspace clone (no credentials enter sandboxes)"
 - Test: `test/stream.test.ts`
 
 **Interfaces:**
-- Produces: `RunnerEvent` union (`{type:'session';sessionId}`, `{type:'log';line}`, `{type:'usage';tokens}`, `{type:'done';result}`, `{type:'limit';reason:'timeout'|'token-budget'}`, `{type:'error';message}`) and `parseStreamLine(line: string): RunnerEvent[]`. Every raw line yields a `log` event; recognized messages add typed events. Usage counts assistant messages only (the final `result` usage is cumulative — counting it would double-count).
+- Produces: `RunnerEvent` union (`{type:'session';sessionId}`, `{type:'log';line}`, `{type:'usage';tokens;messageId:string|null}`, `{type:'done';result}`, `{type:'limit';reason:'timeout'|'token-budget'}`, `{type:'error';message}`) and `parseStreamLine(line: string): RunnerEvent[]`. Every raw line yields a `log` event; recognized messages add typed events. Usage counts assistant messages only (the final `result` usage is cumulative — counting it would double-count), and carries the assistant `message.id` so the runner can dedupe: stream-json repeats the same message (same id, same usage) once per content block. Error results (`is_error: true`) yield `error`, not `done`. Token budget counts non-cached input+output tokens only — a deliberate "work done" proxy; cache_read/cache_creation tokens are excluded (they'd dwarf real usage ~200x).
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -688,9 +688,24 @@ describe('parseStreamLine', () => {
     expect(events).toContainEqual({ type: 'session', sessionId: 's-1' })
   })
 
-  it('extracts usage from assistant messages', () => {
-    const line = JSON.stringify({ type: 'assistant', message: { usage: { input_tokens: 100, output_tokens: 50 } } })
-    expect(parseStreamLine(line)).toContainEqual({ type: 'usage', tokens: 150 })
+  it('extracts usage with message id from assistant messages', () => {
+    const line = JSON.stringify({ type: 'assistant', message: { id: 'msg-1', usage: { input_tokens: 100, output_tokens: 50 } } })
+    expect(parseStreamLine(line)).toContainEqual({ type: 'usage', tokens: 150, messageId: 'msg-1' })
+  })
+
+  it('emits error (not done) for error results', () => {
+    const line = JSON.stringify({ type: 'result', subtype: 'error_during_execution', is_error: true })
+    const events = parseStreamLine(line)
+    expect(events).toContainEqual({ type: 'error', message: 'error_during_execution' })
+    expect(events.find((e) => e.type === 'done')).toBeUndefined()
+  })
+
+  it('always yields the raw log event first', () => {
+    const line = JSON.stringify({ type: 'system', subtype: 'init', session_id: 's-1' })
+    expect(parseStreamLine(line)).toEqual([
+      { type: 'log', line },
+      { type: 'session', sessionId: 's-1' },
+    ])
   })
 
   it('emits done for the result message without counting its cumulative usage', () => {
@@ -717,7 +732,7 @@ Expected: FAIL — cannot find `../src/stream.js`
 export type RunnerEvent =
   | { type: 'session'; sessionId: string }
   | { type: 'log'; line: string }
-  | { type: 'usage'; tokens: number }
+  | { type: 'usage'; tokens: number; messageId: string | null }
   | { type: 'done'; result: string }
   | { type: 'limit'; reason: 'timeout' | 'token-budget' }
   | { type: 'error'; message: string }
@@ -730,16 +745,22 @@ export function parseStreamLine(line: string): RunnerEvent[] {
   } catch {
     return [{ type: 'log', line }]
   }
+  if (msg === null || typeof msg !== 'object') return [{ type: 'log', line }]
   const events: RunnerEvent[] = [{ type: 'log', line }]
   if (msg.type === 'system' && msg.subtype === 'init' && msg.session_id) {
     events.push({ type: 'session', sessionId: msg.session_id })
   }
   if (msg.type === 'assistant' && msg.message?.usage) {
     const u = msg.message.usage
-    events.push({ type: 'usage', tokens: (u.input_tokens ?? 0) + (u.output_tokens ?? 0) })
+    events.push({
+      type: 'usage',
+      tokens: (u.input_tokens ?? 0) + (u.output_tokens ?? 0),
+      messageId: msg.message.id ?? null,
+    })
   }
   if (msg.type === 'result') {
-    events.push({ type: 'done', result: msg.result ?? '' })
+    if (msg.is_error) events.push({ type: 'error', message: String(msg.subtype ?? 'error') })
+    else events.push({ type: 'done', result: msg.result ?? '' })
   }
   return events
 }
@@ -778,12 +799,16 @@ const mode = process.argv[2] ?? 'ok'
 const out = (o) => console.log(JSON.stringify(o))
 
 out({ type: 'system', subtype: 'init', session_id: 'sess-123' })
-out({ type: 'assistant', message: { usage: { input_tokens: 100, output_tokens: 50 } } })
+out({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 100, output_tokens: 50 } } })
 
 if (mode === 'ok') {
   out({ type: 'result', subtype: 'success', result: 'all tests pass' })
+} else if (mode === 'dup-usage') {
+  // stream-json repeats the same message (same id, same usage) per content block
+  out({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 100, output_tokens: 50 } } })
+  out({ type: 'result', subtype: 'success', result: 'all tests pass' })
 } else if (mode === 'big-usage') {
-  out({ type: 'assistant', message: { usage: { input_tokens: 900000, output_tokens: 0 } } })
+  out({ type: 'assistant', message: { id: 'm2', usage: { input_tokens: 900000, output_tokens: 0 } } })
   setTimeout(() => out({ type: 'result', subtype: 'success', result: 'too late' }), 2000)
 } else if (mode === 'slow') {
   setTimeout(() => out({ type: 'result', subtype: 'success', result: 'too late' }), 2000)
@@ -841,6 +866,11 @@ describe('CliRunner', () => {
     const { events } = await run({ command: fake('crash'), timeoutMs: 5000, tokenBudget: 500000 })
     expect(events).toContainEqual({ type: 'error', message: 'exit code 3' })
   })
+
+  it('counts duplicated usage messages (same message id) only once', async () => {
+    const { runner } = await run({ command: fake('dup-usage'), timeoutMs: 5000, tokenBudget: 500000 })
+    expect(runner.tokensUsed()).toBe(150)
+  })
 })
 ```
 
@@ -868,6 +898,7 @@ export class CliRunner extends EventEmitter {
   private child?: ChildProcess
   private tokens: number
   private settled = false
+  private countedMessageIds = new Set<string>()
 
   constructor(private opts: CliRunnerOptions) {
     super()
@@ -885,9 +916,15 @@ export class CliRunner extends EventEmitter {
 
     const rl = createInterface({ input: this.child.stdout! })
     rl.on('line', (line) => {
+      if (!line.trim()) return
       for (const event of parseStreamLine(line)) {
+        if (event.type === 'usage' && event.messageId !== null) {
+          // stream-json repeats a message once per content block; count each id once
+          if (this.countedMessageIds.has(event.messageId)) continue
+          this.countedMessageIds.add(event.messageId)
+        }
         if (this.settled && event.type !== 'log') continue
-        if (event.type === 'done') this.settled = true
+        if (event.type === 'done' || event.type === 'error') this.settled = true
         this.emit('event', event)
         if (event.type === 'usage') {
           this.tokens += event.tokens

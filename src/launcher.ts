@@ -1,4 +1,4 @@
-import { appendFileSync, mkdirSync } from 'node:fs'
+import { createWriteStream, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PetreeConfig } from './config.js'
 import { prepareWorkspace } from './git.js'
@@ -29,13 +29,28 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     })
     store.transition(task.id, 'running')
 
+    // Recorded so a later failure — either a log-stream error or a swallowed
+    // store-transition race — can be surfaced by the post-run reconciliation below,
+    // instead of being silently lost.
+    let storeError: string | undefined
+    const logStream = createWriteStream(logFile, { flags: 'a', mode: 0o600 })
+    logStream.on('error', (err) => {
+      storeError = err.message
+    })
+
     const safely = (fn: () => void) => {
-      try { fn() } catch { /* event arrived after a terminal transition; ignore */ }
+      try {
+        fn()
+      } catch (err) {
+        // event arrived after a terminal transition (or another store race); don't
+        // throw out of the event handler, but remember it for reconciliation.
+        storeError = String(err)
+      }
     }
 
     await new Promise<void>((resolve) => {
       runner.on('event', (e) => {
-        if (e.type === 'log') appendFileSync(logFile, e.line + '\n')
+        if (e.type === 'log') logStream.write(e.line + '\n')
         else if (e.type === 'session') safely(() => store.patch(task.id, { sessionId: e.sessionId }))
         else if (e.type === 'usage') safely(() => store.addUsage(task.id, e.tokens))
         else if (e.type === 'done') safely(() => store.transition(task.id, 'done'))
@@ -45,5 +60,20 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
       runner.on('closed', resolve)
       runner.start()
     })
+
+    await new Promise<void>((resolve) => logStream.end(resolve))
+
+    // The child can exit cleanly (code 0) without ever emitting a 'done' or 'error'
+    // stream event (e.g. it printed nothing parseable as a result). Left unchecked
+    // the task would sit in 'running'/'provisioning' forever, permanently occupying
+    // a scheduler concurrency slot. Reconcile: if we're still non-terminal here, the
+    // run ended without telling us why, so fail it explicitly.
+    const finished = store.get(task.id)
+    if (finished && (finished.state === 'running' || finished.state === 'provisioning')) {
+      const error = storeError
+        ? `run ended without terminal event; store error: ${storeError}`
+        : 'run ended without terminal event'
+      safely(() => store.transition(task.id, 'failed', { error }))
+    }
   }
 }

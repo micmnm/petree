@@ -3,7 +3,9 @@ const mode = process.argv[2] ?? 'ok'
 const out = (o) => console.log(JSON.stringify(o))
 
 out({ type: 'system', subtype: 'init', session_id: 'sess-123' })
-out({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 100, output_tokens: 50 } } })
+if (mode !== 'silent') {
+  out({ type: 'assistant', message: { id: 'm1', usage: { input_tokens: 100, output_tokens: 50 } } })
+}
 
 if (mode === 'ok') {
   out({ type: 'result', subtype: 'success', result: 'all tests pass' })
@@ -22,4 +24,6 @@ if (mode === 'ok') {
   out({ type: 'result', subtype: 'success', result: 'all tests pass' })
   out({ type: 'assistant', message: { id: 'm9', usage: { input_tokens: 10, output_tokens: 10 } } })
   out({ type: 'system', subtype: 'init', session_id: 'sess-999' })
+} else if (mode === 'silent') {
+  // Exits 0 without ever emitting a done/error result line.
 }

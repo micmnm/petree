@@ -1,0 +1,69 @@
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { describe, it, expect } from 'vitest'
+import type { PetreeConfig } from '../src/config.js'
+import { TaskStore } from '../src/store.js'
+import { makeLauncher } from '../src/launcher.js'
+
+const fakeClaude = fileURLToPath(new URL('./fixtures/fake-claude.js', import.meta.url))
+
+function makeFixtureRepo(): string {
+  const dir = mkdtempSync(join(tmpdir(), 'petree-fixture-'))
+  execFileSync('git', ['init', '-b', 'main', dir])
+  writeFileSync(join(dir, 'README.md'), 'hello')
+  execFileSync('git', ['-C', dir, 'add', '.'])
+  execFileSync('git', ['-C', dir, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'init'])
+  return dir
+}
+
+describe('makeLauncher', () => {
+  it('runs a task end to end: clone, run, record usage and result', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const cfg: PetreeConfig = {
+      home,
+      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3 },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [] } },
+      allowClone: [],
+    }
+    const store = new TaskStore(join(home, 'petree.db'))
+    const created = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const task = store.transition(created.id, 'provisioning')
+
+    const launch = makeLauncher(cfg, store, {
+      buildCommand: () => [process.execPath, fakeClaude, 'ok'],
+    })
+    await launch(task)
+
+    const finished = store.get(task.id)!
+    expect(finished.state).toBe('done')
+    expect(finished.tokensUsed).toBe(150)
+    expect(finished.sessionId).toBe('sess-123')
+    expect(existsSync(join(home, 'work', task.id, 'demo', 'README.md'))).toBe(true)
+    expect(readFileSync(join(home, 'logs', `${task.id}.log`), 'utf8')).toContain('sess-123')
+  })
+
+  it('pauses the task when a limit is hit', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
+    const cfg: PetreeConfig = {
+      home,
+      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3 },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [] } },
+      allowClone: [],
+    }
+    const store = new TaskStore(join(home, 'petree.db'))
+    const created = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1000, timeoutMinutes: 30 })
+    const task = store.transition(created.id, 'provisioning')
+
+    const launch = makeLauncher(cfg, store, {
+      buildCommand: () => [process.execPath, fakeClaude, 'big-usage'],
+    })
+    await launch(task)
+
+    expect(store.get(task.id)?.state).toBe('paused-limit')
+    expect(store.get(task.id)?.error).toBe('token-budget')
+  })
+})

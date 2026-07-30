@@ -71,7 +71,7 @@ export class TaskStore {
   }
 
   list(): TaskRecord[] {
-    return this.db.prepare('SELECT * FROM tasks ORDER BY created_at DESC, id').all().map(rowToTask)
+    return this.db.prepare('SELECT * FROM tasks ORDER BY created_at DESC, rowid DESC').all().map(rowToTask)
   }
 
   transition(id: string, to: TaskState, patch: { error?: string | null } = {}): TaskRecord {
@@ -103,7 +103,7 @@ export class TaskStore {
   }
 
   nextQueued(): TaskRecord | undefined {
-    const r = this.db.prepare("SELECT * FROM tasks WHERE state = 'queued' ORDER BY created_at ASC, id LIMIT 1").get()
+    const r = this.db.prepare("SELECT * FROM tasks WHERE state = 'queued' ORDER BY created_at ASC, rowid ASC LIMIT 1").get()
     return r ? rowToTask(r) : undefined
   }
 }

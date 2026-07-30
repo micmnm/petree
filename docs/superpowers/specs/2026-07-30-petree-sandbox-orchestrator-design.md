@@ -19,8 +19,16 @@ multi-machine distribution, CI replacement.
 Checked against current Claude Code / Agent SDK documentation:
 
 - Headless & automated use under a Max subscription is supported
-  (`claude -p`, Agent SDK, `claude setup-token`). OAuth works inside Docker
-  by mounting `~/.claude` and setting `CLAUDE_CONFIG_DIR`.
+  (`claude -p`, Agent SDK, `claude setup-token`).
+- **Container auth**: on macOS, `/login` credentials live in the Keychain —
+  mounting `~/.claude` into a Linux container does *not* carry them. The
+  supported flow is `claude setup-token` run once on the host, producing a
+  one-year OAuth token tied to the Max subscription; the orchestrator passes
+  it to every container as `CLAUDE_CODE_OAUTH_TOKEN`. The same token may be
+  used by several containers concurrently, needs no interactive login, and
+  `claude -p` skips first-run trust dialogs. (`ANTHROPIC_API_KEY` must NOT be
+  set — it would bill the API separately instead of using Max. Token has no
+  auto-refresh: regenerate before the 1-year expiry.)
 - Docker is the officially supported isolation path (Anthropic devcontainer
   feature; `--dangerously-skip-permissions` is sanctioned inside containers
   as non-root).
@@ -113,9 +121,12 @@ One container per task, from per-stack base images (`sandbox-dotnet`,
 - **Private repos mid-task**: a `sandbox-git clone <name|url>` helper calls the
   orchestrator; if the repo is in `repos:` or `allow_clone:`, the host clones
   and injects it. Otherwise denied.
-- **Mounts**: `~/.claude` (OAuth, skills, settings — read-only except state
-  dir), `shared/skills` (ro), `shared/findings` (rw), repo-local skills of the
-  involved repos.
+- **Auth**: `CLAUDE_CODE_OAUTH_TOKEN` env var (from host-side
+  `claude setup-token`, stored once in `~/.petree/`, mode 0600). Credentials
+  are never in a mounted file; mounts carry config only.
+- **Mounts**: skills/settings from `~/.claude` (ro), `shared/skills` (ro),
+  `shared/findings` (rw), repo-local skills of the involved repos, plus a
+  container-local `CLAUDE_CONFIG_DIR` volume for session state.
 - **Network**: default-deny except Anthropic API, package feeds
   (NuGet/npm), `github.com`. Phase 3 widens per task.
 - Claude runs with full permissions inside; the container is the boundary.

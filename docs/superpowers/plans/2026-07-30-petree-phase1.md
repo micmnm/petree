@@ -1011,7 +1011,7 @@ const task: TaskRecord = {
 describe('buildDockerCommand', () => {
   it('builds a docker run command with token env, mounts and stream output', () => {
     const cmd = buildDockerCommand(task, cfg, '/tmp/work/abc123', 'tok-1')
-    expect(cmd.slice(0, 3)).toEqual(['docker', 'run', '--rm'])
+    expect(cmd.slice(0, 4)).toEqual(['docker', 'run', '--rm', '--init'])
     expect(cmd).toContain('sandbox-node')
     expect(cmd.join(' ')).toContain('-e CLAUDE_CODE_OAUTH_TOKEN=tok-1')
     expect(cmd.join(' ')).toContain('/tmp/work/abc123:/work')
@@ -1071,7 +1071,7 @@ export function buildDockerCommand(
 ): string[] {
   const image = cfg.repos[task.repos[0]].image
   const cmd = [
-    'docker', 'run', '--rm',
+    'docker', 'run', '--rm', '--init',
     '--name', `petree-${task.id}`,
     '-v', `${workDir}:/work`,
     '-v', `${join(cfg.home, 'shared', 'skills')}:/petree/skills:ro`,

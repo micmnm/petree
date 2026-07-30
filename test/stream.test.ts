@@ -22,4 +22,10 @@ describe('parseStreamLine', () => {
   it('treats non-JSON lines as plain logs', () => {
     expect(parseStreamLine('warming up...')).toEqual([{ type: 'log', line: 'warming up...' }])
   })
+
+  it('treats non-object JSON lines (null, numbers, strings) as plain logs', () => {
+    expect(parseStreamLine('null')).toEqual([{ type: 'log', line: 'null' }])
+    expect(parseStreamLine('42')).toEqual([{ type: 'log', line: '42' }])
+    expect(parseStreamLine('"hi"')).toEqual([{ type: 'log', line: '"hi"' }])
+  })
 })

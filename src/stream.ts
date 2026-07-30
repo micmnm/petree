@@ -14,6 +14,7 @@ export function parseStreamLine(line: string): RunnerEvent[] {
   } catch {
     return [{ type: 'log', line }]
   }
+  if (msg === null || typeof msg !== 'object') return [{ type: 'log', line }]
   const events: RunnerEvent[] = [{ type: 'log', line }]
   if (msg.type === 'system' && msg.subtype === 'init' && msg.session_id) {
     events.push({ type: 'session', sessionId: msg.session_id })

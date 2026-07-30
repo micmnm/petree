@@ -18,4 +18,8 @@ if (mode === 'ok') {
   setTimeout(() => out({ type: 'result', subtype: 'success', result: 'too late' }), 2000)
 } else if (mode === 'crash') {
   process.exit(3)
+} else if (mode === 'chatty-after-done') {
+  out({ type: 'result', subtype: 'success', result: 'all tests pass' })
+  out({ type: 'assistant', message: { id: 'm9', usage: { input_tokens: 10, output_tokens: 10 } } })
+  out({ type: 'system', subtype: 'init', session_id: 'sess-999' })
 }

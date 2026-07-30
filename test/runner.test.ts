@@ -47,4 +47,38 @@ describe('CliRunner', () => {
     const { runner } = await run({ command: fake('dup-usage'), timeoutMs: 5000, tokenBudget: 500000 })
     expect(runner.tokensUsed()).toBe(150)
   })
+
+  it('emits an error and closes when the child fails to spawn', async () => {
+    const { events } = await run({
+      command: ['definitely-not-a-real-binary-petree'],
+      timeoutMs: 5000,
+      tokenBudget: 500000,
+    })
+    expect(events.some((e) => e.type === 'error')).toBe(true)
+  })
+
+  it('suppresses events emitted after done (settle gate) and does not pollute usage counting', async () => {
+    const { events, runner } = await run({ command: fake('chatty-after-done'), timeoutMs: 5000, tokenBudget: 500000 })
+    const doneIndex = events.findIndex((e) => e.type === 'done')
+    expect(doneIndex).toBeGreaterThanOrEqual(0)
+    const after = events.slice(doneIndex + 1)
+    expect(after.some((e) => e.type === 'usage')).toBe(false)
+    expect(after.some((e) => e.type === 'session')).toBe(false)
+    expect(runner.tokensUsed()).toBe(150)
+  })
+
+  it('seeds tokensUsed from alreadyUsed', async () => {
+    const { runner } = await run({ command: fake('ok'), timeoutMs: 5000, tokenBudget: 500000, alreadyUsed: 100 })
+    expect(runner.tokensUsed()).toBe(250)
+  })
+
+  it('emits limit immediately without spawning when the budget is already exhausted', async () => {
+    const { events } = await run({
+      command: fake('ok'),
+      timeoutMs: 5000,
+      tokenBudget: 500000,
+      alreadyUsed: 500000,
+    })
+    expect(events).toContainEqual({ type: 'limit', reason: 'token-budget' })
+  })
 })

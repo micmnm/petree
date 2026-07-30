@@ -68,7 +68,10 @@ and `stop()`. Two interchangeable implementations:
 Start with v1; swap to v2 when stream-parsing shows its limits. Orchestrator
 and dashboard are untouched by the swap.
 
-### 3.2 Repo registry — `repos.yaml`
+### 3.2 Repo registry — `~/.petree/repos.yaml`
+
+User-level state lives in `~/.petree/` (registry, SQLite db, `shared/`);
+the Petree code itself lives in this repo.
 
 ```yaml
 defaults:
@@ -153,7 +156,7 @@ Plain local web page, minimal first, enriched later:
 
 ## 6. Shared brain
 
-`~/orchestrator/shared/` mounted into every sandbox:
+`~/.petree/shared/` mounted into every sandbox:
 
 - `skills/` (ro) — skills available to all sandboxes, now and future.
 - `findings/` (rw) — tasks write durable discoveries (build quirks, gotchas,

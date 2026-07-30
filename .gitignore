@@ -1,2 +1,4 @@
 node_modules/
 dist/
+.superpowers/
+.claude/settings.local.json

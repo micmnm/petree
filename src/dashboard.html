@@ -1,63 +1,120 @@
 <title>Petree</title>
 <style>
-  body { font-family: ui-monospace, monospace; margin: 2rem; background: #fafaf7; color: #222; }
+  body { font-family: ui-monospace, monospace; margin: 1.5rem; background: #fafaf7; color: #222; }
+  h1 { font-size: 1.3rem; }
+  .layout { display: flex; gap: 1.5rem; align-items: flex-start; }
+  .left { flex: 1 1 45%; min-width: 0; }
+  .right { flex: 1 1 55%; min-width: 0; }
   table { border-collapse: collapse; width: 100%; }
-  td, th { border-bottom: 1px solid #ddd; padding: .4rem .6rem; text-align: left; }
-  .state { padding: .1rem .5rem; border-radius: 1rem; font-size: .85em; background: #eee; }
+  td, th { border-bottom: 1px solid #ddd; padding: .35rem .5rem; text-align: left; }
+  tr.sel { background: #eef6ff; }
+  .state { padding: .1rem .5rem; border-radius: 1rem; font-size: .8em; background: #eee; }
   .state.running { background: #cfe8ff; } .state.done { background: #d3f2d3; }
   .state.failed { background: #ffd6d6; } .state[class*="paused"], .state.waiting-for-you { background: #ffe9b8; }
-  pre { background: #111; color: #ddd; padding: 1rem; overflow: auto; max-height: 50vh; }
-  form { margin: 1rem 0; display: flex; gap: .5rem; }
-  input { padding: .4rem; } input[name=prompt] { flex: 1; }
+  form { margin: 1rem 0; display: flex; flex-direction: column; gap: .5rem; max-width: 640px; }
+  textarea { padding: .5rem; font: inherit; resize: none; overflow: hidden; min-height: 3rem; }
+  .repos { display: flex; flex-wrap: wrap; gap: .75rem; }
+  .detail { border: 1px solid #ddd; border-radius: 6px; padding: 1rem; background: #fff; }
+  .detail dt { color: #666; font-size: .8em; margin-top: .5rem; }
+  .result { background: #f7f7f4; border-radius: 6px; padding: .75rem 1rem; margin-top: .5rem; }
+  .result h1,.result h2,.result h3 { font-size: 1rem; margin: .6rem 0 .3rem; }
+  .result pre { background: #111; color: #ddd; padding: .75rem; overflow: auto; }
+  .result code { background: #eee; padding: 0 .2rem; }
+  .err { color: #b00; white-space: pre-wrap; }
+  pre.log { background: #111; color: #ddd; padding: .75rem; overflow: auto; max-height: 40vh; font-size: .8em; }
+  button { padding: .4rem .8rem; align-self: flex-start; }
 </style>
 <h1>🧫 Petree</h1>
 <form id="create">
-  <input name="prompt" placeholder="task prompt" required>
-  <input name="repos" placeholder="repos (comma-separated)" required>
+  <textarea name="prompt" id="prompt" placeholder="task prompt (Cmd/Ctrl+Enter to start)" required></textarea>
+  <div><strong>repos:</strong> <span class="repos" id="repos"></span></div>
+  <div><strong>model:</strong>
+    <select name="model" id="model">
+      <option value="default">default</option>
+      <option value="haiku">haiku</option>
+      <option value="sonnet">sonnet</option>
+      <option value="opus">opus</option>
+    </select>
+  </div>
   <button>Start task</button>
 </form>
-<table>
-  <thead><tr><th>id</th><th>state</th><th>repos</th><th>tokens</th><th>error</th><th></th></tr></thead>
-  <tbody id="tasks"></tbody>
-</table>
-<h2 id="logtitle" hidden></h2>
-<pre id="logs" hidden></pre>
-<script>
-  let selected = null
+<div class="layout">
+  <div class="left">
+    <table>
+      <thead><tr><th>id</th><th>state</th><th>repos</th><th>tokens</th></tr></thead>
+      <tbody id="tasks"></tbody>
+    </table>
+  </div>
+  <div class="right"><div class="detail" id="detail">Select a task to see details.</div></div>
+</div>
+<script type="module">
+  import { renderMarkdown } from './markdown.js'
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
-  async function refresh() {
-    const tasks = await (await fetch('/api/tasks')).json()
-    document.getElementById('tasks').innerHTML = tasks.map(t => `
-      <tr>
-        <td><a href="#" onclick="showLogs('${esc(t.id)}');return false">${esc(t.id)}</a></td>
-        <td><span class="state ${esc(t.state)}">${esc(t.state)}</span></td>
-        <td>${esc(t.repos.join(', '))}</td>
-        <td>${esc(t.tokensUsed)} / ${esc(t.tokenBudget)}</td>
-        <td>${esc(t.error ?? '')}</td>
-        <td>${['paused-limit','paused-rate-limit','waiting-for-you','failed'].includes(t.state)
-          ? `<button onclick="resume('${esc(t.id)}')">resume</button>` : ''}</td>
-      </tr>`).join('')
-    if (selected) {
-      document.getElementById('logs').textContent = await (await fetch(`/api/tasks/${selected}/logs`)).text()
-    }
-  }
-  function showLogs(id) {
-    selected = id
-    document.getElementById('logtitle').textContent = `logs: ${id}`
-    document.getElementById('logtitle').hidden = false
-    document.getElementById('logs').hidden = false
-    refresh()
-  }
-  async function resume(id) { await fetch(`/api/tasks/${id}/resume`, { method: 'POST' }); refresh() }
+  let selected = null
+
+  // repo checkboxes
+  const reposEl = document.getElementById('repos')
+  fetch('/api/repos').then((r) => r.json()).then((repos) => {
+    reposEl.innerHTML = repos.map((r) =>
+      `<label><input type="checkbox" name="repo" value="${esc(r.name)}"> ${esc(r.name)}</label>`).join('')
+  })
+
+  // smart prompt: autosize + draft persistence + Cmd/Ctrl+Enter
+  const prompt = document.getElementById('prompt')
+  const autosize = () => { prompt.style.height = 'auto'; prompt.style.height = prompt.scrollHeight + 'px' }
+  prompt.value = localStorage.getItem('petree-draft') || ''
+  autosize()
+  prompt.addEventListener('input', () => { localStorage.setItem('petree-draft', prompt.value); autosize() })
+  prompt.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); document.getElementById('create').requestSubmit() }
+  })
+
   document.getElementById('create').addEventListener('submit', async (e) => {
     e.preventDefault()
-    const data = new FormData(e.target)
+    const repos = [...document.querySelectorAll('input[name=repo]:checked')].map((c) => c.value)
+    if (repos.length === 0) { alert('select at least one repo'); return }
     await fetch('/api/tasks', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ prompt: data.get('prompt'), repos: String(data.get('repos')).split(',').map(s => s.trim()) }),
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt.value, repos, model: document.getElementById('model').value }),
     })
-    e.target.reset(); refresh()
+    prompt.value = ''; localStorage.removeItem('petree-draft'); autosize(); refresh()
   })
+
+  function row(t) {
+    return `<tr class="${t.id === selected ? 'sel' : ''}" onclick="petreeSelect('${esc(t.id)}')">
+      <td>${esc(t.id)}</td><td><span class="state ${esc(t.state)}">${esc(t.state)}</span></td>
+      <td>${esc(t.repos.join(', '))}</td><td>${esc(t.tokensUsed)}</td></tr>`
+  }
+
+  async function renderDetail() {
+    if (!selected) return
+    const t = await (await fetch('/api/tasks/' + selected)).json()
+    const logs = await (await fetch('/api/tasks/' + selected + '/logs')).text()
+    const resume = ['paused-limit', 'paused-rate-limit', 'waiting-for-you', 'failed'].includes(t.state)
+      ? `<button onclick="petreeResume('${esc(t.id)}')">resume</button>` : ''
+    const body = t.state === 'done' && t.result
+      ? `<dt>result</dt><div class="result">${renderMarkdown(t.result)}</div>`
+      : t.state === 'failed' && t.error
+        ? `<dt>error</dt><div class="err">${esc(t.error)}</div>` : ''
+    document.getElementById('detail').innerHTML = `
+      <div><span class="state ${esc(t.state)}">${esc(t.state)}</span> ${resume}</div>
+      <dt>prompt</dt><div>${esc(t.prompt)}</div>
+      <dt>repos</dt><div>${esc(t.repos.join(', '))}</div>
+      <dt>model</dt><div>${esc(t.model || 'default')}</div>
+      <dt>tokens</dt><div>${esc(t.tokensUsed)} / ${esc(t.tokenBudget)}</div>
+      <dt>session</dt><div>${esc(t.sessionId || '—')}</div>
+      <dt>created / updated</dt><div>${esc(t.createdAt)} · ${esc(t.updatedAt)}</div>
+      ${body}
+      <dt>log</dt><pre class="log">${esc(logs)}</pre>`
+  }
+
+  window.petreeSelect = (id) => { selected = id; refresh() }
+  window.petreeResume = async (id) => { await fetch('/api/tasks/' + id + '/resume', { method: 'POST' }); refresh() }
+
+  async function refresh() {
+    const tasks = await (await fetch('/api/tasks')).json()
+    document.getElementById('tasks').innerHTML = tasks.map(row).join('')
+    await renderDetail()
+  }
   setInterval(refresh, 3000); refresh()
 </script>

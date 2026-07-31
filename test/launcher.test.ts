@@ -121,4 +121,22 @@ describe('makeLauncher', () => {
     expect(store.get(task.id)?.state).toBe('paused-limit')
     expect(store.get(task.id)?.error).toBe('timeout')
   })
+
+  it('captures the result text on a successful run', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const cfg: PetreeConfig = {
+      home,
+      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
+      allowClone: [],
+    }
+    const store = new TaskStore(join(home, 'petree.db'))
+    const created = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const task = store.transition(created.id, 'provisioning')
+    const launch = makeLauncher(cfg, store, { buildCommand: () => [process.execPath, fakeClaude, 'ok'] })
+    await launch(task)
+    expect(store.get(task.id)?.state).toBe('done')
+    expect(store.get(task.id)?.result).toBe('all tests pass')
+  })
 })

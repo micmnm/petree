@@ -53,7 +53,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
         if (e.type === 'log') logStream.write(e.line + '\n')
         else if (e.type === 'session') safely(() => store.patch(task.id, { sessionId: e.sessionId }))
         else if (e.type === 'usage') safely(() => store.addUsage(task.id, e.tokens))
-        else if (e.type === 'done') safely(() => store.transition(task.id, 'done'))
+        else if (e.type === 'done') safely(() => { store.setResult(task.id, e.result); store.transition(task.id, 'done') })
         else if (e.type === 'limit') safely(() => store.transition(task.id, 'paused-limit', { error: e.reason }))
         else if (e.type === 'error') safely(() => store.transition(task.id, 'failed', { error: e.message }))
       })

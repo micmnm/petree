@@ -1,0 +1,62 @@
+<title>Petree</title>
+<style>
+  body { font-family: ui-monospace, monospace; margin: 2rem; background: #fafaf7; color: #222; }
+  table { border-collapse: collapse; width: 100%; }
+  td, th { border-bottom: 1px solid #ddd; padding: .4rem .6rem; text-align: left; }
+  .state { padding: .1rem .5rem; border-radius: 1rem; font-size: .85em; background: #eee; }
+  .state.running { background: #cfe8ff; } .state.done { background: #d3f2d3; }
+  .state.failed { background: #ffd6d6; } .state[class*="paused"], .state.waiting-for-you { background: #ffe9b8; }
+  pre { background: #111; color: #ddd; padding: 1rem; overflow: auto; max-height: 50vh; }
+  form { margin: 1rem 0; display: flex; gap: .5rem; }
+  input { padding: .4rem; } input[name=prompt] { flex: 1; }
+</style>
+<h1>🧫 Petree</h1>
+<form id="create">
+  <input name="prompt" placeholder="task prompt" required>
+  <input name="repos" placeholder="repos (comma-separated)" required>
+  <button>Start task</button>
+</form>
+<table>
+  <thead><tr><th>id</th><th>state</th><th>repos</th><th>tokens</th><th>error</th><th></th></tr></thead>
+  <tbody id="tasks"></tbody>
+</table>
+<h2 id="logtitle" hidden></h2>
+<pre id="logs" hidden></pre>
+<script>
+  let selected = null
+  async function refresh() {
+    const tasks = await (await fetch('/api/tasks')).json()
+    document.getElementById('tasks').innerHTML = tasks.map(t => `
+      <tr>
+        <td><a href="#" onclick="showLogs('${t.id}');return false">${t.id}</a></td>
+        <td><span class="state ${t.state}">${t.state}</span></td>
+        <td>${t.repos.join(', ')}</td>
+        <td>${t.tokensUsed} / ${t.tokenBudget}</td>
+        <td>${t.error ?? ''}</td>
+        <td>${['paused-limit','paused-rate-limit','waiting-for-you','failed'].includes(t.state)
+          ? `<button onclick="resume('${t.id}')">resume</button>` : ''}</td>
+      </tr>`).join('')
+    if (selected) {
+      document.getElementById('logs').textContent = await (await fetch(`/api/tasks/${selected}/logs`)).text()
+    }
+  }
+  function showLogs(id) {
+    selected = id
+    document.getElementById('logtitle').textContent = `logs: ${id}`
+    document.getElementById('logtitle').hidden = false
+    document.getElementById('logs').hidden = false
+    refresh()
+  }
+  async function resume(id) { await fetch(`/api/tasks/${id}/resume`, { method: 'POST' }); refresh() }
+  document.getElementById('create').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    const data = new FormData(e.target)
+    await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: data.get('prompt'), repos: String(data.get('repos')).split(',').map(s => s.trim()) }),
+    })
+    e.target.reset(); refresh()
+  })
+  setInterval(refresh, 3000); refresh()
+</script>

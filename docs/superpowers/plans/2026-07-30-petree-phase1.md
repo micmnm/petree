@@ -1471,6 +1471,12 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   })
 
   app.get('/api/tasks/:id/logs', (req, res) => {
+    // ids are 8-char uuid slices; reject anything else — Express decodes %2f,
+    // so an unvalidated id is a path traversal into arbitrary *.log files
+    if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) {
+      res.sendStatus(400)
+      return
+    }
     const file = join(cfg.home, 'logs', `${req.params.id}.log`)
     res.type('text/plain').send(existsSync(file) ? readFileSync(file, 'utf8') : '')
   })
@@ -1607,7 +1613,8 @@ setInterval(() => void scheduler.tick(), 2000)
 
 const app = makeApp(cfg, store, scheduler)
 const port = Number(process.env.PORT ?? 4100)
-app.listen(port, () => {
+// 127.0.0.1 explicitly: the API is unauthenticated and must never bind the LAN
+app.listen(port, '127.0.0.1', () => {
   console.log(`petree dashboard: http://localhost:${port}`)
 })
 ```

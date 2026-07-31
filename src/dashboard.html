@@ -24,17 +24,18 @@
 <pre id="logs" hidden></pre>
 <script>
   let selected = null
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
   async function refresh() {
     const tasks = await (await fetch('/api/tasks')).json()
     document.getElementById('tasks').innerHTML = tasks.map(t => `
       <tr>
-        <td><a href="#" onclick="showLogs('${t.id}');return false">${t.id}</a></td>
-        <td><span class="state ${t.state}">${t.state}</span></td>
-        <td>${t.repos.join(', ')}</td>
-        <td>${t.tokensUsed} / ${t.tokenBudget}</td>
-        <td>${t.error ?? ''}</td>
+        <td><a href="#" onclick="showLogs('${esc(t.id)}');return false">${esc(t.id)}</a></td>
+        <td><span class="state ${esc(t.state)}">${esc(t.state)}</span></td>
+        <td>${esc(t.repos.join(', '))}</td>
+        <td>${esc(t.tokensUsed)} / ${esc(t.tokenBudget)}</td>
+        <td>${esc(t.error ?? '')}</td>
         <td>${['paused-limit','paused-rate-limit','waiting-for-you','failed'].includes(t.state)
-          ? `<button onclick="resume('${t.id}')">resume</button>` : ''}</td>
+          ? `<button onclick="resume('${esc(t.id)}')">resume</button>` : ''}</td>
       </tr>`).join('')
     if (selected) {
       document.getElementById('logs').textContent = await (await fetch(`/api/tasks/${selected}/logs`)).text()

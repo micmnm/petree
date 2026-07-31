@@ -74,6 +74,18 @@ describe('API', () => {
     expect(bad.status).toBe(409)
   })
 
+  it('rejects log ids that are not task-id shaped', async () => {
+    const res = await fetch(`${base}/api/tasks/..%2f..%2fsecret/logs`)
+    expect(res.status).toBe(400)
+  })
+
+  it('404s on unknown task get and resume', async () => {
+    const get = await fetch(`${base}/api/tasks/zzzzzzzz`)
+    expect(get.status).toBe(404)
+    const resume = await fetch(`${base}/api/tasks/zzzzzzzz/resume`, { method: 'POST' })
+    expect(resume.status).toBe(404)
+  })
+
   it('serves the dashboard page', async () => {
     const res = await fetch(base)
     expect(res.status).toBe(200)

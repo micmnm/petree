@@ -41,6 +41,10 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   })
 
   app.get('/api/tasks/:id/logs', (req, res) => {
+    if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) {
+      res.sendStatus(400)
+      return
+    }
     const file = join(cfg.home, 'logs', `${req.params.id}.log`)
     res.type('text/plain').send(existsSync(file) ? readFileSync(file, 'utf8') : '')
   })

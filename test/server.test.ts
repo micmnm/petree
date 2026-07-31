@@ -91,4 +91,34 @@ describe('API', () => {
     expect(res.status).toBe(200)
     expect(await res.text()).toContain('Petree')
   })
+
+  it('lists repos for the selector', async () => {
+    const repos = await (await fetch(`${base}/api/repos`)).json()
+    expect(repos).toContainEqual({ name: 'demo', defaultBranch: 'main', image: 'sandbox-node', defaultModel: null })
+  })
+
+  it('accepts a valid model and stores the resolved value', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', repos: ['demo'], model: 'haiku' }),
+    })
+    expect(res.status).toBe(201)
+    expect((await res.json()).model).toBe('haiku')
+  })
+
+  it('rejects an unknown model with 400', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', repos: ['demo'], model: 'gpt-4' }),
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it("stores null when model is 'default' and no config default applies", async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', repos: ['demo'], model: 'default' }),
+    })
+    expect((await res.json()).model).toBeNull()
+  })
 })

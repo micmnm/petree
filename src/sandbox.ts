@@ -30,6 +30,7 @@ export function buildDockerCommand(
     '-w', '/work',
     image,
     'claude', '-p', task.prompt,
+    ...(task.model ? ['--model', task.model] : []),
     '--output-format', 'stream-json', '--verbose',
     '--dangerously-skip-permissions',
   ]

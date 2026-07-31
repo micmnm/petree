@@ -35,6 +35,21 @@ describe('buildDockerCommand', () => {
     const cmd = buildDockerCommand({ ...task, sessionId: 'sess-9' }, cfg, '/w', 't')
     expect(cmd.join(' ')).toContain('--resume sess-9')
   })
+
+  it('appends --model when the task has a model', () => {
+    const cmd = buildDockerCommand({ ...task, model: 'haiku' }, cfg, '/w', 't')
+    expect(cmd.join(' ')).toContain('--model haiku')
+    // must come after the prompt, before --output-format
+    const i = cmd.indexOf('--model')
+    expect(cmd[i + 1]).toBe('haiku')
+    expect(cmd.indexOf('-p')).toBeLessThan(i)
+    expect(i).toBeLessThan(cmd.indexOf('--output-format'))
+  })
+
+  it('omits --model when the task model is null', () => {
+    const cmd = buildDockerCommand({ ...task, model: null }, cfg, '/w', 't')
+    expect(cmd).not.toContain('--model')
+  })
 })
 
 describe('readToken', () => {

@@ -4,7 +4,12 @@ const IDENT = ['-c', 'user.name=Petree', '-c', 'user.email=petree@localhost']
 
 function git(repoDir: string, args: string[], opts: { ident?: boolean } = {}): string {
   const full = ['-C', repoDir, ...(opts.ident ? IDENT : []), ...args]
-  return execFileSync('git', full, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+  // Node's default maxBuffer (1 MiB) would otherwise throw ENOBUFS on a large diff/patch.
+  return execFileSync('git', full, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+    maxBuffer: 64 * 1024 * 1024,
+  })
 }
 
 export function taskBranch(taskId: string): string {
@@ -41,9 +46,13 @@ export function repoStatus(repoDir: string, baseBranch: string): RepoStatus {
 
 export function diffBranch(repoDir: string, baseBranch: string): { stat: string; patch: string } {
   const base = `origin/${baseBranch}`
-  const stat = git(repoDir, ['diff', '--stat', `${base}...HEAD`])
-  const patch = git(repoDir, ['diff', `${base}...HEAD`])
-  return { stat, patch }
+  try {
+    const stat = git(repoDir, ['diff', '--stat', `${base}...HEAD`])
+    const patch = git(repoDir, ['diff', `${base}...HEAD`])
+    return { stat, patch }
+  } catch {
+    return { stat: '', patch: '' }
+  }
 }
 
 export function pushBranch(repoDir: string, taskId: string, target: string): { ok: boolean; output: string } {

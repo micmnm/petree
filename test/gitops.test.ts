@@ -74,4 +74,14 @@ describe('gitops', () => {
     expect(res.ok).toBe(false)
     expect(res.output.length).toBeGreaterThan(0)
   })
+
+  it('diffBranch returns empty (does not throw) when the base ref is missing', () => {
+    const { repoDir } = fixture()
+    createTaskBranch(repoDir, 'abc123')
+    // remove the remote-tracking ref so origin/main no longer resolves
+    execFileSync('git', ['-C', repoDir, 'remote', 'remove', 'origin'])
+    expect(() => diffBranch(repoDir, 'main')).not.toThrow()
+    const d = diffBranch(repoDir, 'main')
+    expect(d).toEqual({ stat: '', patch: '' })
+  })
 })

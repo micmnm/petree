@@ -8,8 +8,8 @@ import { buildDockerCommand, readToken } from '../src/sandbox.js'
 
 const cfg: PetreeConfig = {
   home: '/petree-home',
-  defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3 },
-  repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [] } },
+  defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
+  repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
   allowClone: [],
 }
 

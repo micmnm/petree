@@ -10,12 +10,14 @@ export interface RepoConfig {
   setup: string[]
   test: string[]
   skills: string[]
+  defaultModel: string | null
 }
 
 export interface Defaults {
   timeoutMinutes: number
   tokenBudget: number
   concurrency: number
+  defaultModel: string | null
 }
 
 export interface PetreeConfig {
@@ -29,7 +31,7 @@ export function loadConfig(
   home: string = process.env.PETREE_HOME ?? join(homedir(), '.petree'),
 ): PetreeConfig {
   const raw = (yaml.load(readFileSync(join(home, 'repos.yaml'), 'utf8')) ?? {}) as Record<string, unknown>
-  const d = (raw.defaults ?? {}) as Record<string, number>
+  const d = (raw.defaults ?? {}) as Record<string, unknown>
   const repos: Record<string, RepoConfig> = {}
   for (const [name, value] of Object.entries((raw.repos ?? {}) as Record<string, Record<string, unknown>>)) {
     if (!value?.url) throw new Error(`repo ${name}: url is required`)
@@ -41,16 +43,27 @@ export function loadConfig(
       setup: (value.setup as string[]) ?? [],
       test: (value.test as string[]) ?? [],
       skills: (value.skills as string[]) ?? [],
+      defaultModel: value.default_model != null ? String(value.default_model) : null,
     }
   }
   return {
     home,
     defaults: {
-      timeoutMinutes: d.timeout_minutes ?? 30,
-      tokenBudget: d.token_budget ?? 500_000,
-      concurrency: d.concurrency ?? 3,
+      timeoutMinutes: Number(d.timeout_minutes ?? 30),
+      tokenBudget: Number(d.token_budget ?? 500_000),
+      concurrency: Number(d.concurrency ?? 3),
+      defaultModel: d.default_model != null ? String(d.default_model) : null,
     },
     repos,
     allowClone: (raw.allow_clone as string[]) ?? [],
   }
+}
+
+export function resolveModel(
+  requested: string | null | undefined,
+  repoDefault: string | null,
+  globalDefault: string | null,
+): string | null {
+  const norm = (m?: string | null): string | null => (m && m !== 'default' ? m : null)
+  return norm(requested) ?? norm(repoDefault) ?? norm(globalDefault) ?? null
 }

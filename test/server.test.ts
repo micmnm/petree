@@ -17,8 +17,8 @@ beforeEach(async () => {
   home = mkdtempSync(join(tmpdir(), 'petree-srv-'))
   const cfg: PetreeConfig = {
     home,
-    defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3 },
-    repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [] } },
+    defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
+    repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
     allowClone: [],
   }
   store = new TaskStore(join(home, 'db'))

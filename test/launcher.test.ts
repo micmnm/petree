@@ -29,8 +29,8 @@ function setup(input: { tokenBudget?: number; timeoutMinutes?: number } = {}): {
   const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
   const cfg: PetreeConfig = {
     home,
-    defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3 },
-    repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [] } },
+    defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
+    repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
     allowClone: [],
   }
   const store = new TaskStore(join(home, 'petree.db'))

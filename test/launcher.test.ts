@@ -157,4 +157,29 @@ describe('makeLauncher', () => {
     expect(store.get(task.id)?.state).toBe('done')
     expect(store.get(task.id)?.result).toBe('final answer')
   })
+
+  it('commits the agent changes on the task branch after a run', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const cfg = {
+      home,
+      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
+      allowClone: [],
+    }
+    const store = new TaskStore(join(home, 'petree.db'))
+    const created = store.create({ prompt: 'edit the readme', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const task = store.transition(created.id, 'provisioning')
+    // fake "claude" that writes a file into /work/demo then emits a clean done
+    const writer = [process.execPath, '-e',
+      `const fs=require('fs');fs.writeFileSync(process.env.WD+'/demo/added.txt','x');` +
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'done'}))`]
+    const launch = makeLauncher(cfg, store, { buildCommand: (t, workDir) => { process.env.WD = workDir; return writer } })
+    await launch(task)
+    const repoDir = join(home, 'work', task.id, 'demo')
+    const msg = execFileSync('git', ['-C', repoDir, 'log', '-1', '--pretty=%s'], { encoding: 'utf8' }).trim()
+    expect(msg).toContain(`petree ${task.id}`)
+    const branch = execFileSync('git', ['-C', repoDir, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim()
+    expect(branch).toBe(`petree/${task.id}`)
+  })
 })

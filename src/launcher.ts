@@ -2,6 +2,7 @@ import { createWriteStream, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PetreeConfig } from './config.js'
 import { prepareWorkspace } from './git.js'
+import { commitChanges } from './gitops.js'
 import { CliRunner } from './runner.js'
 import { buildDockerCommand, readToken } from './sandbox.js'
 import type { TaskRecord, TaskStore } from './store.js'
@@ -20,7 +21,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     const logFile = join(cfg.home, 'logs', `${task.id}.log`)
     mkdirSync(join(cfg.home, 'logs'), { recursive: true })
 
-    prepareWorkspace(cfg, task.repos, workDir)
+    prepareWorkspace(cfg, task.repos, workDir, task.id)
     const runner = new CliRunner({
       command: buildCommand(task, workDir),
       timeoutMs: task.timeoutMinutes * 60_000,
@@ -74,6 +75,17 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
         ? `run ended without terminal event; store error: ${storeError}`
         : 'run ended without terminal event'
       safely(() => store.transition(task.id, 'failed', { error }))
+    }
+
+    // Capture any file changes the agent made as a commit on the task branch,
+    // per repo, on the host. Investigation tasks that changed nothing get no commit.
+    const firstLine = task.prompt.split('\n')[0].slice(0, 72)
+    for (const repo of task.repos) {
+      try {
+        commitChanges(join(workDir, repo), task.id, `petree ${task.id}: ${firstLine}`)
+      } catch (err) {
+        storeError = `commit failed for ${repo}: ${String(err)}`
+      }
     }
   }
 }

@@ -1,7 +1,8 @@
-import { mkdtempSync } from 'node:fs'
+import { mkdtempSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, beforeEach } from 'vitest'
+import Database from 'better-sqlite3'
 import { TaskStore } from '../src/store.js'
 
 let store: TaskStore
@@ -49,5 +50,45 @@ describe('TaskStore', () => {
     store.create(input)
     expect(store.countByState('queued')).toBe(2)
     expect(store.nextQueued()?.id).toBe(a.id)
+  })
+})
+
+describe('TaskStore result & model', () => {
+  it('defaults result and model to null and persists a model on create', () => {
+    const s = new TaskStore(join(mkdtempSync(join(tmpdir(), 'petree-rm-')), 'db'))
+    const a = s.create(input)
+    expect(a.result).toBeNull()
+    expect(a.model).toBeNull()
+    const b = s.create({ ...input, model: 'haiku' })
+    expect(b.model).toBe('haiku')
+  })
+
+  it('setResult stores the result text', () => {
+    const s = new TaskStore(join(mkdtempSync(join(tmpdir(), 'petree-rm-')), 'db'))
+    const t = s.create(input)
+    const updated = s.setResult(t.id, '# answer\nhello')
+    expect(updated.result).toBe('# answer\nhello')
+    expect(s.get(t.id)?.result).toBe('# answer\nhello')
+  })
+
+  it('migrates a pre-existing Phase-1 db (no result/model columns)', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'petree-mig-')), 'db')
+    // create a Phase-1-shaped table without result/model
+    const raw = new Database(file)
+    raw.exec(`CREATE TABLE tasks (
+      id TEXT PRIMARY KEY, prompt TEXT NOT NULL, repos TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'unattended', state TEXT NOT NULL,
+      session_id TEXT, tokens_used INTEGER NOT NULL DEFAULT 0,
+      token_budget INTEGER NOT NULL, timeout_minutes INTEGER NOT NULL,
+      error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`)
+    raw.prepare(`INSERT INTO tasks (id,prompt,repos,mode,state,token_budget,timeout_minutes,created_at,updated_at)
+      VALUES ('old1','p','["demo"]','unattended','done',1000,30,'t','t')`).run()
+    raw.close()
+    // opening with the new TaskStore must add the columns and not throw
+    const s = new TaskStore(file)
+    const old = s.get('old1')!
+    expect(old.result).toBeNull()
+    expect(old.model).toBeNull()
+    expect(existsSync(file)).toBe(true)
   })
 })

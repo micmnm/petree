@@ -17,6 +17,8 @@ export interface TaskRecord {
   tokenBudget: number
   timeoutMinutes: number
   error: string | null
+  result: string | null
+  model: string | null
   createdAt: string
   updatedAt: string
 }
@@ -38,7 +40,8 @@ function rowToTask(r: any): TaskRecord {
     id: r.id, prompt: r.prompt, repos: JSON.parse(r.repos), mode: r.mode,
     state: r.state, sessionId: r.session_id, tokensUsed: r.tokens_used,
     tokenBudget: r.token_budget, timeoutMinutes: r.timeout_minutes,
-    error: r.error, createdAt: r.created_at, updatedAt: r.updated_at,
+    error: r.error, result: r.result ?? null, model: r.model ?? null,
+    createdAt: r.created_at, updatedAt: r.updated_at,
   }
 }
 
@@ -52,16 +55,19 @@ export class TaskStore {
       mode TEXT NOT NULL DEFAULT 'unattended', state TEXT NOT NULL,
       session_id TEXT, tokens_used INTEGER NOT NULL DEFAULT 0,
       token_budget INTEGER NOT NULL, timeout_minutes INTEGER NOT NULL,
-      error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`)
+      error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result TEXT, model TEXT)`)
+    const cols = (this.db.prepare('PRAGMA table_info(tasks)').all() as { name: string }[]).map((c) => c.name)
+    if (!cols.includes('result')) this.db.exec('ALTER TABLE tasks ADD COLUMN result TEXT')
+    if (!cols.includes('model')) this.db.exec('ALTER TABLE tasks ADD COLUMN model TEXT')
   }
 
-  create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number }): TaskRecord {
+  create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number; model?: string | null }): TaskRecord {
     const now = new Date().toISOString()
     const id = randomUUID().slice(0, 8)
     this.db.prepare(`INSERT INTO tasks
-      (id, prompt, repos, mode, state, token_budget, timeout_minutes, created_at, updated_at)
-      VALUES (?, ?, ?, 'unattended', 'queued', ?, ?, ?, ?)`)
-      .run(id, input.prompt, JSON.stringify(input.repos), input.tokenBudget, input.timeoutMinutes, now, now)
+      (id, prompt, repos, mode, state, token_budget, timeout_minutes, model, created_at, updated_at)
+      VALUES (?, ?, ?, 'unattended', 'queued', ?, ?, ?, ?, ?)`)
+      .run(id, input.prompt, JSON.stringify(input.repos), input.tokenBudget, input.timeoutMinutes, input.model ?? null, now, now)
     return this.get(id)!
   }
 
@@ -88,6 +94,14 @@ export class TaskStore {
     if (!t) throw new Error(`no task ${id}`)
     this.db.prepare('UPDATE tasks SET session_id = ?, updated_at = ? WHERE id = ?')
       .run(fields.sessionId ?? t.sessionId, new Date().toISOString(), id)
+    return this.get(id)!
+  }
+
+  setResult(id: string, text: string): TaskRecord {
+    const t = this.get(id)
+    if (!t) throw new Error(`no task ${id}`)
+    this.db.prepare('UPDATE tasks SET result = ?, updated_at = ? WHERE id = ?')
+      .run(text, new Date().toISOString(), id)
     return this.get(id)!
   }
 

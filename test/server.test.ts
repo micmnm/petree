@@ -92,6 +92,13 @@ describe('API', () => {
     expect(await res.text()).toContain('Petree')
   })
 
+  it('serves the markdown module as javascript', async () => {
+    const res = await fetch(`${base}/markdown.js`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toContain('javascript')
+    expect(await res.text()).toContain('renderMarkdown')
+  })
+
   it('lists repos for the selector', async () => {
     const repos = await (await fetch(`${base}/api/repos`)).json()
     expect(repos).toContainEqual({ name: 'demo', defaultBranch: 'main', image: 'sandbox-node', defaultModel: null })

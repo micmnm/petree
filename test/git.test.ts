@@ -25,14 +25,16 @@ function cfgWith(url: string): PetreeConfig {
 }
 
 describe('prepareWorkspace', () => {
-  it('clones named repos into workDir/<name>', () => {
+  it('clones named repos into workDir/<name> on a petree task branch', () => {
     const fixture = makeFixtureRepo()
     const workDir = join(mkdtempSync(join(tmpdir(), 'petree-work-')), 'w')
-    prepareWorkspace(cfgWith(`file://${fixture}`), ['demo'], workDir)
+    prepareWorkspace(cfgWith(`file://${fixture}`), ['demo'], workDir, 'abc123')
     expect(existsSync(join(workDir, 'demo', 'README.md'))).toBe(true)
+    const branch = execFileSync('git', ['-C', join(workDir, 'demo'), 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim()
+    expect(branch).toBe('petree/abc123')
   })
 
   it('throws on unknown repo names', () => {
-    expect(() => prepareWorkspace(cfgWith('file:///x'), ['nope'], '/tmp/unused-dir')).toThrow(/unknown repo/)
+    expect(() => prepareWorkspace(cfgWith('file:///x'), ['nope'], '/tmp/unused-dir', 'abc123')).toThrow(/unknown repo/)
   })
 })

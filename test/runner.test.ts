@@ -57,14 +57,12 @@ describe('CliRunner', () => {
     expect(events.some((e) => e.type === 'error')).toBe(true)
   })
 
-  it('suppresses events emitted after done (settle gate) and does not pollute usage counting', async () => {
-    const { events, runner } = await run({ command: fake('chatty-after-done'), timeoutMs: 5000, tokenBudget: 500000 })
-    const doneIndex = events.findIndex((e) => e.type === 'done')
-    expect(doneIndex).toBeGreaterThanOrEqual(0)
-    const after = events.slice(doneIndex + 1)
-    expect(after.some((e) => e.type === 'usage')).toBe(false)
-    expect(after.some((e) => e.type === 'session')).toBe(false)
-    expect(runner.tokensUsed()).toBe(150)
+  it('emits the LAST result as done and counts usage across all turns', async () => {
+    const { events, runner } = await run({ command: fake('two-results'), timeoutMs: 5000, tokenBudget: 500000 })
+    const dones = events.filter((e) => e.type === 'done')
+    expect(dones).toHaveLength(1)
+    expect(dones[0]).toEqual({ type: 'done', result: 'final answer' })
+    expect(runner.tokensUsed()).toBe(210) // 150 (m1) + 60 (m2)
   })
 
   it('seeds tokensUsed from alreadyUsed', async () => {

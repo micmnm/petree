@@ -18,6 +18,7 @@ export class CliRunner extends EventEmitter {
   private settled = false
   private closed = false
   private countedMessageIds = new Set<string>()
+  private lastResult: string | null = null
   private timeoutTimer?: NodeJS.Timeout
   private killTimer?: NodeJS.Timeout
 
@@ -56,7 +57,13 @@ export class CliRunner extends EventEmitter {
           if (this.countedMessageIds.has(event.messageId)) continue
           this.countedMessageIds.add(event.messageId)
         }
-        if (event.type === 'done' || event.type === 'error') this.settled = true
+        if (event.type === 'done') {
+          // not terminal yet — later turns may produce more results/usage.
+          // Remember the latest; the authoritative done is emitted at close.
+          this.lastResult = event.result
+          continue
+        }
+        if (event.type === 'error') this.settled = true
         this.emit('event', event)
         if (event.type === 'usage') {
           this.tokens += event.tokens
@@ -82,9 +89,15 @@ export class CliRunner extends EventEmitter {
 
     this.child.on('close', (code, signal) => {
       this.clearTimers()
-      if (!this.settled && code !== 0) {
-        const message = code !== null ? `exit code ${code}` : `killed by ${signal}`
-        this.emit('event', { type: 'error', message } satisfies RunnerEvent)
+      if (!this.settled) {
+        if (this.lastResult !== null) {
+          this.emit('event', { type: 'done', result: this.lastResult } satisfies RunnerEvent)
+        } else if (code !== 0) {
+          const message = code !== null ? `exit code ${code}` : `killed by ${signal}`
+          this.emit('event', { type: 'error', message } satisfies RunnerEvent)
+        }
+        // clean exit with no result at all → emit nothing; the launcher's
+        // post-run reconciliation fails the task ("run ended without terminal event")
       }
       this.settled = true
       this.emitClosed()

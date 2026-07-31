@@ -40,4 +40,12 @@ describe('parseStreamLine', () => {
     const line = JSON.stringify({ type: 'system', subtype: 'init', session_id: 's-1' })
     expect(parseStreamLine(line)).toEqual([{ type: 'log', line }, { type: 'session', sessionId: 's-1' }])
   })
+
+  it('uses the result text for is_error results even when subtype is "success"', () => {
+    // the real CLI reports auth failures as { is_error: true, subtype: 'success', result: '<message>' }
+    const line = JSON.stringify({ type: 'result', subtype: 'success', is_error: true, result: 'Failed to authenticate. API Error: 401 Invalid bearer token' })
+    const events = parseStreamLine(line)
+    expect(events).toContainEqual({ type: 'error', message: 'Failed to authenticate. API Error: 401 Invalid bearer token' })
+    expect(events.filter((e) => e.type === 'done')).toEqual([])
+  })
 })

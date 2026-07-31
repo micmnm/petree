@@ -24,7 +24,9 @@ export function parseStreamLine(line: string): RunnerEvent[] {
     events.push({ type: 'usage', tokens: (u.input_tokens ?? 0) + (u.output_tokens ?? 0), messageId: msg.message.id ?? null })
   }
   if (msg.type === 'result') {
-    if (msg.is_error) events.push({ type: 'error', message: String(msg.subtype ?? 'error') })
+    // is_error can arrive with subtype 'success' (subtype is the result
+    // category, not a pass/fail flag) — prefer the human-readable result text
+    if (msg.is_error) events.push({ type: 'error', message: String(msg.result ?? msg.subtype ?? 'error') })
     else events.push({ type: 'done', result: msg.result ?? '' })
   }
   return events

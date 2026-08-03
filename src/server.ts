@@ -76,6 +76,10 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
         defaultBranch: r.defaultBranch,
         image: r.image,
         defaultModel: r.defaultModel,
+        instructions: r.instructions,
+        setup: r.setup,
+        build: r.build,
+        test: r.test,
       })),
     )
   })

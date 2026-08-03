@@ -25,6 +25,42 @@ Create a task from the dashboard (prompt + repo names). Tasks run unattended
 inside containers; diffs stay in ~/.petree/work/<task-id>/ for your review.
 Pushing is always manual, from the host.
 
+## Per-repo settings
+
+`~/.petree/repos.yaml` carries standing instructions per repo. Petree appends
+them to the prompt of every task touching that repo, so you don't retype
+"run the tests" each time:
+
+```yaml
+defaults:
+  instructions: |          # applied to every task, whatever its repos
+    Write a failing test first, then make it pass.
+
+repos:
+  admin-ui:
+    url: git@github.com:org/admin-ui.git
+    image: sandbox-node
+    instructions: |        # applied to tasks touching this repo
+      Never edit src/generated/ — it is codegen output.
+      Keep public component props backwards compatible.
+    setup: ["pnpm install"]         # run before making changes
+    build: ["pnpm build"]           # must pass before reporting success
+    test: ["pnpm test", "pnpm typecheck"]
+```
+
+All four keys are optional; a command list may also be a bare string
+(`test: pnpm test`). Repos with none of them behave exactly as before — the
+prompt is passed through untouched.
+
+The composed prompt is built at launch, not at task creation, so editing
+`repos.yaml` also affects re-runs and resumes of existing tasks. The dashboard's
+create form shows the conventions attached to the repos you select.
+
+**These are prompt-level constraints, not a host-side gate.** When `build`/`test`
+commands are configured, the prompt tells the agent it must run them and must not
+report success on a failure — but petree does not itself re-run them after the
+container exits. Check the Result and Log tabs before pushing.
+
 The **Log** tab summarizes the run instead of dumping stream-json: what the
 agent is doing now, its todo list, turn/tool/file/error counts, token budget
 use, and a timeline of tool calls (click one for its input and output). Switch

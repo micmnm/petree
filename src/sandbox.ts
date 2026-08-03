@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { PetreeConfig } from './config.js'
+import { composePrompt } from './prompt.js'
 import type { TaskRecord } from './store.js'
 
 export function readToken(home: string): string {
@@ -29,7 +30,7 @@ export function buildDockerCommand(
     '-e', `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`,
     '-w', '/work',
     image,
-    'claude', '-p', task.prompt,
+    'claude', '-p', composePrompt(task, cfg),
     ...(task.model ? ['--model', task.model] : []),
     '--output-format', 'stream-json', '--verbose',
     '--dangerously-skip-permissions',

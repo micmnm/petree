@@ -7,7 +7,10 @@ export interface RepoConfig {
   url: string
   defaultBranch: string
   image: string
+  /** Free-form prompt text prepended to every task touching this repo. */
+  instructions: string
   setup: string[]
+  build: string[]
   test: string[]
   skills: string[]
   defaultModel: string | null
@@ -18,6 +21,20 @@ export interface Defaults {
   tokenBudget: number
   concurrency: number
   defaultModel: string | null
+  /** Free-form prompt text prepended to every task, whatever its repos. */
+  instructions: string
+}
+
+// Command lists accept either a YAML list or a bare string, so both
+// `test: ["npm test"]` and `test: npm test` work.
+function toList(value: unknown): string[] {
+  if (value == null) return []
+  const items = Array.isArray(value) ? value : [value]
+  return items.map((v) => String(v).trim()).filter(Boolean)
+}
+
+function toText(value: unknown): string {
+  return value == null ? '' : String(value).trim()
 }
 
 export interface PetreeConfig {
@@ -40,9 +57,11 @@ export function loadConfig(
       url: String(value.url),
       defaultBranch: String(value.default_branch ?? 'main'),
       image: String(value.image),
-      setup: (value.setup as string[]) ?? [],
-      test: (value.test as string[]) ?? [],
-      skills: (value.skills as string[]) ?? [],
+      instructions: toText(value.instructions),
+      setup: toList(value.setup),
+      build: toList(value.build),
+      test: toList(value.test),
+      skills: toList(value.skills),
       defaultModel: value.default_model != null ? String(value.default_model) : null,
     }
   }
@@ -53,6 +72,7 @@ export function loadConfig(
       tokenBudget: Number(d.token_budget ?? 500_000),
       concurrency: Number(d.concurrency ?? 3),
       defaultModel: d.default_model != null ? String(d.default_model) : null,
+      instructions: toText(d.instructions),
     },
     repos,
     allowClone: (raw.allow_clone as string[]) ?? [],

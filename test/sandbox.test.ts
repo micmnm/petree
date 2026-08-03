@@ -8,8 +8,8 @@ import { buildDockerCommand, readToken } from '../src/sandbox.js'
 
 const cfg: PetreeConfig = {
   home: '/petree-home',
-  defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
-  repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
+  defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
+  repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
   allowClone: [],
 }
 
@@ -44,6 +44,23 @@ describe('buildDockerCommand', () => {
     expect(cmd[i + 1]).toBe('haiku')
     expect(cmd.indexOf('-p')).toBeLessThan(i)
     expect(i).toBeLessThan(cmd.indexOf('--output-format'))
+  })
+
+  it('passes the repo conventions through in the -p prompt', () => {
+    const withRules: PetreeConfig = {
+      ...cfg,
+      repos: { demo: { ...cfg.repos.demo, instructions: 'Never edit src/generated/.', test: ['npm test'] } },
+    }
+    const cmd = buildDockerCommand(task, withRules, '/w', 't')
+    const prompt = cmd[cmd.indexOf('-p') + 1]
+    expect(prompt.startsWith('fix the bug')).toBe(true)
+    expect(prompt).toContain('Never edit src/generated/.')
+    expect(prompt).toContain('`npm test`')
+  })
+
+  it('passes the bare prompt when the repo has no conventions', () => {
+    const cmd = buildDockerCommand(task, cfg, '/w', 't')
+    expect(cmd[cmd.indexOf('-p') + 1]).toBe('fix the bug')
   })
 
   it('omits --model when the task model is null', () => {

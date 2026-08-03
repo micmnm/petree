@@ -18,8 +18,8 @@ function makeFixtureRepo(): string {
 function cfgWith(url: string): PetreeConfig {
   return {
     home: '/unused',
-    defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
-    repos: { demo: { url, defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
+    defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
+    repos: { demo: { url, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
     allowClone: [],
   }
 }

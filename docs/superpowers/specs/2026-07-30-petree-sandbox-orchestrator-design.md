@@ -86,13 +86,18 @@ defaults:
   timeout_minutes: 30
   token_budget: 500000        # per task, resumable
   concurrency: 3
+  instructions: |             # prepended to every task's prompt
+    Write a failing test first, then make it pass.
 
 repos:
   druid-connector:
     url: git@github.com:org/Druid.Connector.git
     default_branch: develop
     image: sandbox-dotnet
+    instructions: |                   # prepended to tasks touching this repo
+      Never edit the generated client in src/Generated/.
     setup: ["dotnet restore"]
+    build: ["dotnet build"]
     test: ["dotnet test"]
     skills: [".claude/skills"]        # repo-local skills, mounted in
   admin-ui:
@@ -108,6 +113,12 @@ allow_clone:                  # private repos claude may request mid-task
 A task names the repos it needs; multi-repo tasks get them cloned side by side
 under `/work/<repo>` in one sandbox. New stacks = new image name, no
 orchestrator changes.
+
+`instructions` plus the `setup`/`build`/`test` command lists are composed into
+the prompt handed to `claude -p` (`src/prompt.ts`), at launch time rather than
+task-creation time so registry edits reach re-runs and resumes. Phase 1 enforces
+build/test through the prompt only — the orchestrator does not re-run the
+commands host-side after the container exits.
 
 ### 3.3 Sandboxes
 

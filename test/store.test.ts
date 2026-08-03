@@ -279,3 +279,109 @@ describe('TaskStore retention settings & prune', () => {
     expect(s.get(pairReordered.id)).toBeDefined()
   })
 })
+
+describe('restart recovery', () => {
+  function toRunning(s: TaskStore, id: string) {
+    s.transition(id, 'provisioning')
+    s.transition(id, 'running')
+  }
+
+  it('new tasks default restarts 0, no retryAt, no startedAt, logOffset 0', () => {
+    const t = store.create(input)
+    expect(t.restarts).toBe(0)
+    expect(t.retryAt).toBeNull()
+    expect(t.startedAt).toBeNull()
+    expect(t.logOffset).toBe(0)
+  })
+
+  it('patch persists startedAt and logOffset', () => {
+    const t = store.create(input)
+    const patched = store.patch(t.id, { startedAt: '2026-08-03T10:00:00.000Z', logOffset: 4096 })
+    expect(patched.startedAt).toBe('2026-08-03T10:00:00.000Z')
+    expect(patched.logOffset).toBe(4096)
+  })
+
+  it('recoveryRequeue from running: queued, restarts 1, retryAt ~now+30s', () => {
+    const t = store.create(input)
+    toRunning(store, t.id)
+    const now = new Date('2026-08-03T10:00:00.000Z')
+    const r = store.recoveryRequeue(t.id, now)
+    expect(r.state).toBe('queued')
+    expect(r.restarts).toBe(1)
+    expect(r.retryAt).toBe('2026-08-03T10:00:30.000Z')
+  })
+
+  it('backoff grows 30s, 2m, 8m and caps at 15m', () => {
+    const t = store.create(input)
+    const now = new Date('2026-08-03T10:00:00.000Z')
+    const delays: number[] = []
+    for (let i = 0; i < 5; i++) {
+      store.transition(t.id, 'provisioning')
+      const r = store.recoveryRequeue(t.id, now)
+      delays.push(Date.parse(r.retryAt!) - now.getTime())
+    }
+    expect(delays).toEqual([30_000, 120_000, 480_000, 900_000, 900_000])
+  })
+
+  it('fails instead of requeueing after MAX_RESTARTS', () => {
+    const t = store.create(input)
+    for (let i = 0; i < 5; i++) {
+      store.transition(t.id, 'provisioning')
+      store.recoveryRequeue(t.id)
+    }
+    store.transition(t.id, 'provisioning')
+    const r = store.recoveryRequeue(t.id)
+    expect(r.state).toBe('failed')
+    expect(r.error).toMatch(/gave up after 5 recovery restarts/)
+  })
+
+  it('recoveryRequeue works from provisioning and rejects other states', () => {
+    const t = store.create(input)
+    store.transition(t.id, 'provisioning')
+    expect(store.recoveryRequeue(t.id).state).toBe('queued')
+    expect(() => store.recoveryRequeue(t.id)).toThrow(/cannot recovery-requeue/)
+  })
+
+  it('nextQueued skips tasks whose retryAt is in the future', () => {
+    const t = store.create(input)
+    toRunning(store, t.id)
+    const now = new Date('2026-08-03T10:00:00.000Z')
+    store.recoveryRequeue(t.id, now)
+    expect(store.nextQueued(new Date('2026-08-03T10:00:10.000Z'))).toBeUndefined()
+    expect(store.nextQueued(new Date('2026-08-03T10:00:31.000Z'))?.id).toBe(t.id)
+  })
+
+  it('a turn ending normally resets restarts and retryAt', () => {
+    const t = store.create(input)
+    toRunning(store, t.id)
+    store.recoveryRequeue(t.id)
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    const done = store.transition(t.id, 'done')
+    expect(done.restarts).toBe(0)
+    expect(done.retryAt).toBeNull()
+  })
+
+  it('manual requeue (e.g. resume from failed) clears the backoff gate', () => {
+    const t = store.create(input)
+    toRunning(store, t.id)
+    store.recoveryRequeue(t.id)
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'failed')
+    const r = store.transition(t.id, 'queued')
+    expect(r.retryAt).toBeNull()
+    expect(r.restarts).toBe(0)
+  })
+
+  it('followUp resets restarts and retryAt', () => {
+    const t = store.create(input)
+    toRunning(store, t.id)
+    store.recoveryRequeue(t.id)
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'done')
+    const f = store.followUp(t.id, 'next step')
+    expect(f.restarts).toBe(0)
+    expect(f.retryAt).toBeNull()
+  })
+})

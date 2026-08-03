@@ -3,13 +3,29 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { describe, it, expect } from 'vitest'
+import { beforeEach, describe, it, expect } from 'vitest'
 import type { PetreeConfig } from '../src/config.js'
+import { prepareWorkspace } from '../src/git.js'
 import { TaskStore } from '../src/store.js'
 import type { TaskRecord } from '../src/store.js'
 import { makeLauncher } from '../src/launcher.js'
+import type { SandboxCommands } from '../src/sandbox.js'
+import { inspectContainerState } from '../src/sandbox.js'
 
-const fakeClaude = fileURLToPath(new URL('./fixtures/fake-claude.js', import.meta.url))
+const shim = fileURLToPath(new URL('./fixtures/fake-docker.js', import.meta.url))
+
+function shimCommands(scenario: string, name: string): SandboxCommands {
+  const d = (...a: string[]) => [process.execPath, shim, ...a]
+  return {
+    containerName: name,
+    create: d('run', name, scenario),
+    stream: d('logs', '-f', name),
+    wait: d('wait', name),
+    kill: d('stop', name),
+    remove: d('rm', name),
+    inspect: d('inspect', name),
+  }
+}
 
 function makeFixtureRepo(): string {
   const dir = mkdtempSync(join(tmpdir(), 'petree-fixture-'))
@@ -44,13 +60,17 @@ function setup(input: { tokenBudget?: number; timeoutMinutes?: number } = {}): {
   return { home, cfg, store, task }
 }
 
+beforeEach(() => {
+  process.env.FAKE_DOCKER_HOME = mkdtempSync(join(tmpdir(), 'fdock-'))
+})
+
 describe('makeLauncher', () => {
   it('runs a task end to end: clone, run, record usage and result', async () => {
     const { home, cfg, store, task } = setup()
     mkdirSync(join(home, 'logs'), { recursive: true })
 
     const launch = makeLauncher(cfg, store, {
-      buildCommand: () => [process.execPath, fakeClaude, 'ok'],
+      buildCommands: (t) => shimCommands('ok', `petree-${t.id}`),
     })
     await launch(task)
 
@@ -67,7 +87,7 @@ describe('makeLauncher', () => {
     const { cfg, store, task } = setup({ tokenBudget: 1000 })
 
     const launch = makeLauncher(cfg, store, {
-      buildCommand: () => [process.execPath, fakeClaude, 'big-usage'],
+      buildCommands: (t) => shimCommands('big-usage', `petree-${t.id}`),
     })
     await launch(task)
 
@@ -79,7 +99,7 @@ describe('makeLauncher', () => {
     const { cfg, store, task } = setup()
 
     const launch = makeLauncher(cfg, store, {
-      buildCommand: () => [process.execPath, fakeClaude, 'crash'],
+      buildCommands: (t) => shimCommands('crash', `petree-${t.id}`),
     })
     await launch(task)
 
@@ -91,7 +111,7 @@ describe('makeLauncher', () => {
     const { cfg, store, task } = setup()
 
     const launch = makeLauncher(cfg, store, {
-      buildCommand: () => [process.execPath, fakeClaude, 'silent'],
+      buildCommands: (t) => shimCommands('silent', `petree-${t.id}`),
     })
     await launch(task)
 
@@ -103,7 +123,7 @@ describe('makeLauncher', () => {
     const { cfg, store, task } = setup()
 
     const launch = makeLauncher(cfg, store, {
-      buildCommand: () => ['no-such-binary-petree'],
+      buildCommands: (t) => ({ ...shimCommands('ok', `petree-${t.id}`), create: ['no-such-binary-petree'] }),
     })
     await launch(task)
 
@@ -116,10 +136,10 @@ describe('makeLauncher', () => {
     mkdirSync(join(home, 'logs'), { recursive: true })
 
     const launch = makeLauncher(cfg, store, {
-      buildCommand: () => [process.execPath, fakeClaude, 'slow'], // emits its result after 2s
+      buildCommands: (t) => shimCommands('slow', `petree-${t.id}`), // emits its result after 2s
     })
     const running = launch(task)
-    // give the child a moment to spawn before killing it
+    // give the container a moment to start before killing it
     await new Promise((r) => setTimeout(r, 200))
     const stopped = await launch.stop(task.id)
     expect(stopped).toBe(true)
@@ -133,7 +153,7 @@ describe('makeLauncher', () => {
     mkdirSync(join(home, 'logs'), { recursive: true })
 
     const launch = makeLauncher(cfg, store, {
-      buildCommand: () => [process.execPath, fakeClaude, 'ok'],
+      buildCommands: (t) => shimCommands('ok', `petree-${t.id}`),
     })
     await launch(task)
     expect(await launch.stop(task.id)).toBe(false)
@@ -143,7 +163,7 @@ describe('makeLauncher', () => {
     const { cfg, store, task } = setup({ timeoutMinutes: 0.005 })
 
     const launch = makeLauncher(cfg, store, {
-      buildCommand: () => [process.execPath, fakeClaude, 'slow'],
+      buildCommands: (t) => shimCommands('slow', `petree-${t.id}`),
     })
     await launch(task)
 
@@ -152,39 +172,40 @@ describe('makeLauncher', () => {
   })
 
   it('captures the result text on a successful run', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
+    const { home, cfg, store, task } = setup()
     mkdirSync(join(home, 'logs'), { recursive: true })
-    const cfg: PetreeConfig = {
-      home,
-      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
-      allowClone: [],
-    }
-    const store = new TaskStore(join(home, 'petree.db'))
-    const created = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
-    const task = store.transition(created.id, 'provisioning')
-    const launch = makeLauncher(cfg, store, { buildCommand: () => [process.execPath, fakeClaude, 'ok'] })
+    const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })
     await launch(task)
     expect(store.get(task.id)?.state).toBe('done')
     expect(store.get(task.id)?.result).toBe('all tests pass')
   })
 
   it('stores the final result of a multi-result run', async () => {
-    const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
+    const { home, cfg, store, task } = setup()
     mkdirSync(join(home, 'logs'), { recursive: true })
-    const cfg: PetreeConfig = {
-      home,
-      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
-      allowClone: [],
-    }
-    const store = new TaskStore(join(home, 'petree.db'))
-    const created = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
-    const task = store.transition(created.id, 'provisioning')
-    const launch = makeLauncher(cfg, store, { buildCommand: () => [process.execPath, fakeClaude, 'two-results'] })
+    const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('two-results', `petree-${t.id}`) })
     await launch(task)
     expect(store.get(task.id)?.state).toBe('done')
     expect(store.get(task.id)?.result).toBe('final answer')
+  })
+
+  it('persists startedAt and logOffset when launching', async () => {
+    const { home, cfg, store, task } = setup()
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })
+    await launch(task)
+    const finished = store.get(task.id)!
+    expect(finished.startedAt).toBeTruthy()
+    expect(finished.logOffset).toBe(0)
+  })
+
+  it('removes the container after the run', async () => {
+    const { home, cfg, store, task } = setup()
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const dockerHome = process.env.FAKE_DOCKER_HOME!
+    const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })
+    await launch(task)
+    expect(existsSync(join(dockerHome, `petree-${task.id}.pid`))).toBe(false)
   })
 
   it('commits the agent changes on the task branch after a run', async () => {
@@ -200,11 +221,17 @@ describe('makeLauncher', () => {
     const created = store.create({ prompt: 'edit the readme', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
     const task = store.transition(created.id, 'provisioning')
     // fake "claude" that writes a file into /work/demo then emits a clean done
-    const writer = [process.execPath, '-e',
+    process.env.FAKE_CONTAINER_EXEC = JSON.stringify([process.execPath, '-e',
       `const fs=require('fs');fs.writeFileSync(process.env.WD+'/demo/added.txt','x');` +
-      `console.log(JSON.stringify({type:'result',subtype:'success',result:'done'}))`]
-    const launch = makeLauncher(cfg, store, { buildCommand: (t, workDir) => { process.env.WD = workDir; return writer } })
-    await launch(task)
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'done'}))`])
+    process.env.WD = join(home, 'work', task.id)
+    try {
+      const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })
+      await launch(task)
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
     const repoDir = join(home, 'work', task.id, 'demo')
     const msg = execFileSync('git', ['-C', repoDir, 'log', '-1', '--pretty=%s'], { encoding: 'utf8' }).trim()
     expect(msg).toContain(`petree ${task.id}`)
@@ -226,11 +253,17 @@ describe('makeLauncher', () => {
     const task = store.transition(created.id, 'provisioning')
     // fake "claude" that wrecks the repo's .git dir before exiting cleanly, so the
     // post-run commit step fails
-    const wrecker = [process.execPath, '-e',
+    process.env.FAKE_CONTAINER_EXEC = JSON.stringify([process.execPath, '-e',
       `const fs=require('fs');fs.rmSync(process.env.WD+'/demo/.git',{recursive:true,force:true});` +
-      `console.log(JSON.stringify({type:'result',subtype:'success',result:'done'}))`]
-    const launch = makeLauncher(cfg, store, { buildCommand: (t, workDir) => { process.env.WD = workDir; return wrecker } })
-    await launch(task)
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'done'}))`])
+    process.env.WD = join(home, 'work', task.id)
+    try {
+      const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })
+      await launch(task)
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
     const finished = store.get(task.id)!
     expect(finished.state).toBe('done')
     expect(finished.result).toBe('done')
@@ -242,8 +275,8 @@ describe('makeLauncher', () => {
     mkdirSync(join(home, 'logs'), { recursive: true })
     const cfg: PetreeConfig = {
       home,
-      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
+      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
       allowClone: [],
     }
     const store = new TaskStore(join(home, 'petree.db'))
@@ -252,15 +285,23 @@ describe('makeLauncher', () => {
       `const fs=require('fs');fs.writeFileSync(process.env.WD+'/demo/${file}','x');` +
       `console.log(JSON.stringify({type:'result',subtype:'success',result:'done ${file}'}))`]
     let file = 'turn1.txt'
-    const launch = makeLauncher(cfg, store, { buildCommand: (t, workDir) => { process.env.WD = workDir; return writer(file) } })
+    process.env.WD = join(home, 'work', created.id)
+    const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })
 
-    await launch(store.transition(created.id, 'provisioning'))
-    expect(store.get(created.id)?.state).toBe('done')
+    try {
+      process.env.FAKE_CONTAINER_EXEC = JSON.stringify(writer(file))
+      await launch(store.transition(created.id, 'provisioning'))
+      expect(store.get(created.id)?.state).toBe('done')
 
-    const followed = store.followUp(created.id, 'implement it')
-    expect(followed.state).toBe('queued')
-    file = 'turn2.txt'
-    await launch(store.transition(created.id, 'provisioning'))
+      const followed = store.followUp(created.id, 'implement it')
+      expect(followed.state).toBe('queued')
+      file = 'turn2.txt'
+      process.env.FAKE_CONTAINER_EXEC = JSON.stringify(writer(file))
+      await launch(store.transition(created.id, 'provisioning'))
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
 
     const finished = store.get(created.id)!
     expect(finished.state).toBe('done')
@@ -274,5 +315,99 @@ describe('makeLauncher', () => {
     const subjects = execFileSync('git', ['-C', repoDir, 'log', '--pretty=%s'], { encoding: 'utf8' }).trim().split('\n')
     expect(subjects.filter((s) => s.startsWith(`petree ${created.id}`)).length).toBe(2)
     expect(subjects[0]).toContain('implement it')
+  })
+
+  it('reattach on a live container finalizes the turn without double-counting', async () => {
+    const { home, cfg, store, task } = setup()
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const dockerHome = process.env.FAKE_DOCKER_HOME!
+    const name = `petree-${task.id}`
+    // simulate the pre-restart server: container started, first 2 lines already
+    // streamed into the petree log and their usage persisted
+    execFileSync(process.execPath, [shim, 'run', name, 'slow'])
+    store.transition(task.id, 'running')
+    store.patch(task.id, { startedAt: new Date().toISOString(), logOffset: 0 })
+    await new Promise((r) => setTimeout(r, 300)) // let init+usage lines land in the fake log
+    const streamed = readFileSync(join(dockerHome, `${name}.log`), 'utf8')
+    writeFileSync(join(home, 'logs', `${task.id}.log`), streamed, { mode: 0o600 })
+    store.addUsage(task.id, 150)
+
+    const launch = makeLauncher(cfg, store, {
+      buildCommands: (t) => shimCommands('slow', `petree-${t.id}`),
+    })
+    await launch.reattach(store.get(task.id)!)
+
+    const finished = store.get(task.id)!
+    expect(finished.state).toBe('done')
+    expect(finished.result).toBe('too late')
+    expect(finished.tokensUsed).toBe(150)
+    const log = readFileSync(join(home, 'logs', `${task.id}.log`), 'utf8')
+    expect(log.match(/sess-123/g)).toHaveLength(1)
+  })
+
+  it('reattach on an exited container completes the turn and the commit capture', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const cfg: PetreeConfig = {
+      home,
+      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+      allowClone: [],
+    }
+    const store = new TaskStore(join(home, 'petree.db'))
+    const created = store.create({ prompt: 'edit the readme', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const name = `petree-${created.id}`
+    const launch = makeLauncher(cfg, store, {
+      buildCommands: (t) => shimCommands('ok', `petree-${t.id}`),
+    })
+    const task = store.transition(created.id, 'provisioning')
+    process.env.FAKE_CONTAINER_EXEC = JSON.stringify([process.execPath, '-e',
+      `const fs=require('fs');fs.writeFileSync('${join(home, 'work', created.id, 'demo')}/offline.txt','x');` +
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'offline done'}))`])
+    try {
+      // simulate: container ran to completion while the server was down
+      store.transition(task.id, 'running')
+      store.patch(task.id, { startedAt: new Date().toISOString(), logOffset: 0 })
+      await prepareWorkspace(cfg, task.repos, join(home, 'work', task.id), task.id)
+      execFileSync(process.execPath, [shim, 'run', name, 'ok'])
+      execFileSync(process.execPath, [shim, 'wait', name])
+      await launch.reattach(store.get(task.id)!)
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+    }
+    const finished = store.get(task.id)!
+    expect(finished.state).toBe('done')
+    expect(finished.result).toBe('offline done')
+    const repoDir = join(home, 'work', task.id, 'demo')
+    const msg = execFileSync('git', ['-C', repoDir, 'log', '-1', '--pretty=%s'], { encoding: 'utf8' }).trim()
+    expect(msg).toContain(`petree ${task.id}`)
+  })
+
+  it('reattach clamps the timeout to the persisted turn start', async () => {
+    const { home, cfg, store, task } = setup({ timeoutMinutes: 0.01 }) // 600ms
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    await prepareWorkspace(cfg, task.repos, join(home, 'work', task.id), task.id)
+    const name = `petree-${task.id}`
+    execFileSync(process.execPath, [shim, 'run', name, 'slow'])
+    store.transition(task.id, 'running')
+    store.patch(task.id, { startedAt: new Date(Date.now() - 60_000).toISOString(), logOffset: 0 })
+    const launch = makeLauncher(cfg, store, {
+      buildCommands: (t) => shimCommands('slow', `petree-${t.id}`),
+    })
+    await launch.reattach(store.get(task.id)!)
+    expect(store.get(task.id)?.state).toBe('paused-limit')
+    expect(store.get(task.id)?.error).toBe('timeout')
+  })
+})
+
+describe('inspectContainerState via the shim', () => {
+  it('reports running/exited/absent against the fake docker daemon', async () => {
+    const name = 'petree-inspect-1'
+    execFileSync(process.execPath, [shim, 'run', name, 'slow'])
+    expect(await inspectContainerState([process.execPath, shim, 'inspect', name])).toBe('running')
+    execFileSync(process.execPath, [shim, 'stop', name])
+    expect(await inspectContainerState([process.execPath, shim, 'inspect', name])).toBe('exited')
+    execFileSync(process.execPath, [shim, 'rm', name])
+    expect(await inspectContainerState([process.execPath, shim, 'inspect', name])).toBe('absent')
   })
 })

@@ -46,7 +46,7 @@ beforeEach(async () => {
   store = new TaskStore(join(home, 'db'))
   // concurrency 0: nothing launches during API tests; stop() always reports
   // "nothing to stop" since no real process ever runs here.
-  const launch: Launcher = Object.assign(async () => {}, { stop: async () => false })
+  const launch: Launcher = Object.assign(async () => {}, { stop: async () => false, reattach: async () => {} })
   const scheduler = new Scheduler(store, 0, launch)
   const app = makeApp(cfg, store, scheduler, launch)
   await new Promise<void>((r) => { server = app.listen(0, () => r()) })

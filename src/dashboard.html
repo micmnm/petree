@@ -149,6 +149,7 @@
           <div><strong>${esc(r.repo)}</strong> <span class="muted mono">${esc(r.branch)} vs ${esc(r.baseBranch)}</span></div>
           <dt>review locally</dt>
           <div class="cmd"><span>${esc(cmd)}</span>${copyBtn(cmd)}</div>
+          <dt>summary</dt><pre class="diff" style="max-height:none">${esc(r.stat)}</pre>
           <dt>diff</dt>
           <div><button class="copy" data-copy="${encodeURIComponent(r.patch)}">copy diff</button></div>
           <pre class="diff">${esc(r.patch)}</pre>
@@ -179,7 +180,11 @@
   async function refresh() {
     const tasks = await (await fetch('/api/tasks')).json()
     document.getElementById('tasks').innerHTML = tasks.map(taskRow).join('')
-    renderTabs(); await renderBody()
+    renderTabs()
+    // Only auto-refresh live tabs; Changes/Result render on tab entry so the 3s
+    // poll can't reset the push-target input, re-run git diff, or detach the
+    // push-result node mid-push.
+    if (selected && (tab === 'Overview' || tab === 'Log')) await renderBody()
   }
   setInterval(refresh, 3000); refresh()
 </script>

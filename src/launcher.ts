@@ -31,6 +31,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     const workDir = join(cfg.home, 'work', task.id)
     const logFile = join(cfg.home, 'logs', `${task.id}.log`)
     mkdirSync(join(cfg.home, 'logs'), { recursive: true })
+    mkdirSync(join(cfg.home, 'sessions', task.id), { recursive: true })
 
     if (cancelled.delete(task.id)) {
       store.transition(task.id, 'cancelled')

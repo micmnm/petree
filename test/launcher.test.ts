@@ -60,6 +60,7 @@ describe('makeLauncher', () => {
     expect(finished.sessionId).toBe('sess-123')
     expect(existsSync(join(home, 'work', task.id, 'demo', 'README.md'))).toBe(true)
     expect(readFileSync(join(home, 'logs', `${task.id}.log`), 'utf8')).toContain('sess-123')
+    expect(existsSync(join(home, 'sessions', task.id))).toBe(true)
   })
 
   it('pauses the task when a limit is hit', async () => {

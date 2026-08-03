@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
@@ -31,9 +31,22 @@ describe('buildDockerCommand', () => {
     expect(cmd.join(' ')).not.toContain('ANTHROPIC_API_KEY')
   })
 
-  it('adds --resume when the task has a session id', () => {
-    const cmd = buildDockerCommand({ ...task, sessionId: 'sess-9' }, cfg, '/w', 't')
-    expect(cmd.join(' ')).toContain('--resume sess-9')
+  it('mounts the per-task session dir at /home/dev/.claude', () => {
+    const cmd = buildDockerCommand(task, cfg, '/tmp/work/abc123', 'tok-1')
+    expect(cmd.join(' ')).toContain('/petree-home/sessions/abc123:/home/dev/.claude')
+  })
+
+  it('adds --resume only when the session transcript exists on the host', () => {
+    const home = mkdtempSync(join(tmpdir(), 'petree-sess-'))
+    const cfgReal = { ...cfg, home }
+    // transcript missing: fresh session instead of a crashing --resume
+    const without = buildDockerCommand({ ...task, sessionId: 'sess-9' }, cfgReal, '/w', 't')
+    expect(without).not.toContain('--resume')
+    // transcript present (as written by a previous containerized run): resume
+    mkdirSync(join(home, 'sessions', task.id, 'projects', '-work'), { recursive: true })
+    writeFileSync(join(home, 'sessions', task.id, 'projects', '-work', 'sess-9.jsonl'), '{}\n')
+    const withResume = buildDockerCommand({ ...task, sessionId: 'sess-9' }, cfgReal, '/w', 't')
+    expect(withResume.join(' ')).toContain('--resume sess-9')
   })
 
   it('appends --model when the task has a model', () => {

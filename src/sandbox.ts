@@ -26,6 +26,7 @@ export function buildDockerCommand(
     '-v', `${workDir}:/work`,
     '-v', `${join(cfg.home, 'shared', 'skills')}:/petree/skills:ro`,
     '-v', `${join(cfg.home, 'shared', 'findings')}:/petree/findings`,
+    '-v', `${join(cfg.home, 'sessions', task.id)}:/home/dev/.claude`,
     '-e', `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`,
     '-w', '/work',
     image,
@@ -34,6 +35,13 @@ export function buildDockerCommand(
     '--output-format', 'stream-json', '--verbose',
     '--dangerously-skip-permissions',
   ]
-  if (task.sessionId) cmd.push('--resume', task.sessionId)
+  // Resume only when the transcript from a previous run actually exists on the
+  // host (cwd inside the container is always /work, so the project key is
+  // stable). A stale sessionId with no transcript must start a fresh session,
+  // not crash the run.
+  const transcript = task.sessionId
+    ? join(cfg.home, 'sessions', task.id, 'projects', '-work', `${task.sessionId}.jsonl`)
+    : null
+  if (task.sessionId && transcript && existsSync(transcript)) cmd.push('--resume', task.sessionId)
   return cmd
 }

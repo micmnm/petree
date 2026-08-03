@@ -236,4 +236,43 @@ describe('makeLauncher', () => {
     expect(finished.result).toBe('done')
     expect(finished.error).toMatch(/commit failed for demo/)
   })
+
+  it('runs a follow-up turn in the same workspace, stacking commits on the task branch', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const cfg: PetreeConfig = {
+      home,
+      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
+      allowClone: [],
+    }
+    const store = new TaskStore(join(home, 'petree.db'))
+    const created = store.create({ prompt: 'investigate', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const writer = (file: string) => [process.execPath, '-e',
+      `const fs=require('fs');fs.writeFileSync(process.env.WD+'/demo/${file}','x');` +
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'done ${file}'}))`]
+    let file = 'turn1.txt'
+    const launch = makeLauncher(cfg, store, { buildCommand: (t, workDir) => { process.env.WD = workDir; return writer(file) } })
+
+    await launch(store.transition(created.id, 'provisioning'))
+    expect(store.get(created.id)?.state).toBe('done')
+
+    const followed = store.followUp(created.id, 'implement it')
+    expect(followed.state).toBe('queued')
+    file = 'turn2.txt'
+    await launch(store.transition(created.id, 'provisioning'))
+
+    const finished = store.get(created.id)!
+    expect(finished.state).toBe('done')
+    expect(finished.result).toBe('done turn2.txt')
+    expect(finished.turns).toHaveLength(1)
+    const repoDir = join(home, 'work', created.id, 'demo')
+    expect(existsSync(join(repoDir, 'turn1.txt'))).toBe(true)
+    expect(existsSync(join(repoDir, 'turn2.txt'))).toBe(true)
+    const branch = execFileSync('git', ['-C', repoDir, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim()
+    expect(branch).toBe(`petree/${created.id}`)
+    const subjects = execFileSync('git', ['-C', repoDir, 'log', '--pretty=%s'], { encoding: 'utf8' }).trim().split('\n')
+    expect(subjects.filter((s) => s.startsWith(`petree ${created.id}`)).length).toBe(2)
+    expect(subjects[0]).toContain('implement it')
+  })
 })

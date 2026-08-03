@@ -37,7 +37,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
       return
     }
 
-    prepareWorkspace(cfg, task.repos, workDir, task.id)
+    await prepareWorkspace(cfg, task.repos, workDir, task.id)
 
     if (cancelled.delete(task.id)) {
       store.transition(task.id, 'cancelled')

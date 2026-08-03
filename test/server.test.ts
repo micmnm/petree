@@ -257,4 +257,53 @@ describe('API', () => {
     expect(body.ok).toBe(false)
     expect(body.output.length).toBeGreaterThan(0)
   })
+
+  it('queues a follow-up turn on a done task via /next', async () => {
+    const t = store.create({ prompt: 'investigate', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.setResult(t.id, 'findings')
+    store.transition(t.id, 'done')
+    const res = await fetch(`${base}/api/tasks/${t.id}/next`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'now implement it', model: 'haiku' }),
+    })
+    expect(res.status).toBe(200)
+    const task = await res.json()
+    expect(task.state).toBe('queued')
+    expect(task.prompt).toBe('now implement it')
+    expect(task.model).toBe('haiku')
+    expect(task.turns).toHaveLength(1)
+    expect(task.turns[0].prompt).toBe('investigate')
+    expect(task.turns[0].result).toBe('findings')
+  })
+
+  it('rejects /next with a missing prompt, unknown model, wrong state, or unknown id', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'done')
+    const noPrompt = await fetch(`${base}/api/tasks/${t.id}/next`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}),
+    })
+    expect(noPrompt.status).toBe(400)
+    const badModel = await fetch(`${base}/api/tasks/${t.id}/next`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', model: 'gpt-4' }),
+    })
+    expect(badModel.status).toBe(400)
+
+    const running = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    store.transition(running.id, 'provisioning')
+    store.transition(running.id, 'running')
+    const wrongState = await fetch(`${base}/api/tasks/${running.id}/next`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'x' }),
+    })
+    expect(wrongState.status).toBe(409)
+
+    const missing = await fetch(`${base}/api/tasks/zzzzzzzz/next`, {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'x' }),
+    })
+    expect(missing.status).toBe(404)
+  })
 })

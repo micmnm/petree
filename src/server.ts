@@ -156,6 +156,32 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     }
   })
 
+
+  app.post('/api/tasks/:id/next', (req, res) => {
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    const { prompt, model } = (req.body ?? {}) as { prompt?: string; model?: string }
+    if (typeof prompt !== 'string' || !prompt.trim()) {
+      res.status(400).json({ error: 'prompt is required' })
+      return
+    }
+    if (model !== undefined && !MODELS.includes(model)) {
+      res.status(400).json({ error: `unknown model: ${model}` })
+      return
+    }
+    if (!['done', 'failed', 'cancelled'].includes(t.state)) {
+      res.status(409).json({ error: `cannot follow up from state ${t.state}` })
+      return
+    }
+    // Omitted model keeps the task's current one; a given model resolves the
+    // same way task creation does ('default' -> config defaults).
+    const effectiveModel = model !== undefined
+      ? resolveModel(model, cfg.repos[t.repos[0]].defaultModel, cfg.defaults.defaultModel)
+      : undefined
+    res.json(store.followUp(t.id, prompt, effectiveModel))
+    void scheduler.tick()
+  })
+
   app.post('/api/tasks/:id/stop', async (req, res) => {
     const t = store.get(req.params.id)
     if (!t) {

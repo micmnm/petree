@@ -31,6 +31,14 @@ export interface TaskRecord {
   updatedAt: string
 }
 
+// States a finished task's turn can be archived from, then requeued with a
+// follow-up prompt (used by followUp() and the /next route).
+export const FOLLOWUP_STATES: TaskState[] = ['done', 'failed', 'cancelled']
+
+// States from which /resume may re-run the same prompt. Deliberately excludes
+// 'done' — a done task's turn must be archived via /next, not re-run in place.
+export const RESUMABLE_STATES: TaskState[] = ['paused-limit', 'paused-rate-limit', 'waiting-for-you', 'failed', 'cancelled']
+
 const TRANSITIONS: Record<TaskState, TaskState[]> = {
   queued: ['provisioning', 'failed', 'cancelled'],
   provisioning: ['running', 'failed', 'cancelled'],
@@ -121,7 +129,7 @@ export class TaskStore {
   followUp(id: string, prompt: string, model?: string | null): TaskRecord {
     const t = this.get(id)
     if (!t) throw new Error(`no task ${id}`)
-    if (!['done', 'failed', 'cancelled'].includes(t.state)) {
+    if (!FOLLOWUP_STATES.includes(t.state)) {
       throw new Error(`cannot follow up from state ${t.state}`)
     }
     const turns: Turn[] = [

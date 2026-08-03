@@ -99,6 +99,21 @@ describe('API', () => {
     expect(bad.status).toBe(409)
   })
 
+  it('refuses to resume a done task, leaving its result and turns untouched', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.setResult(t.id, 'findings')
+    store.transition(t.id, 'done')
+    const res = await fetch(`${base}/api/tasks/${t.id}/resume`, { method: 'POST' })
+    expect(res.status).toBe(409)
+    expect(await res.json()).toEqual({ error: 'cannot resume from state done' })
+    const after = store.get(t.id)!
+    expect(after.state).toBe('done')
+    expect(after.result).toBe('findings')
+    expect(after.turns).toHaveLength(0)
+  })
+
   it('stops a queued task directly, without touching the launcher', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     const res = await fetch(`${base}/api/tasks/${t.id}/stop`, { method: 'POST' })

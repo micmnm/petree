@@ -39,8 +39,8 @@ beforeEach(async () => {
   home = mkdtempSync(join(tmpdir(), 'petree-srv-'))
   const cfg: PetreeConfig = {
     home,
-    defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
-    repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
+    defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
+    repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
     allowClone: [],
   }
   store = new TaskStore(join(home, 'db'))
@@ -158,7 +158,10 @@ describe('API', () => {
 
   it('lists repos for the selector', async () => {
     const repos = await (await fetch(`${base}/api/repos`)).json()
-    expect(repos).toContainEqual({ name: 'demo', defaultBranch: 'main', image: 'sandbox-node', defaultModel: null })
+    expect(repos).toContainEqual({
+      name: 'demo', defaultBranch: 'main', image: 'sandbox-node', defaultModel: null,
+      instructions: '', setup: [], build: [], test: [],
+    })
   })
 
   it('accepts a valid model and stores the resolved value', async () => {

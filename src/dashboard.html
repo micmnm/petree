@@ -57,6 +57,11 @@
   .copy { font-size: .72rem; padding: 2px 8px; margin-left: 6px; }
   .cmd { display: flex; align-items: center; gap: 6px; background: #f0efe9; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-family: var(--mono); font-size: .8rem; overflow-x: auto; }
   .muted { color: var(--muted); } .small { font-size: .75rem; }
+  /* create form: standing repo conventions that will be appended to the prompt */
+  #conventions { border-top: 1px dashed var(--line); padding-top: var(--sp); }
+  .conv { margin-top: 6px; } .conv-name { font-family: var(--mono); color: var(--ink); }
+  .conv-text { white-space: pre-wrap; }
+  .conv code { background: #f0efe9; border-radius: 3px; padding: 0 .25rem; font-family: var(--mono); }
   /* Log tab — activity view */
   .logbar { display: flex; align-items: center; gap: var(--sp); margin-bottom: 10px; }
   .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
@@ -122,6 +127,7 @@
         <div class="combo-menu" id="repoMenu" hidden></div>
       </div>
     </div>
+    <div class="small muted" id="conventions" hidden></div>
     <div class="field"><label class="k">model</label>
       <select id="model">
         <option value="default">default</option><option value="haiku">haiku</option>
@@ -166,10 +172,27 @@
   const repoSearch = document.getElementById('repoSearch')
   const repoMenu = document.getElementById('repoMenu')
   const repoTags = document.getElementById('repoTags')
-  fetch('/api/repos').then((r) => r.json()).then((repos) => { allRepos = repos; renderRepoMenu() })
+  const conventions = document.getElementById('conventions')
+  fetch('/api/repos').then((r) => r.json()).then((repos) => { allRepos = repos; renderRepoMenu(); renderConventions() })
 
   function renderRepoTags() {
     repoTags.innerHTML = selectedRepos.map((name) => `<span class="tag">${esc(name)}<button type="button" data-remove="${esc(name)}" aria-label="remove ${esc(name)}">×</button></span>`).join('')
+    renderConventions()
+  }
+  // Mirrors composePrompt() in src/prompt.ts: what repos.yaml will append to the
+  // prompt for the repos currently selected.
+  const cmdLine = (label, list) =>
+    list && list.length ? `<div>${label}: ${list.map((c) => `<code>${esc(c)}</code>`).join(' ')}</div>` : ''
+  function renderConventions() {
+    const active = allRepos.filter((r) => selectedRepos.includes(r.name) &&
+      (r.instructions || r.setup?.length || r.build?.length || r.test?.length))
+    conventions.hidden = active.length === 0
+    conventions.innerHTML = active.length
+      ? 'repo conventions appended to this prompt:' + active.map((r) => `<div class="conv">
+          <span class="conv-name">${esc(r.name)}</span>
+          ${r.instructions ? `<div class="conv-text">${esc(r.instructions)}</div>` : ''}
+          ${cmdLine('setup', r.setup)}${cmdLine('build', r.build)}${cmdLine('test', r.test)}</div>`).join('')
+      : ''
   }
   function renderRepoMenu() {
     const q = repoSearch.value.trim().toLowerCase()

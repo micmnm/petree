@@ -29,6 +29,10 @@ export interface TaskRecord {
   turns: Turn[]
   createdAt: string
   updatedAt: string
+  restarts: number
+  retryAt: string | null
+  startedAt: string | null
+  logOffset: number
 }
 
 // States a task must reach before it becomes eligible for automatic
@@ -51,8 +55,8 @@ export const RESUMABLE_STATES: TaskState[] = ['paused-limit', 'paused-rate-limit
 
 const TRANSITIONS: Record<TaskState, TaskState[]> = {
   queued: ['provisioning', 'failed', 'cancelled'],
-  provisioning: ['running', 'failed', 'cancelled'],
-  running: ['done', 'failed', 'paused-limit', 'paused-rate-limit', 'waiting-for-you', 'cancelled'],
+  provisioning: ['running', 'queued', 'failed', 'cancelled'],
+  running: ['done', 'queued', 'failed', 'paused-limit', 'paused-rate-limit', 'waiting-for-you', 'cancelled'],
   'paused-limit': ['queued', 'failed'],
   'paused-rate-limit': ['queued', 'failed'],
   'waiting-for-you': ['queued', 'failed'],
@@ -60,6 +64,12 @@ const TRANSITIONS: Record<TaskState, TaskState[]> = {
   failed: ['queued'],
   cancelled: ['queued'],
 }
+
+// Recovery backoff (spec §4): 30s, 2m, 8m, 15m, 15m, then give up.
+export const MAX_RESTARTS = 5
+const BACKOFF_BASE_MS = 30_000
+const BACKOFF_FACTOR = 4
+const BACKOFF_CAP_MS = 15 * 60_000
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToTask(r: any): TaskRecord {
@@ -70,6 +80,8 @@ function rowToTask(r: any): TaskRecord {
     error: r.error, result: r.result ?? null, model: r.model ?? null,
     turns: JSON.parse(r.turns ?? '[]'),
     createdAt: r.created_at, updatedAt: r.updated_at,
+    restarts: r.restarts ?? 0, retryAt: r.retry_at ?? null,
+    startedAt: r.started_at ?? null, logOffset: r.log_offset ?? 0,
   }
 }
 
@@ -88,6 +100,10 @@ export class TaskStore {
     if (!cols.includes('result')) this.db.exec('ALTER TABLE tasks ADD COLUMN result TEXT')
     if (!cols.includes('model')) this.db.exec('ALTER TABLE tasks ADD COLUMN model TEXT')
     if (!cols.includes('turns')) this.db.exec('ALTER TABLE tasks ADD COLUMN turns TEXT')
+    if (!cols.includes('restarts')) this.db.exec('ALTER TABLE tasks ADD COLUMN restarts INTEGER NOT NULL DEFAULT 0')
+    if (!cols.includes('retry_at')) this.db.exec('ALTER TABLE tasks ADD COLUMN retry_at TEXT')
+    if (!cols.includes('started_at')) this.db.exec('ALTER TABLE tasks ADD COLUMN started_at TEXT')
+    if (!cols.includes('log_offset')) this.db.exec('ALTER TABLE tasks ADD COLUMN log_offset INTEGER NOT NULL DEFAULT 0')
 
     this.db.exec(`CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -121,16 +137,25 @@ export class TaskStore {
     const t = this.get(id)
     if (!t) throw new Error(`no task ${id}`)
     if (!TRANSITIONS[t.state].includes(to)) throw new Error(`illegal transition ${t.state} -> ${to}`)
-    this.db.prepare('UPDATE tasks SET state = ?, error = ?, updated_at = ? WHERE id = ?')
-      .run(to, patch.error !== undefined ? patch.error : t.error, new Date().toISOString(), id)
+    // Leaving 'running' proves the task is not crash-looping; entering 'queued'
+    // by hand (resume/follow-up) must not stay gated behind an old backoff.
+    // recoveryRequeue() re-applies its own counter right after this call.
+    const clearBackoff = t.state === 'running' || to === 'queued'
+    this.db.prepare(`UPDATE tasks SET state = ?, error = ?, updated_at = ?,
+        restarts = CASE WHEN ? THEN 0 ELSE restarts END,
+        retry_at = CASE WHEN ? THEN NULL ELSE retry_at END
+      WHERE id = ?`)
+      .run(to, patch.error !== undefined ? patch.error : t.error, new Date().toISOString(),
+        clearBackoff ? 1 : 0, clearBackoff ? 1 : 0, id)
     return this.get(id)!
   }
 
-  patch(id: string, fields: { sessionId?: string; error?: string }): TaskRecord {
+  patch(id: string, fields: { sessionId?: string; error?: string; startedAt?: string; logOffset?: number }): TaskRecord {
     const t = this.get(id)
     if (!t) throw new Error(`no task ${id}`)
-    this.db.prepare('UPDATE tasks SET session_id = ?, error = ?, updated_at = ? WHERE id = ?')
-      .run(fields.sessionId ?? t.sessionId, fields.error ?? t.error, new Date().toISOString(), id)
+    this.db.prepare('UPDATE tasks SET session_id = ?, error = ?, started_at = ?, log_offset = ?, updated_at = ? WHERE id = ?')
+      .run(fields.sessionId ?? t.sessionId, fields.error ?? t.error, fields.startedAt ?? t.startedAt,
+        fields.logOffset ?? t.logOffset, new Date().toISOString(), id)
     return this.get(id)!
   }
 
@@ -155,8 +180,28 @@ export class TaskStore {
       { prompt: t.prompt, result: t.result, tokensUsed: t.tokensUsed, endedAt: new Date().toISOString() },
     ]
     this.db.prepare(`UPDATE tasks SET prompt = ?, model = ?, tokens_used = 0, result = NULL,
-      turns = ?, state = 'queued', updated_at = ? WHERE id = ?`)
+      turns = ?, state = 'queued', restarts = 0, retry_at = NULL, updated_at = ? WHERE id = ?`)
       .run(prompt, model !== undefined ? model : t.model, JSON.stringify(turns), new Date().toISOString(), id)
+    return this.get(id)!
+  }
+
+  // Requeue a task orphaned by a server restart (its container is gone).
+  // Retries are spaced with exponential backoff so a crash-looping setup
+  // cannot relaunch — and spend tokens — in a tight loop; after MAX_RESTARTS
+  // the task fails instead.
+  recoveryRequeue(id: string, now: Date = new Date()): TaskRecord {
+    const t = this.get(id)
+    if (!t) throw new Error(`no task ${id}`)
+    if (t.state !== 'running' && t.state !== 'provisioning') {
+      throw new Error(`cannot recovery-requeue from state ${t.state}`)
+    }
+    if (t.restarts >= MAX_RESTARTS) {
+      return this.transition(id, 'failed', { error: `gave up after ${t.restarts} recovery restarts` })
+    }
+    const delay = Math.min(BACKOFF_BASE_MS * BACKOFF_FACTOR ** t.restarts, BACKOFF_CAP_MS)
+    this.transition(id, 'queued', { error: 'recovered after server restart' })
+    this.db.prepare('UPDATE tasks SET restarts = ?, retry_at = ? WHERE id = ?')
+      .run(t.restarts + 1, new Date(now.getTime() + delay).toISOString(), id)
     return this.get(id)!
   }
 
@@ -171,8 +216,10 @@ export class TaskStore {
     return r.c
   }
 
-  nextQueued(): TaskRecord | undefined {
-    const r = this.db.prepare("SELECT * FROM tasks WHERE state = 'queued' ORDER BY created_at ASC, rowid ASC LIMIT 1").get()
+  nextQueued(now: Date = new Date()): TaskRecord | undefined {
+    const r = this.db.prepare(`SELECT * FROM tasks WHERE state = 'queued'
+      AND (retry_at IS NULL OR retry_at <= ?)
+      ORDER BY created_at ASC, rowid ASC LIMIT 1`).get(now.toISOString())
     return r ? rowToTask(r) : undefined
   }
 

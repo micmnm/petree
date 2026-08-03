@@ -189,10 +189,14 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     res.type('html').send(html)
   })
 
-  app.get('/markdown.js', (_req, res) => {
-    const file = join(dirname(fileURLToPath(import.meta.url)), 'markdown.js')
-    res.type('application/javascript').send(readFileSync(file, 'utf8'))
-  })
+  // Browser modules the dashboard imports. Allowlisted by name — never a path
+  // taken from the request.
+  for (const name of ['markdown.js', 'activity.js']) {
+    app.get(`/${name}`, (_req, res) => {
+      const file = join(dirname(fileURLToPath(import.meta.url)), name)
+      res.type('application/javascript').send(readFileSync(file, 'utf8'))
+    })
+  }
 
   return app
 }

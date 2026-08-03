@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { PetreeConfig } from './config.js'
@@ -18,6 +18,9 @@ export async function prepareWorkspace(cfg: PetreeConfig, repoNames: string[], w
   }
   mkdirSync(workDir, { recursive: true })
   for (const name of repoNames) {
+    // Requeued tasks (follow-up turns, resume after pause/failure) already have
+    // their clone on the petree/<taskId> branch with prior commits — reuse it.
+    if (existsSync(join(workDir, name))) continue
     const repo = cfg.repos[name]
     await execFileAsync(
       'git',

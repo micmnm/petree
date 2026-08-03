@@ -37,6 +37,7 @@
   .badge { padding: 2px 8px; border-radius: 20px; font-size: .78rem; background: #eee; white-space: nowrap; }
   .badge.running { background: #cfe8ff; } .badge.done { background: #d4f3d4; } .badge.failed { background: #ffd7d7; }
   .badge[class*="paused"], .badge.waiting-for-you { background: #ffe9b8; }
+  .badge.cancelled { background: #e3e3de; }
   .mono { font-family: var(--mono); }
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); padding: 0 var(--sp); }
   .tabs button { border: none; background: none; border-radius: 0; padding: 10px 12px; color: var(--muted); border-bottom: 2px solid transparent; }
@@ -174,10 +175,12 @@
     const t = await (await fetch('/api/tasks/' + selected)).json()
     renderTabs()
     if (tab === 'Overview') {
-      const resume = ['paused-limit', 'paused-rate-limit', 'waiting-for-you', 'failed'].includes(t.state)
+      const resume = ['paused-limit', 'paused-rate-limit', 'waiting-for-you', 'failed', 'cancelled'].includes(t.state)
         ? `<button data-resume="${esc(t.id)}">resume</button>` : ''
+      const stop = ['queued', 'provisioning', 'running'].includes(t.state)
+        ? `<button data-stop="${esc(t.id)}">stop</button>` : ''
       body.innerHTML = `<dl>
-        <dt>state</dt><dd><span class="badge ${esc(t.state)}">${esc(t.state)}</span> ${resume}</dd>
+        <dt>state</dt><dd><span class="badge ${esc(t.state)}">${esc(t.state)}</span> ${resume} ${stop}</dd>
         <dt>id</dt><dd class="mono">${esc(t.id)} ${copyBtn(t.id)}</dd>
         <dt>prompt</dt><dd>${esc(t.prompt)}</dd>
         <dt>repos</dt><dd>${esc(t.repos.join(', '))}</dd>
@@ -264,6 +267,10 @@
     }
     document.querySelectorAll('[data-resume]').forEach((b) => b.addEventListener('click', async () => {
       await fetch('/api/tasks/' + b.dataset.resume + '/resume', { method: 'POST' }); refresh()
+    }))
+    document.querySelectorAll('[data-stop]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('Stop this task? This will kill it.')) return
+      await fetch('/api/tasks/' + b.dataset.stop + '/stop', { method: 'POST' }); refresh()
     }))
   }
 

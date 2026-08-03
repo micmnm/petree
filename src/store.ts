@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 export type TaskState =
   | 'queued' | 'provisioning' | 'running'
   | 'paused-limit' | 'paused-rate-limit' | 'waiting-for-you'
-  | 'done' | 'failed'
+  | 'done' | 'failed' | 'cancelled'
 
 export interface TaskRecord {
   id: string
@@ -24,14 +24,15 @@ export interface TaskRecord {
 }
 
 const TRANSITIONS: Record<TaskState, TaskState[]> = {
-  queued: ['provisioning', 'failed'],
-  provisioning: ['running', 'failed'],
-  running: ['done', 'failed', 'paused-limit', 'paused-rate-limit', 'waiting-for-you'],
+  queued: ['provisioning', 'failed', 'cancelled'],
+  provisioning: ['running', 'failed', 'cancelled'],
+  running: ['done', 'failed', 'paused-limit', 'paused-rate-limit', 'waiting-for-you', 'cancelled'],
   'paused-limit': ['queued', 'failed'],
   'paused-rate-limit': ['queued', 'failed'],
   'waiting-for-you': ['queued', 'failed'],
   done: [],
   failed: ['queued'],
+  cancelled: ['queued'],
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

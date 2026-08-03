@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type { Server } from 'node:http'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { PetreeConfig } from '../src/config.js'
+import type { Launcher } from '../src/launcher.js'
 import { TaskStore } from '../src/store.js'
 import { Scheduler } from '../src/scheduler.js'
 import { makeApp } from '../src/server.js'
@@ -43,8 +44,11 @@ beforeEach(async () => {
     allowClone: [],
   }
   store = new TaskStore(join(home, 'db'))
-  const scheduler = new Scheduler(store, 0, async () => {}) // concurrency 0: nothing launches during API tests
-  const app = makeApp(cfg, store, scheduler)
+  // concurrency 0: nothing launches during API tests; stop() always reports
+  // "nothing to stop" since no real process ever runs here.
+  const launch: Launcher = Object.assign(async () => {}, { stop: async () => false })
+  const scheduler = new Scheduler(store, 0, launch)
+  const app = makeApp(cfg, store, scheduler, launch)
   await new Promise<void>((r) => { server = app.listen(0, () => r()) })
   const address = server.address() as { port: number }
   base = `http://127.0.0.1:${address.port}`
@@ -93,6 +97,31 @@ describe('API', () => {
     const t2 = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     const bad = await fetch(`${base}/api/tasks/${t2.id}/resume`, { method: 'POST' })
     expect(bad.status).toBe(409)
+  })
+
+  it('stops a queued task directly, without touching the launcher', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    const res = await fetch(`${base}/api/tasks/${t.id}/stop`, { method: 'POST' })
+    expect((await res.json()).state).toBe('cancelled')
+  })
+
+  it('stops a running task via the launcher and 404s/409s appropriately', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    const res = await fetch(`${base}/api/tasks/${t.id}/stop`, { method: 'POST' })
+    // the fake launcher's stop() always returns false (no real process is running)
+    expect(res.status).toBe(409)
+
+    const t2 = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    store.transition(t2.id, 'provisioning')
+    store.transition(t2.id, 'running')
+    store.transition(t2.id, 'done')
+    const doneStop = await fetch(`${base}/api/tasks/${t2.id}/stop`, { method: 'POST' })
+    expect(doneStop.status).toBe(409)
+
+    const missing = await fetch(`${base}/api/tasks/zzzzzzzz/stop`, { method: 'POST' })
+    expect(missing.status).toBe(404)
   })
 
   it('rejects log ids that are not task-id shaped', async () => {

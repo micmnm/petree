@@ -11,10 +11,11 @@ for (const dir of ['logs', 'work', 'shared/skills', 'shared/findings']) {
   mkdirSync(join(cfg.home, dir), { recursive: true })
 }
 const store = new TaskStore(join(cfg.home, 'petree.db'))
-const scheduler = new Scheduler(store, cfg.defaults.concurrency, makeLauncher(cfg, store))
+const launcher = makeLauncher(cfg, store)
+const scheduler = new Scheduler(store, cfg.defaults.concurrency, launcher)
 setInterval(() => void scheduler.tick(), 2000)
 
-const app = makeApp(cfg, store, scheduler)
+const app = makeApp(cfg, store, scheduler, launcher)
 const port = Number(process.env.PORT ?? 4100)
 // 127.0.0.1 explicitly: the API is unauthenticated and must never bind the LAN
 app.listen(port, '127.0.0.1', () => {

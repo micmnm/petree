@@ -5,6 +5,7 @@ import express from 'express'
 import { resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
 import { repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch } from './gitops.js'
+import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
 import type { TaskStore, TaskRecord } from './store.js'
 import type { Response } from 'express'
@@ -34,7 +35,7 @@ function targetOrError(
   return norm
 }
 
-export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Scheduler): express.Express {
+export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Scheduler, launcher: Launcher): express.Express {
   const app = express()
   app.use(express.json())
 
@@ -153,6 +154,34 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     } catch {
       res.status(409).json({ error: `cannot resume from state ${t.state}` })
     }
+  })
+
+  app.post('/api/tasks/:id/stop', async (req, res) => {
+    const t = store.get(req.params.id)
+    if (!t) {
+      res.sendStatus(404)
+      return
+    }
+    // Queued and not yet picked up by the scheduler: no process exists, so cancel
+    // it directly rather than going through the launcher.
+    if (t.state === 'queued') {
+      try {
+        res.json(store.transition(t.id, 'cancelled'))
+      } catch {
+        res.status(409).json({ error: `cannot stop from state ${t.state}` })
+      }
+      return
+    }
+    if (t.state !== 'provisioning' && t.state !== 'running') {
+      res.status(409).json({ error: `cannot stop from state ${t.state}` })
+      return
+    }
+    const stopped = await launcher.stop(t.id)
+    if (!stopped) {
+      res.status(409).json({ error: 'task has no active process to stop' })
+      return
+    }
+    res.json(store.get(t.id))
   })
 
   app.get('/', (_req, res) => {

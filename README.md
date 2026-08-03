@@ -25,6 +25,11 @@ Create a task from the dashboard (prompt + repo names). Tasks run unattended
 inside containers; diffs stay in ~/.petree/work/<task-id>/ for your review.
 Pushing is always manual, from the host.
 
+The **Log** tab summarizes the run instead of dumping stream-json: what the
+agent is doing now, its todo list, turn/tool/file/error counts, token budget
+use, and a timeline of tool calls (click one for its input and output). Switch
+to **Raw** for the unprocessed log.
+
 ## Phase 1 limitations
 
 - **Resume is partial.** The dashboard's "resume" button and the underlying

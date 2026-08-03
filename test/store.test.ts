@@ -114,3 +114,83 @@ describe('TaskStore result & model', () => {
     expect(existsSync(file)).toBe(true)
   })
 })
+
+describe('TaskStore follow-up turns', () => {
+  function finish(s: TaskStore, id: string): void {
+    s.transition(id, 'provisioning')
+    s.transition(id, 'running')
+    s.patch(id, { sessionId: 'sess-7' })
+    s.addUsage(id, 120)
+    s.setResult(id, 'first conclusions')
+    s.transition(id, 'done')
+  }
+
+  it('archives the turn and requeues with a fresh budget on followUp', () => {
+    const t = store.create(input)
+    finish(store, t.id)
+    const next = store.followUp(t.id, 'now implement it')
+    expect(next.state).toBe('queued')
+    expect(next.prompt).toBe('now implement it')
+    expect(next.tokensUsed).toBe(0)
+    expect(next.result).toBeNull()
+    expect(next.sessionId).toBe('sess-7')
+    expect(next.turns).toHaveLength(1)
+    expect(next.turns[0].prompt).toBe('do it')
+    expect(next.turns[0].result).toBe('first conclusions')
+    expect(next.turns[0].tokensUsed).toBe(120)
+    expect(next.turns[0].endedAt).toBeTruthy()
+  })
+
+  it('keeps the model unless a new one is passed', () => {
+    const a = store.create({ ...input, model: 'haiku' })
+    finish(store, a.id)
+    expect(store.followUp(a.id, 'more').model).toBe('haiku')
+    const b = store.create({ ...input, model: 'haiku' })
+    finish(store, b.id)
+    expect(store.followUp(b.id, 'more', 'sonnet').model).toBe('sonnet')
+    const c = store.create({ ...input, model: 'haiku' })
+    finish(store, c.id)
+    expect(store.followUp(c.id, 'more', null).model).toBeNull()
+  })
+
+  it('works from failed and cancelled, rejects from running', () => {
+    const f = store.create(input)
+    store.transition(f.id, 'provisioning')
+    store.transition(f.id, 'running')
+    store.transition(f.id, 'failed', { error: 'boom' })
+    expect(store.followUp(f.id, 'try again').state).toBe('queued')
+
+    const r = store.create(input)
+    store.transition(r.id, 'provisioning')
+    store.transition(r.id, 'running')
+    expect(() => store.followUp(r.id, 'nope')).toThrow(/cannot follow up/)
+  })
+
+  it('accumulates multiple turns in order', () => {
+    const t = store.create(input)
+    finish(store, t.id)
+    store.followUp(t.id, 'second')
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.setResult(t.id, 'second result')
+    store.transition(t.id, 'done')
+    const third = store.followUp(t.id, 'third')
+    expect(third.turns.map((x) => x.prompt)).toEqual(['do it', 'second'])
+  })
+
+  it('migrates a pre-turns db (no turns column) to turns: []', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'petree-mig-')), 'db')
+    const raw = new Database(file)
+    raw.exec(`CREATE TABLE tasks (
+      id TEXT PRIMARY KEY, prompt TEXT NOT NULL, repos TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'unattended', state TEXT NOT NULL,
+      session_id TEXT, tokens_used INTEGER NOT NULL DEFAULT 0,
+      token_budget INTEGER NOT NULL, timeout_minutes INTEGER NOT NULL,
+      error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result TEXT, model TEXT)`)
+    raw.prepare(`INSERT INTO tasks (id,prompt,repos,mode,state,token_budget,timeout_minutes,created_at,updated_at)
+      VALUES ('old1','p','["demo"]','unattended','done',1000,30,'t','t')`).run()
+    raw.close()
+    const s = new TaskStore(file)
+    expect(s.get('old1')?.turns).toEqual([])
+  })
+})

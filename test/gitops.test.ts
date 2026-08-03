@@ -75,6 +75,18 @@ describe('gitops', () => {
     expect(res.output.length).toBeGreaterThan(0)
   })
 
+  it('scrubs credential-bearing remote URLs out of push output', () => {
+    const { repoDir } = fixture()
+    createTaskBranch(repoDir, 'abc123')
+    writeFileSync(join(repoDir, 'f.txt'), 'x\n')
+    commitChanges(repoDir, 'abc123', 'petree abc123: f')
+    // point origin at a URL carrying embedded credentials, like a token-authed remote
+    execFileSync('git', ['-C', repoDir, 'remote', 'set-url', 'origin', 'https://x-access-token:s3cr3t@example.com/org/repo.git'])
+    const res = pushBranch(repoDir, 'abc123', 'petree/abc123')
+    expect(res.output).not.toContain('s3cr3t')
+    expect(res.output).not.toContain('https://')
+  })
+
   it('diffBranch returns empty (does not throw) when the base ref is missing', () => {
     const { repoDir } = fixture()
     createTaskBranch(repoDir, 'abc123')

@@ -55,13 +55,19 @@ export function diffBranch(repoDir: string, baseBranch: string): { stat: string;
   }
 }
 
+// git's push output echoes the remote URL (e.g. "To https://x-access-token:TOKEN@host/repo.git"),
+// which can carry embedded credentials — strip URLs before this reaches the API response.
+function scrubUrls(text: string): string {
+  return text.replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, '[url redacted]').replace(/\bgit@\S+/gi, '[url redacted]')
+}
+
 export function pushBranch(repoDir: string, taskId: string, target: string): { ok: boolean; output: string } {
   try {
     const output = git(repoDir, ['push', 'origin', `${taskBranch(taskId)}:${target}`], { ident: true })
-    return { ok: true, output: output || `pushed ${taskBranch(taskId)} -> ${target}` }
+    return { ok: true, output: scrubUrls(output || `pushed ${taskBranch(taskId)} -> ${target}`) }
   } catch (err) {
     const e = err as { stderr?: Buffer | string; stdout?: Buffer | string; message?: string }
     const output = String(e.stderr?.toString() || e.stdout?.toString() || e.message || 'push failed')
-    return { ok: false, output }
+    return { ok: false, output: scrubUrls(output) }
   }
 }

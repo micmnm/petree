@@ -35,6 +35,15 @@ describe('TaskStore', () => {
     expect(() => store.transition(t.id, 'done')).toThrow(/illegal transition/)
   })
 
+  it('allows cancelling a running task and resuming it afterward', () => {
+    const t = store.create(input)
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    const cancelled = store.transition(t.id, 'cancelled')
+    expect(cancelled.state).toBe('cancelled')
+    expect(store.transition(t.id, 'queued').state).toBe('queued')
+  })
+
   it('accumulates usage and stores session id', () => {
     const t = store.create(input)
     store.addUsage(t.id, 100)

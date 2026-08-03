@@ -110,6 +110,34 @@ describe('makeLauncher', () => {
     expect(store.get(task.id)?.error).toBeTruthy()
   })
 
+  it('stops a running task on request, marking it cancelled rather than failed', async () => {
+    const { home, cfg, store, task } = setup()
+    mkdirSync(join(home, 'logs'), { recursive: true })
+
+    const launch = makeLauncher(cfg, store, {
+      buildCommand: () => [process.execPath, fakeClaude, 'slow'], // emits its result after 2s
+    })
+    const running = launch(task)
+    // give the child a moment to spawn before killing it
+    await new Promise((r) => setTimeout(r, 200))
+    const stopped = await launch.stop(task.id)
+    expect(stopped).toBe(true)
+    await running
+
+    expect(store.get(task.id)?.state).toBe('cancelled')
+  })
+
+  it('stop() returns false once the task has already finished', async () => {
+    const { home, cfg, store, task } = setup()
+    mkdirSync(join(home, 'logs'), { recursive: true })
+
+    const launch = makeLauncher(cfg, store, {
+      buildCommand: () => [process.execPath, fakeClaude, 'ok'],
+    })
+    await launch(task)
+    expect(await launch.stop(task.id)).toBe(false)
+  })
+
   it('pauses the task on timeout', async () => {
     const { cfg, store, task } = setup({ timeoutMinutes: 0.005 })
 

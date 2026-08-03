@@ -11,23 +11,46 @@ export interface LauncherOptions {
   buildCommand?: (task: TaskRecord, workDir: string) => string[]
 }
 
-export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: LauncherOptions = {}) {
+export interface Launcher {
+  (task: TaskRecord): Promise<void>
+  // Kills the task's in-flight process (or, if it's still cloning/provisioning
+  // with no process yet, marks it so launch() cancels before spawning one).
+  // Resolves true once a stop was actioned, false if there was nothing to stop.
+  stop(id: string): Promise<boolean>
+}
+
+export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: LauncherOptions = {}): Launcher {
   const buildCommand =
     opts.buildCommand ??
     ((task: TaskRecord, workDir: string) => buildDockerCommand(task, cfg, workDir, readToken(cfg.home)))
 
-  return async function launch(task: TaskRecord): Promise<void> {
+  const runners = new Map<string, CliRunner>()
+  const cancelled = new Set<string>()
+
+  const launch = async function launch(task: TaskRecord): Promise<void> {
     const workDir = join(cfg.home, 'work', task.id)
     const logFile = join(cfg.home, 'logs', `${task.id}.log`)
     mkdirSync(join(cfg.home, 'logs'), { recursive: true })
 
+    if (cancelled.delete(task.id)) {
+      store.transition(task.id, 'cancelled')
+      return
+    }
+
     prepareWorkspace(cfg, task.repos, workDir, task.id)
+
+    if (cancelled.delete(task.id)) {
+      store.transition(task.id, 'cancelled')
+      return
+    }
+
     const runner = new CliRunner({
       command: buildCommand(task, workDir),
       timeoutMs: task.timeoutMinutes * 60_000,
       tokenBudget: task.tokenBudget,
       alreadyUsed: task.tokensUsed,
     })
+    runners.set(task.id, runner)
     store.transition(task.id, 'running')
 
     // Recorded so a later failure — either a log-stream error or a swallowed
@@ -61,20 +84,28 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
       runner.on('closed', resolve)
       runner.start()
     })
+    runners.delete(task.id)
 
     await new Promise<void>((resolve) => logStream.end(resolve))
 
     // The child can exit cleanly (code 0) without ever emitting a 'done' or 'error'
-    // stream event (e.g. it printed nothing parseable as a result). Left unchecked
-    // the task would sit in 'running'/'provisioning' forever, permanently occupying
-    // a scheduler concurrency slot. Reconcile: if we're still non-terminal here, the
-    // run ended without telling us why, so fail it explicitly.
+    // stream event (e.g. it printed nothing parseable as a result, or was killed via
+    // stop()). Left unchecked the task would sit in 'running'/'provisioning' forever,
+    // permanently occupying a scheduler concurrency slot. Reconcile: if we're still
+    // non-terminal here, the run ended without telling us why — unless stop() killed
+    // it, in which case that's the reason.
     const finished = store.get(task.id)
     if (finished && (finished.state === 'running' || finished.state === 'provisioning')) {
-      const error = storeError
-        ? `run ended without terminal event; store error: ${storeError}`
-        : 'run ended without terminal event'
-      safely(() => store.transition(task.id, 'failed', { error }))
+      if (cancelled.delete(task.id)) {
+        safely(() => store.transition(task.id, 'cancelled'))
+      } else {
+        const error = storeError
+          ? `run ended without terminal event; store error: ${storeError}`
+          : 'run ended without terminal event'
+        safely(() => store.transition(task.id, 'failed', { error }))
+      }
+    } else {
+      cancelled.delete(task.id)
     }
 
     // Capture any file changes the agent made as a commit on the task branch,
@@ -96,5 +127,24 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
       const combined = [current?.error, ...commitErrors].filter(Boolean).join('; ')
       safely(() => store.patch(task.id, { error: combined }))
     }
+  } as Launcher
+
+  launch.stop = async (id: string): Promise<boolean> => {
+    const runner = runners.get(id)
+    if (runner) {
+      cancelled.add(id)
+      await runner.stop()
+      return true
+    }
+    // No process yet (still cloning in prepareWorkspace, or queued and not yet
+    // picked up) — mark it so launch() cancels at its next check instead of
+    // spawning one.
+    if (store.get(id)?.state === 'provisioning') {
+      cancelled.add(id)
+      return true
+    }
+    return false
   }
+
+  return launch
 }

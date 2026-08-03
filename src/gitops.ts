@@ -72,6 +72,15 @@ export function pushBranch(repoDir: string, taskId: string, target: string): { o
   }
 }
 
+// GitHub rejects PR bodies over 65536 characters; 10k keeps them readable well under that.
+const PR_BODY_LIMIT = 10_000
+const PR_BODY_TRUNCATION_NOTE = '\n\n---\n*(prompt truncated to fit the GitHub PR body limit)*'
+
+export function prBody(prompt: string): string {
+  if (prompt.length <= PR_BODY_LIMIT) return prompt
+  return prompt.slice(0, PR_BODY_LIMIT - PR_BODY_TRUNCATION_NOTE.length) + PR_BODY_TRUNCATION_NOTE
+}
+
 // Shells out to the GitHub CLI (`gh`), which reads its own auth from the host —
 // same "host owns credentials, sandbox never sees them" model as git push above.
 export function createPullRequest(
@@ -84,7 +93,7 @@ export function createPullRequest(
   try {
     const output = execFileSync(
       'gh',
-      ['pr', 'create', '--head', target, '--base', baseBranch, '--title', title, '--body', body],
+      ['pr', 'create', '--head', target, '--base', baseBranch, '--title', title, '--body', prBody(body)],
       { cwd: repoDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
     ).trim()
     // gh pr create prints the new PR's URL as the last line of stdout.

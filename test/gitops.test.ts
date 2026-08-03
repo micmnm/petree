@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { taskBranch, createTaskBranch, commitChanges, repoStatus, diffBranch, pushBranch, createPullRequest } from '../src/gitops.js'
+import { taskBranch, createTaskBranch, commitChanges, repoStatus, diffBranch, pushBranch, createPullRequest, prBody } from '../src/gitops.js'
 
 // a clone-shaped fixture: a bare "origin" + a working clone on branch main
 function fixture(): { repoDir: string; bare: string } {
@@ -96,6 +96,15 @@ describe('gitops', () => {
     expect(res.ok).toBe(false)
     expect(res.output.length).toBeGreaterThan(0)
     expect(res.url).toBeUndefined()
+  })
+
+  it('prBody passes short prompts through and truncates long ones to the 10k cap', () => {
+    expect(prBody('short prompt')).toBe('short prompt')
+    const long = 'x'.repeat(80_000)
+    const body = prBody(long)
+    expect(body.length).toBeLessThanOrEqual(10_000)
+    expect(body.startsWith('x'.repeat(1000))).toBe(true)
+    expect(body).toContain('truncated')
   })
 
   it('diffBranch returns empty (does not throw) when the base ref is missing', () => {

@@ -6,6 +6,13 @@ export type TaskState =
   | 'paused-limit' | 'paused-rate-limit' | 'waiting-for-you'
   | 'done' | 'failed' | 'cancelled'
 
+export interface Turn {
+  prompt: string
+  result: string | null
+  tokensUsed: number
+  endedAt: string
+}
+
 export interface TaskRecord {
   id: string
   prompt: string
@@ -19,9 +26,18 @@ export interface TaskRecord {
   error: string | null
   result: string | null
   model: string | null
+  turns: Turn[]
   createdAt: string
   updatedAt: string
 }
+
+// States a finished task's turn can be archived from, then requeued with a
+// follow-up prompt (used by followUp() and the /next route).
+export const FOLLOWUP_STATES: TaskState[] = ['done', 'failed', 'cancelled']
+
+// States from which /resume may re-run the same prompt. Deliberately excludes
+// 'done' — a done task's turn must be archived via /next, not re-run in place.
+export const RESUMABLE_STATES: TaskState[] = ['paused-limit', 'paused-rate-limit', 'waiting-for-you', 'failed', 'cancelled']
 
 const TRANSITIONS: Record<TaskState, TaskState[]> = {
   queued: ['provisioning', 'failed', 'cancelled'],
@@ -30,7 +46,7 @@ const TRANSITIONS: Record<TaskState, TaskState[]> = {
   'paused-limit': ['queued', 'failed'],
   'paused-rate-limit': ['queued', 'failed'],
   'waiting-for-you': ['queued', 'failed'],
-  done: [],
+  done: ['queued'],
   failed: ['queued'],
   cancelled: ['queued'],
 }
@@ -42,6 +58,7 @@ function rowToTask(r: any): TaskRecord {
     state: r.state, sessionId: r.session_id, tokensUsed: r.tokens_used,
     tokenBudget: r.token_budget, timeoutMinutes: r.timeout_minutes,
     error: r.error, result: r.result ?? null, model: r.model ?? null,
+    turns: JSON.parse(r.turns ?? '[]'),
     createdAt: r.created_at, updatedAt: r.updated_at,
   }
 }
@@ -60,6 +77,7 @@ export class TaskStore {
     const cols = (this.db.prepare('PRAGMA table_info(tasks)').all() as { name: string }[]).map((c) => c.name)
     if (!cols.includes('result')) this.db.exec('ALTER TABLE tasks ADD COLUMN result TEXT')
     if (!cols.includes('model')) this.db.exec('ALTER TABLE tasks ADD COLUMN model TEXT')
+    if (!cols.includes('turns')) this.db.exec('ALTER TABLE tasks ADD COLUMN turns TEXT')
   }
 
   create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number; model?: string | null }): TaskRecord {
@@ -103,6 +121,24 @@ export class TaskStore {
     if (!t) throw new Error(`no task ${id}`)
     this.db.prepare('UPDATE tasks SET result = ?, updated_at = ? WHERE id = ?')
       .run(text, new Date().toISOString(), id)
+    return this.get(id)!
+  }
+
+  // Archive the finished turn and requeue the task with a follow-up prompt.
+  // sessionId is kept — it is what lets the next run resume the conversation.
+  followUp(id: string, prompt: string, model?: string | null): TaskRecord {
+    const t = this.get(id)
+    if (!t) throw new Error(`no task ${id}`)
+    if (!FOLLOWUP_STATES.includes(t.state)) {
+      throw new Error(`cannot follow up from state ${t.state}`)
+    }
+    const turns: Turn[] = [
+      ...t.turns,
+      { prompt: t.prompt, result: t.result, tokensUsed: t.tokensUsed, endedAt: new Date().toISOString() },
+    ]
+    this.db.prepare(`UPDATE tasks SET prompt = ?, model = ?, tokens_used = 0, result = NULL,
+      turns = ?, state = 'queued', updated_at = ? WHERE id = ?`)
+      .run(prompt, model !== undefined ? model : t.model, JSON.stringify(turns), new Date().toISOString(), id)
     return this.get(id)!
   }
 

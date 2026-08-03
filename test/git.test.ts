@@ -37,4 +37,22 @@ describe('prepareWorkspace', () => {
   it('throws on unknown repo names', async () => {
     await expect(prepareWorkspace(cfgWith('file:///x'), ['nope'], '/tmp/unused-dir', 'abc123')).rejects.toThrow(/unknown repo/)
   })
+
+  it('skips repos already cloned, preserving branch and commits (requeue)', async () => {
+    const fixture = makeFixtureRepo()
+    const workDir = join(mkdtempSync(join(tmpdir(), 'petree-work-')), 'w')
+    const cfg = cfgWith(`file://${fixture}`)
+    await prepareWorkspace(cfg, ['demo'], workDir, 'abc123')
+    // simulate a first turn: a commit lands on the task branch
+    writeFileSync(join(workDir, 'demo', 'turn1.txt'), 'x\n')
+    execFileSync('git', ['-C', join(workDir, 'demo'), 'add', '-A'])
+    execFileSync('git', ['-C', join(workDir, 'demo'), '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'turn 1'])
+    // requeue: must not re-clone or reset anything
+    await prepareWorkspace(cfg, ['demo'], workDir, 'abc123')
+    const branch = execFileSync('git', ['-C', join(workDir, 'demo'), 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim()
+    expect(branch).toBe('petree/abc123')
+    const msg = execFileSync('git', ['-C', join(workDir, 'demo'), 'log', '-1', '--pretty=%s'], { encoding: 'utf8' }).trim()
+    expect(msg).toBe('turn 1')
+    expect(existsSync(join(workDir, 'demo', 'turn1.txt'))).toBe(true)
+  })
 })

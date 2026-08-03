@@ -7,6 +7,7 @@ import type { PetreeConfig } from './config.js'
 import { repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch } from './gitops.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
+import { FOLLOWUP_STATES, RESUMABLE_STATES } from './store.js'
 import type { TaskStore, TaskRecord } from './store.js'
 import type { Response } from 'express'
 
@@ -152,12 +153,46 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       res.sendStatus(404)
       return
     }
+    // Only these states may re-run the same prompt in place. A done task must
+    // go through /next so its finished turn gets archived, not silently
+    // overwritten by /resume re-running the old prompt.
+    if (!RESUMABLE_STATES.includes(t.state)) {
+      res.status(409).json({ error: `cannot resume from state ${t.state}` })
+      return
+    }
     try {
       res.json(store.transition(t.id, 'queued'))
       void scheduler.tick()
     } catch {
       res.status(409).json({ error: `cannot resume from state ${t.state}` })
     }
+  })
+
+
+  app.post('/api/tasks/:id/next', (req, res) => {
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    const { prompt, model } = (req.body ?? {}) as { prompt?: string; model?: string }
+    if (typeof prompt !== 'string' || !prompt.trim()) {
+      res.status(400).json({ error: 'prompt is required' })
+      return
+    }
+    if (model !== undefined && !MODELS.includes(model)) {
+      res.status(400).json({ error: `unknown model: ${model}` })
+      return
+    }
+    if (!FOLLOWUP_STATES.includes(t.state)) {
+      res.status(409).json({ error: `cannot follow up from state ${t.state}` })
+      return
+    }
+    // Omitted model keeps the task's current one; a given model resolves the
+    // same way task creation does ('default' -> config defaults). The repo may
+    // have been removed from repos.yaml since the task was created.
+    const effectiveModel = model !== undefined
+      ? resolveModel(model, cfg.repos[t.repos[0]]?.defaultModel ?? null, cfg.defaults.defaultModel)
+      : undefined
+    res.json(store.followUp(t.id, prompt, effectiveModel))
+    void scheduler.tick()
   })
 
   app.post('/api/tasks/:id/stop', async (req, res) => {

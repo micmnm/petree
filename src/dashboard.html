@@ -278,16 +278,35 @@
         <dt>session</dt><dd class="mono">${esc(t.sessionId || '—')} ${t.sessionId ? copyBtn(t.sessionId) : ''}</dd>
         <dt>created / updated</dt><dd class="mono">${esc(t.createdAt)} · ${esc(t.updatedAt)}</dd>
         ${t.state === 'failed' && t.error ? `<dt>error</dt><dd class="err">${esc(t.error)}</dd>` : ''}
-      </dl>`
+      </dl>
+        ${['done', 'failed', 'cancelled'].includes(t.state) ? `
+        <div class="card" style="margin-top:16px;padding:12px">
+          <dt>next prompt</dt>
+          <textarea id="nextPrompt" placeholder="follow-up prompt — continues this task's session, branch and workspace"></textarea>
+          <div class="field" style="margin-top:8px">
+            <label class="k">model</label>
+            <select id="nextModel">
+              ${['default', 'haiku', 'sonnet', 'opus'].map((m) => `<option value="${m}" ${(t.model || 'default') === m ? 'selected' : ''}>${m}</option>`).join('')}
+            </select>
+            <button class="primary" data-next="${esc(t.id)}" style="margin-left:auto">Continue task</button>
+          </div>
+        </div>` : ''}`
     } else if (tab === 'Result') {
+      const history = (t.turns || []).map((turn, i) => `
+        <details class="card" style="margin-bottom:8px;padding:8px">
+          <summary class="muted">turn ${i + 1} — ${esc(turn.prompt.split('\n')[0].slice(0, 80))} <span class="small">(${esc(turn.tokensUsed)} tokens)</span></summary>
+          <dt>prompt</dt><dd>${esc(turn.prompt)}</dd>
+          <dt>result</dt>
+          <div class="result">${turn.result ? renderMarkdown(turn.result) : '<p class="muted">no result recorded</p>'}</div>
+        </details>`).join('')
       if (t.state !== 'done' || !t.result) {
-        body.innerHTML = '<p class="muted">No result yet.</p>'
+        body.innerHTML = history + '<p class="muted">No result yet.</p>'
       } else {
         // Once rendered for this task, the poll loop stops re-entering this branch (see
         // refresh()) — like Changes, the PR target input and in-flight request here would
         // otherwise get reset/detached out from under the user every 3s.
         resultShownFor = selected
-        body.innerHTML = `<div><button class="copy" data-copy="${encodeURIComponent(t.result)}">copy markdown</button></div>
+        body.innerHTML = history + `<div><button class="copy" data-copy="${encodeURIComponent(t.result)}">copy markdown</button></div>
           <div class="result">${renderMarkdown(t.result)}</div>
           <div class="card" id="prSection" style="margin-top:16px;padding:12px"><p class="muted">loading repos…</p></div>`
         const repos = await (await fetch('/api/tasks/' + selected + '/diff')).json()
@@ -383,6 +402,21 @@
       if (!confirm('Stop this task? This will kill it.')) return
       await fetch('/api/tasks/' + b.dataset.stop + '/stop', { method: 'POST' }); refresh()
     }))
+    document.querySelectorAll('[data-next]').forEach((b) => b.addEventListener('click', async () => {
+      const ta = document.getElementById('nextPrompt')
+      if (!ta.value.trim()) { alert('enter a follow-up prompt'); return }
+      const res = await fetch('/api/tasks/' + b.dataset.next + '/next', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: ta.value, model: document.getElementById('nextModel').value }),
+      })
+      if (!res.ok) { alert((await res.json()).error || 'follow-up failed'); return }
+      resultShownFor = null
+      refresh()
+    }))
+    const nextTa = document.getElementById('nextPrompt')
+    if (nextTa) nextTa.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); document.querySelector('[data-next]').click() }
+    })
   }
 
   async function refresh() {
@@ -396,7 +430,12 @@
     // for the same reason as Changes (the PR target input, once shown, must survive
     // the poll; the underlying result can't change post-done anyway).
     const resultLive = tab === 'Result' && resultShownFor !== selected
-    if (selected && (tab === 'Overview' || tab === 'Log' || resultLive)) await renderBody()
+    // Don't re-render under the user's caret: the Overview next-prompt form (and
+    // any other input in the detail panel) must survive the 3s poll while focused.
+    const active = document.activeElement
+    const typing = active && document.getElementById('tabbody').contains(active) &&
+      ['TEXTAREA', 'INPUT', 'SELECT'].includes(active.tagName)
+    if (selected && !typing && (tab === 'Overview' || tab === 'Log' || resultLive)) await renderBody()
   }
   setInterval(refresh, 3000); refresh()
 </script>

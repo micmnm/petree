@@ -181,4 +181,16 @@ describe('API', () => {
     })
     expect(unknown.status).toBe(400)
   })
+
+  it('rejects refspec and HEAD tricks that would target the base branch', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    seedWorkRepo(home, t.id, 'demo')
+    for (const target of ['refs/heads/main', 'HEAD', 'refs/tags/x']) {
+      const res = await fetch(`${base}/api/tasks/${t.id}/push`, {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ repo: 'demo', target }),
+      })
+      expect(res.status).toBe(400)
+    }
+  })
 })

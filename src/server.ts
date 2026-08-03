@@ -95,12 +95,13 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (!t) { res.sendStatus(404); return }
     const { repo, target } = (req.body ?? {}) as { repo?: string; target?: string }
     if (!repo || !t.repos.includes(repo)) { res.status(400).json({ error: `unknown repo: ${repo}` }); return }
-    if (!target || target === (cfg.repos[repo]?.defaultBranch ?? 'main')) {
-      res.status(400).json({ error: 'refusing to push to the base branch' }); return
-    }
+    const base = cfg.repos[repo]?.defaultBranch ?? 'main'
+    const norm = String(target ?? '').trim().replace(/^refs\/heads\//, '')
+    const valid = /^[\w.\-/]+$/.test(norm) && !norm.startsWith('refs/') && norm.toUpperCase() !== 'HEAD' && norm !== base
+    if (!valid) { res.status(400).json({ error: 'invalid or protected target branch' }); return }
     const repoDir = join(cfg.home, 'work', t.id, repo)
     if (!existsSync(repoDir)) { res.status(400).json({ error: 'no work dir for task' }); return }
-    res.json(pushBranch(repoDir, t.id, target))
+    res.json(pushBranch(repoDir, t.id, norm))
   })
 
   app.post('/api/tasks/:id/resume', (req, res) => {

@@ -115,8 +115,29 @@
                  max-height: 30vh; overflow: auto; font-family: var(--mono); font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; }
   @media (max-width: 820px) { .layout { flex-direction: column; } .left, .right { flex: 1 1 100%; } }
 </style>
-<header><h1>🧫 Petree</h1></header>
+<header style="display:flex;align-items:center;justify-content:space-between">
+  <h1>🧫 Petree</h1>
+  <button type="button" id="settingsBtn">⚙ settings</button>
+</header>
 <div class="wrap">
+  <div class="card" id="settingsPanel" style="padding:calc(var(--sp)*2);margin-bottom:calc(var(--sp)*2)" hidden>
+    <p class="muted small" style="margin:0 0 8px">Finished tasks (done/failed/cancelled) are cleared automatically. Active tasks are never cleared.</p>
+    <div class="field">
+      <label class="k" for="maxAgeDays">clear after</label>
+      <input type="number" id="maxAgeDays" min="1" step="1" style="width:5rem">
+      <span class="muted">days</span>
+    </div>
+    <div class="field">
+      <label class="k" for="maxPerRepoGroup">keep per repo group</label>
+      <input type="number" id="maxPerRepoGroup" min="1" step="1" style="width:5rem">
+      <span class="muted">tasks (oldest finished ones beyond this are cleared)</span>
+    </div>
+    <div class="field">
+      <button class="primary" type="button" id="saveSettings">Save</button>
+      <button type="button" id="clearNowBtn">Clear now</button>
+      <span class="muted small" id="settingsMsg"></span>
+    </div>
+  </div>
   <form class="create card" id="create">
     <textarea name="prompt" id="prompt" placeholder="task prompt — Cmd/Ctrl+Enter to start" required></textarea>
     <div class="field repos-field">
@@ -224,6 +245,37 @@
     const b = e.target.closest('button[data-remove]'); if (!b) return
     selectedRepos = selectedRepos.filter((n) => n !== b.dataset.remove)
     renderRepoTags(); renderRepoMenu()
+  })
+
+  // settings panel: retention config for automatic task clearing
+  const settingsBtn = document.getElementById('settingsBtn')
+  const settingsPanel = document.getElementById('settingsPanel')
+  const maxAgeDaysInput = document.getElementById('maxAgeDays')
+  const maxPerRepoGroupInput = document.getElementById('maxPerRepoGroup')
+  const settingsMsg = document.getElementById('settingsMsg')
+  const flashSettingsMsg = (text) => { settingsMsg.textContent = text; setTimeout(() => (settingsMsg.textContent = ''), 1500) }
+  async function loadSettings() {
+    const s = await (await fetch('/api/settings')).json()
+    maxAgeDaysInput.value = s.maxAgeDays
+    maxPerRepoGroupInput.value = s.maxPerRepoGroup
+  }
+  settingsBtn.addEventListener('click', async () => {
+    settingsPanel.hidden = !settingsPanel.hidden
+    if (!settingsPanel.hidden) await loadSettings()
+  })
+  document.getElementById('saveSettings').addEventListener('click', async () => {
+    const res = await fetch('/api/settings', {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ maxAgeDays: Number(maxAgeDaysInput.value), maxPerRepoGroup: Number(maxPerRepoGroupInput.value) }),
+    })
+    if (!res.ok) { flashSettingsMsg((await res.json()).error || 'failed to save'); return }
+    flashSettingsMsg('saved')
+    refresh()
+  })
+  document.getElementById('clearNowBtn').addEventListener('click', async () => {
+    await fetch('/api/prune', { method: 'POST' })
+    flashSettingsMsg('cleared')
+    refresh()
   })
 
   const prompt = document.getElementById('prompt')

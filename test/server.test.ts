@@ -296,6 +296,48 @@ describe('API', () => {
     expect(task.turns[0].result).toBe('findings')
   })
 
+  it('returns default retention settings and updates them, validating input', async () => {
+    const got = await (await fetch(`${base}/api/settings`)).json()
+    expect(got).toEqual({ maxAgeDays: 3, maxPerRepoGroup: 5 })
+    const updated = await fetch(`${base}/api/settings`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ maxAgeDays: 7, maxPerRepoGroup: 2 }),
+    })
+    expect(updated.status).toBe(200)
+    const body = await updated.json()
+    expect(body.maxAgeDays).toBe(7)
+    expect(body.maxPerRepoGroup).toBe(2)
+    const bad = await fetch(`${base}/api/settings`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ maxAgeDays: 0 }),
+    })
+    expect(bad.status).toBe(400)
+  })
+
+  it('prunes excess finished tasks per repo group via PUT /api/settings and POST /api/prune', async () => {
+    for (let i = 0; i < 3; i++) {
+      const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+      store.transition(t.id, 'provisioning')
+      store.transition(t.id, 'running')
+      store.transition(t.id, 'done')
+    }
+    const res = await fetch(`${base}/api/settings`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ maxPerRepoGroup: 1 }),
+    })
+    const body = await res.json()
+    expect(body.removedByLimit).toBe(2)
+    expect((await (await fetch(`${base}/api/tasks`)).json())).toHaveLength(1)
+
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'done')
+    const pruneRes = await fetch(`${base}/api/prune`, { method: 'POST' })
+    expect((await pruneRes.json()).removedByLimit).toBe(1)
+    expect((await (await fetch(`${base}/api/tasks`)).json())).toHaveLength(1)
+  })
+
   it('rejects /next with a missing prompt, unknown model, wrong state, or unknown id', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     store.transition(t.id, 'provisioning')

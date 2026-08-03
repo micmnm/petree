@@ -193,4 +193,32 @@ describe('API', () => {
       expect(res.status).toBe(400)
     }
   })
+
+  it('rejects the base branch and unknown repo for PR creation, same as push', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    seedWorkRepo(home, t.id, 'demo')
+    const badTarget = await fetch(`${base}/api/tasks/${t.id}/pr`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repo: 'demo', target: 'main' }),
+    })
+    expect(badTarget.status).toBe(400)
+    const unknownRepo = await fetch(`${base}/api/tasks/${t.id}/pr`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repo: 'nope', target: 'x' }),
+    })
+    expect(unknownRepo.status).toBe(400)
+  })
+
+  it('pushes then attempts gh pr create, surfacing failure without crashing (no real GitHub remote in tests)', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    seedWorkRepo(home, t.id, 'demo')
+    const res = await fetch(`${base}/api/tasks/${t.id}/pr`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repo: 'demo', target: `petree/${t.id}` }),
+    })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(false)
+    expect(body.output.length).toBeGreaterThan(0)
+  })
 })

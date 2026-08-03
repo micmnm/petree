@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { taskBranch, createTaskBranch, commitChanges, repoStatus, diffBranch, pushBranch } from '../src/gitops.js'
+import { taskBranch, createTaskBranch, commitChanges, repoStatus, diffBranch, pushBranch, createPullRequest } from '../src/gitops.js'
 
 // a clone-shaped fixture: a bare "origin" + a working clone on branch main
 function fixture(): { repoDir: string; bare: string } {
@@ -85,6 +85,17 @@ describe('gitops', () => {
     const res = pushBranch(repoDir, 'abc123', 'petree/abc123')
     expect(res.output).not.toContain('s3cr3t')
     expect(res.output).not.toContain('https://')
+  })
+
+  it('returns ok:false with output when gh pr create cannot run (no gh CLI, no real GitHub remote)', () => {
+    const { repoDir } = fixture()
+    createTaskBranch(repoDir, 'abc123')
+    writeFileSync(join(repoDir, 'f.txt'), 'x\n')
+    commitChanges(repoDir, 'abc123', 'petree abc123: f')
+    const res = createPullRequest(repoDir, 'petree/abc123', 'main', 'petree abc123: f', 'body')
+    expect(res.ok).toBe(false)
+    expect(res.output.length).toBeGreaterThan(0)
+    expect(res.url).toBeUndefined()
   })
 
   it('diffBranch returns empty (does not throw) when the base ref is missing', () => {

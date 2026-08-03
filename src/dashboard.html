@@ -17,7 +17,17 @@
   textarea { width: 100%; padding: var(--sp); font: inherit; border: 1px solid var(--line); border-radius: 6px; resize: none; overflow: hidden; min-height: 3rem; }
   .field { display: flex; gap: var(--sp); align-items: center; flex-wrap: wrap; font-size: .9rem; }
   .field > label.k { color: var(--muted); min-width: 3.5rem; }
-  .repos { display: flex; flex-wrap: wrap; gap: calc(var(--sp)*1.5); }
+  .field.repos-field { align-items: flex-start; }
+  .combo { position: relative; flex: 1 1 auto; min-width: 220px; }
+  .combo-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
+  .combo-tags .tag { display: inline-flex; align-items: center; gap: 4px; background: #eef6ff; border: 1px solid var(--line); border-radius: 20px; padding: 2px 6px 2px 10px; font-size: .82rem; }
+  .combo-tags .tag button { border: none; background: none; padding: 0; margin: 0; cursor: pointer; color: var(--muted); font-size: 1rem; line-height: 1; }
+  .combo input { width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+  .combo-menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 10; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; margin-top: 4px; max-height: 220px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+  .combo-menu .opt { padding: 6px 10px; cursor: pointer; font-size: .9rem; }
+  .combo-menu .opt:hover, .combo-menu .opt.active { background: #eef6ff; }
+  .combo-menu .opt.sel { color: var(--muted); }
+  .combo-menu .empty { padding: 6px 10px; color: var(--muted); font-size: .85rem; }
   select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; }
   button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
   table { border-collapse: collapse; width: 100%; font-size: .9rem; }
@@ -47,7 +57,14 @@
 <div class="wrap">
   <form class="create card" id="create">
     <textarea name="prompt" id="prompt" placeholder="task prompt — Cmd/Ctrl+Enter to start" required></textarea>
-    <div class="field"><label class="k">repos</label><span class="repos" id="repos"></span></div>
+    <div class="field repos-field">
+      <label class="k">repos</label>
+      <div class="combo" id="repoCombo">
+        <div class="combo-tags" id="repoTags"></div>
+        <input type="text" id="repoSearch" placeholder="search repos…" autocomplete="off">
+        <div class="combo-menu" id="repoMenu" hidden></div>
+      </div>
+    </div>
     <div class="field"><label class="k">model</label>
       <select id="model">
         <option value="default">default</option><option value="haiku">haiku</option>
@@ -67,7 +84,7 @@
 <script type="module">
   import { renderMarkdown } from './markdown.js'
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
-  let selected = null, tab = 'Overview'
+  let selected = null, tab = 'Overview', resultShownFor = null
   const TABS = ['Overview', 'Result', 'Changes', 'Log']
 
   // copy button: returns HTML; clicking copies decodeURIComponent of data-copy
@@ -77,11 +94,48 @@
     try { await navigator.clipboard.writeText(decodeURIComponent(b.dataset.copy)); const o = b.textContent; b.textContent = 'copied'; setTimeout(() => (b.textContent = o), 1200) } catch {}
   })
 
-  // create form
-  const reposEl = document.getElementById('repos')
-  fetch('/api/repos').then((r) => r.json()).then((repos) => {
-    reposEl.innerHTML = repos.map((r) => `<label><input type="checkbox" name="repo" value="${esc(r.name)}"> ${esc(r.name)}</label>`).join('')
+  // create form — repo combo: searchable, multiselect
+  let allRepos = [], selectedRepos = []
+  const repoSearch = document.getElementById('repoSearch')
+  const repoMenu = document.getElementById('repoMenu')
+  const repoTags = document.getElementById('repoTags')
+  fetch('/api/repos').then((r) => r.json()).then((repos) => { allRepos = repos; renderRepoMenu() })
+
+  function renderRepoTags() {
+    repoTags.innerHTML = selectedRepos.map((name) => `<span class="tag">${esc(name)}<button type="button" data-remove="${esc(name)}" aria-label="remove ${esc(name)}">×</button></span>`).join('')
+  }
+  function renderRepoMenu() {
+    const q = repoSearch.value.trim().toLowerCase()
+    const matches = allRepos.filter((r) => r.name.toLowerCase().includes(q))
+    repoMenu.innerHTML = matches.length
+      ? matches.map((r) => `<div class="opt ${selectedRepos.includes(r.name) ? 'sel' : ''}" data-repo="${esc(r.name)}">${selectedRepos.includes(r.name) ? '✓ ' : ''}${esc(r.name)}</div>`).join('')
+      : '<div class="empty">no matching repos</div>'
+  }
+  function toggleRepo(name) {
+    const i = selectedRepos.indexOf(name)
+    if (i === -1) selectedRepos.push(name); else selectedRepos.splice(i, 1)
+    renderRepoTags(); renderRepoMenu()
+  }
+  repoSearch.addEventListener('input', () => { renderRepoMenu(); repoMenu.hidden = false })
+  repoSearch.addEventListener('focus', () => { renderRepoMenu(); repoMenu.hidden = false })
+  repoSearch.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { repoMenu.hidden = true; return }
+    if (e.key !== 'Enter') return
+    e.preventDefault()
+    const first = repoMenu.querySelector('.opt[data-repo]')
+    if (first) { toggleRepo(first.dataset.repo); repoSearch.value = '' }
   })
+  document.addEventListener('click', (e) => { if (!e.target.closest('#repoCombo')) repoMenu.hidden = true })
+  repoMenu.addEventListener('click', (e) => {
+    const opt = e.target.closest('.opt[data-repo]'); if (!opt) return
+    toggleRepo(opt.dataset.repo); repoSearch.value = ''; repoSearch.focus()
+  })
+  repoTags.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-remove]'); if (!b) return
+    selectedRepos = selectedRepos.filter((n) => n !== b.dataset.remove)
+    renderRepoTags(); renderRepoMenu()
+  })
+
   const prompt = document.getElementById('prompt')
   const autosize = () => { prompt.style.height = 'auto'; prompt.style.height = prompt.scrollHeight + 'px' }
   prompt.value = localStorage.getItem('petree-draft') || ''; autosize()
@@ -89,10 +143,11 @@
   prompt.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); document.getElementById('create').requestSubmit() } })
   document.getElementById('create').addEventListener('submit', async (e) => {
     e.preventDefault()
-    const repos = [...document.querySelectorAll('input[name=repo]:checked')].map((c) => c.value)
-    if (!repos.length) { alert('select at least one repo'); return }
-    await fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: prompt.value, repos, model: document.getElementById('model').value }) })
-    prompt.value = ''; localStorage.removeItem('petree-draft'); autosize(); refresh()
+    if (!selectedRepos.length) { alert('select at least one repo'); return }
+    await fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: prompt.value, repos: selectedRepos, model: document.getElementById('model').value }) })
+    prompt.value = ''; localStorage.removeItem('petree-draft'); autosize()
+    selectedRepos = []; renderRepoTags(); renderRepoMenu()
+    refresh()
   })
 
   function taskRow(t) {
@@ -133,9 +188,41 @@
         ${t.state === 'failed' && t.error ? `<dt>error</dt><dd class="err">${esc(t.error)}</dd>` : ''}
       </dl>`
     } else if (tab === 'Result') {
-      body.innerHTML = t.state === 'done' && t.result
-        ? `<div><button class="copy" data-copy="${encodeURIComponent(t.result)}">copy markdown</button></div><div class="result">${renderMarkdown(t.result)}</div>`
-        : '<p class="muted">No result yet.</p>'
+      if (t.state !== 'done' || !t.result) {
+        body.innerHTML = '<p class="muted">No result yet.</p>'
+      } else {
+        // Once rendered for this task, the poll loop stops re-entering this branch (see
+        // refresh()) — like Changes, the PR target input and in-flight request here would
+        // otherwise get reset/detached out from under the user every 3s.
+        resultShownFor = selected
+        body.innerHTML = `<div><button class="copy" data-copy="${encodeURIComponent(t.result)}">copy markdown</button></div>
+          <div class="result">${renderMarkdown(t.result)}</div>
+          <div class="card" id="prSection" style="margin-top:16px;padding:12px"><p class="muted">loading repos…</p></div>`
+        const repos = await (await fetch('/api/tasks/' + selected + '/diff')).json()
+        const changed = repos.filter((r) => r.hasChanges)
+        const prSection = document.getElementById('prSection')
+        prSection.innerHTML = changed.length
+          ? `<dt>open a pull request</dt>` + changed.map((r) => `<div class="field" style="margin:6px 0">
+              <strong>${esc(r.repo)}</strong>
+              <input class="mono" data-pr-target="${esc(r.repo)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line);border-radius:6px">
+              <button data-pr="${esc(r.repo)}">Create PR</button>
+              <span class="prout muted" data-prout="${esc(r.repo)}"></span>
+            </div>`).join('')
+          : '<p class="muted">No changes to open a PR for.</p>'
+        prSection.querySelectorAll('[data-pr]').forEach((btn) => btn.addEventListener('click', async () => {
+          const repo = btn.dataset.pr
+          const sel = CSS.escape(repo)
+          const target = prSection.querySelector(`[data-pr-target="${sel}"]`).value
+          const out = prSection.querySelector(`[data-prout="${sel}"]`)
+          out.textContent = 'creating…'
+          const res = await (await fetch('/api/tasks/' + selected + '/pr', {
+            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo, target }),
+          })).json()
+          out.innerHTML = res.ok
+            ? `✓ <a href="${esc(res.url)}" target="_blank" rel="noopener noreferrer">${esc(res.url)}</a>`
+            : '✗ ' + esc((res.output || res.error || 'failed').split('\n').slice(-2).join(' '))
+        }))
+      }
     } else if (tab === 'Log') {
       const logs = await (await fetch('/api/tasks/' + selected + '/logs')).text()
       body.innerHTML = `<pre class="log">${esc(logs)}</pre>`
@@ -186,9 +273,12 @@
     renderTabs()
     // Only auto-refresh live tabs; Changes renders on tab entry only so the 3s
     // poll can't reset the push-target input, re-run git diff, or detach the
-    // push-result node mid-push. Result has no such editable state, so it's
-    // safe (and necessary) to keep it live while a run is still in progress.
-    if (selected && (tab === 'Overview' || tab === 'Log' || tab === 'Result')) await renderBody()
+    // push-result node mid-push. Result is live only until its done-result (with
+    // PR controls) has been rendered once for this task — after that it's frozen
+    // for the same reason as Changes (the PR target input, once shown, must survive
+    // the poll; the underlying result can't change post-done anyway).
+    const resultLive = tab === 'Result' && resultShownFor !== selected
+    if (selected && (tab === 'Overview' || tab === 'Log' || resultLive)) await renderBody()
   }
   setInterval(refresh, 3000); refresh()
 </script>

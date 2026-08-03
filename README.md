@@ -13,6 +13,9 @@ Spec: docs/superpowers/specs/2026-07-30-petree-sandbox-orchestrator-design.md
    `~/.petree/token` and `chmod 600 ~/.petree/token`.
    Never put ANTHROPIC_API_KEY in the environment — it would bypass your
    Max subscription and bill the API directly.
+5. (Optional) install and authenticate the [GitHub CLI](https://cli.github.com)
+   (`gh auth login`) on the host to enable the "Create PR" button on a task's
+   Result tab. Without it, you can still push branches and open PRs manually.
 
 ## Run
 

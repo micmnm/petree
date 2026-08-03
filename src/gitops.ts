@@ -71,3 +71,28 @@ export function pushBranch(repoDir: string, taskId: string, target: string): { o
     return { ok: false, output: scrubUrls(output) }
   }
 }
+
+// Shells out to the GitHub CLI (`gh`), which reads its own auth from the host —
+// same "host owns credentials, sandbox never sees them" model as git push above.
+export function createPullRequest(
+  repoDir: string,
+  target: string,
+  baseBranch: string,
+  title: string,
+  body: string,
+): { ok: boolean; output: string; url?: string } {
+  try {
+    const output = execFileSync(
+      'gh',
+      ['pr', 'create', '--head', target, '--base', baseBranch, '--title', title, '--body', body],
+      { cwd: repoDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+    ).trim()
+    // gh pr create prints the new PR's URL as the last line of stdout.
+    const url = output.split('\n').pop()
+    return { ok: true, output, url }
+  } catch (err) {
+    const e = err as { stderr?: Buffer | string; stdout?: Buffer | string; message?: string }
+    const output = String(e.stderr?.toString() || e.stdout?.toString() || e.message || 'gh pr create failed')
+    return { ok: false, output: scrubUrls(output) }
+  }
+}

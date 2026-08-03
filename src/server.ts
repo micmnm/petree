@@ -4,11 +4,35 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
-import { repoStatus, diffBranch, pushBranch, taskBranch } from './gitops.js'
+import { repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch } from './gitops.js'
 import type { Scheduler } from './scheduler.js'
-import type { TaskStore } from './store.js'
+import type { TaskStore, TaskRecord } from './store.js'
+import type { Response } from 'express'
 
 export const MODELS = ['default', 'haiku', 'sonnet', 'opus']
+
+// Shared by /push and /pr: a target must be a plain branch name, never the base
+// branch, HEAD, or a refspec/ref-path trick that could redirect onto it.
+function targetOrError(
+  cfg: PetreeConfig,
+  t: TaskRecord,
+  repo: string | undefined,
+  target: string | undefined,
+  res: Response,
+): string | null {
+  if (!repo || !t.repos.includes(repo)) {
+    res.status(400).json({ error: `unknown repo: ${repo}` })
+    return null
+  }
+  const base = cfg.repos[repo]?.defaultBranch ?? 'main'
+  const norm = String(target ?? '').trim().replace(/^refs\/heads\//, '')
+  const valid = /^[\w.\-/]+$/.test(norm) && !norm.startsWith('refs/') && norm.toUpperCase() !== 'HEAD' && norm !== base
+  if (!valid) {
+    res.status(400).json({ error: 'invalid or protected target branch' })
+    return null
+  }
+  return norm
+}
 
 export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Scheduler): express.Express {
   const app = express()
@@ -94,14 +118,27 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
     const { repo, target } = (req.body ?? {}) as { repo?: string; target?: string }
-    if (!repo || !t.repos.includes(repo)) { res.status(400).json({ error: `unknown repo: ${repo}` }); return }
-    const base = cfg.repos[repo]?.defaultBranch ?? 'main'
-    const norm = String(target ?? '').trim().replace(/^refs\/heads\//, '')
-    const valid = /^[\w.\-/]+$/.test(norm) && !norm.startsWith('refs/') && norm.toUpperCase() !== 'HEAD' && norm !== base
-    if (!valid) { res.status(400).json({ error: 'invalid or protected target branch' }); return }
-    const repoDir = join(cfg.home, 'work', t.id, repo)
+    const norm = targetOrError(cfg, t, repo, target, res)
+    if (!norm) return
+    const repoDir = join(cfg.home, 'work', t.id, repo as string)
     if (!existsSync(repoDir)) { res.status(400).json({ error: 'no work dir for task' }); return }
     res.json(pushBranch(repoDir, t.id, norm))
+  })
+
+  app.post('/api/tasks/:id/pr', (req, res) => {
+    if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) { res.sendStatus(400); return }
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    const { repo, target } = (req.body ?? {}) as { repo?: string; target?: string }
+    const norm = targetOrError(cfg, t, repo, target, res)
+    if (!norm) return
+    const repoDir = join(cfg.home, 'work', t.id, repo as string)
+    if (!existsSync(repoDir)) { res.status(400).json({ error: 'no work dir for task' }); return }
+    const pushed = pushBranch(repoDir, t.id, norm)
+    if (!pushed.ok) { res.json(pushed); return }
+    const base = cfg.repos[repo as string]?.defaultBranch ?? 'main'
+    const title = `petree ${t.id}: ${t.prompt.split('\n')[0].slice(0, 72)}`
+    res.json(createPullRequest(repoDir, norm, base, title, t.prompt))
   })
 
   app.post('/api/tasks/:id/resume', (req, res) => {

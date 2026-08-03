@@ -194,3 +194,88 @@ describe('TaskStore follow-up turns', () => {
     expect(s.get('old1')?.turns).toEqual([])
   })
 })
+
+describe('TaskStore retention settings & prune', () => {
+  function finish(s: TaskStore, id: string): void {
+    s.transition(id, 'provisioning')
+    s.transition(id, 'running')
+    s.transition(id, 'done')
+  }
+  function backdate(file: string, id: string, daysAgo: number): void {
+    const raw = new Database(file)
+    const iso = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString()
+    raw.prepare('UPDATE tasks SET created_at = ? WHERE id = ?').run(iso, id)
+    raw.close()
+  }
+
+  it('defaults to 3 days / 5 per repo group and persists updates', () => {
+    expect(store.getSettings()).toEqual({ maxAgeDays: 3, maxPerRepoGroup: 5 })
+    expect(store.updateSettings({ maxAgeDays: 7 })).toEqual({ maxAgeDays: 7, maxPerRepoGroup: 5 })
+    expect(store.updateSettings({ maxPerRepoGroup: 10 })).toEqual({ maxAgeDays: 7, maxPerRepoGroup: 10 })
+  })
+
+  it('prunes finished tasks older than maxAgeDays, leaving active tasks alone', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'petree-prune-age-')), 'db')
+    const s = new TaskStore(file)
+    const old = s.create(input)
+    finish(s, old.id)
+    backdate(file, old.id, 4)
+    const recent = s.create(input)
+    finish(s, recent.id)
+    const stillRunning = s.create(input)
+    s.transition(stillRunning.id, 'provisioning')
+    s.transition(stillRunning.id, 'running')
+    backdate(file, stillRunning.id, 4)
+
+    const result = s.prune()
+    expect(result.removedByAge).toBe(1)
+    expect(s.get(old.id)).toBeUndefined()
+    expect(s.get(recent.id)).toBeDefined()
+    expect(s.get(stillRunning.id)?.state).toBe('running')
+  })
+
+  it('trims excess finished tasks per repo group, oldest first, keeping active ones', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'petree-prune-limit-')), 'db')
+    const s = new TaskStore(file)
+    s.updateSettings({ maxAgeDays: 365, maxPerRepoGroup: 2 })
+    const ids: string[] = []
+    for (let i = 0; i < 4; i++) {
+      const t = s.create(input)
+      finish(s, t.id)
+      backdate(file, t.id, 4 - i)
+      ids.push(t.id)
+    }
+    const running = s.create(input)
+    s.transition(running.id, 'provisioning')
+    s.transition(running.id, 'running')
+
+    // group total is 5 (4 finished + 1 running) vs a cap of 2, so the 3 oldest
+    // finished tasks are trimmed; the running task counts toward the cap but
+    // can never itself be removed
+    const result = s.prune()
+    expect(result.removedByLimit).toBe(3)
+    expect(s.get(ids[0])).toBeUndefined()
+    expect(s.get(ids[1])).toBeUndefined()
+    expect(s.get(ids[2])).toBeUndefined()
+    expect(s.get(ids[3])).toBeDefined()
+    expect(s.get(running.id)?.state).toBe('running')
+  })
+
+  it('treats repo groups as the exact, order-independent set of repos on a task', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'petree-prune-groups-')), 'db')
+    const s = new TaskStore(file)
+    s.updateSettings({ maxAgeDays: 365, maxPerRepoGroup: 1 })
+    const solo = s.create({ ...input, repos: ['demo'] })
+    finish(s, solo.id)
+    const pair = s.create({ ...input, repos: ['demo', 'other'] })
+    finish(s, pair.id)
+    const pairReordered = s.create({ ...input, repos: ['other', 'demo'] })
+    finish(s, pairReordered.id)
+
+    s.prune()
+    expect(s.get(solo.id)).toBeDefined()
+    // pair and pairReordered belong to the same group (order-independent) — only the newer survives
+    expect(s.get(pair.id)).toBeUndefined()
+    expect(s.get(pairReordered.id)).toBeDefined()
+  })
+})

@@ -65,10 +65,27 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       model: effectiveModel,
     })
     void scheduler.tick()
+    store.prune()
     res.status(201).json(task)
   })
 
   app.get('/api/tasks', (_req, res) => { res.json(store.list()) })
+
+  app.get('/api/settings', (_req, res) => { res.json(store.getSettings()) })
+
+  app.put('/api/settings', (req, res) => {
+    const { maxAgeDays, maxPerRepoGroup } = (req.body ?? {}) as { maxAgeDays?: number; maxPerRepoGroup?: number }
+    for (const [name, v] of [['maxAgeDays', maxAgeDays], ['maxPerRepoGroup', maxPerRepoGroup]] as const) {
+      if (v !== undefined && (!Number.isInteger(v) || v < 1)) {
+        res.status(400).json({ error: `${name} must be a positive integer` })
+        return
+      }
+    }
+    const settings = store.updateSettings({ maxAgeDays, maxPerRepoGroup })
+    res.json({ ...settings, ...store.prune() })
+  })
+
+  app.post('/api/prune', (_req, res) => { res.json(store.prune()) })
 
   app.get('/api/repos', (_req, res) => {
     res.json(

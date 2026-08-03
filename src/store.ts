@@ -31,6 +31,16 @@ export interface TaskRecord {
   updatedAt: string
 }
 
+// States a task must reach before it becomes eligible for automatic
+// clearing — a queued/running/paused task is never pruned, regardless of
+// age or how many other tasks share its repo group.
+const PRUNABLE_STATES: TaskState[] = ['done', 'failed', 'cancelled']
+
+export interface RetentionSettings {
+  maxAgeDays: number
+  maxPerRepoGroup: number
+}
+
 // States a finished task's turn can be archived from, then requeued with a
 // follow-up prompt (used by followUp() and the /next route).
 export const FOLLOWUP_STATES: TaskState[] = ['done', 'failed', 'cancelled']
@@ -78,6 +88,14 @@ export class TaskStore {
     if (!cols.includes('result')) this.db.exec('ALTER TABLE tasks ADD COLUMN result TEXT')
     if (!cols.includes('model')) this.db.exec('ALTER TABLE tasks ADD COLUMN model TEXT')
     if (!cols.includes('turns')) this.db.exec('ALTER TABLE tasks ADD COLUMN turns TEXT')
+
+    this.db.exec(`CREATE TABLE IF NOT EXISTS settings (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      max_age_days INTEGER NOT NULL,
+      max_per_repo_group INTEGER NOT NULL,
+      updated_at TEXT NOT NULL)`)
+    this.db.prepare(`INSERT OR IGNORE INTO settings (id, max_age_days, max_per_repo_group, updated_at)
+      VALUES (1, 3, 5, ?)`).run(new Date().toISOString())
   }
 
   create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number; model?: string | null }): TaskRecord {
@@ -156,5 +174,63 @@ export class TaskStore {
   nextQueued(): TaskRecord | undefined {
     const r = this.db.prepare("SELECT * FROM tasks WHERE state = 'queued' ORDER BY created_at ASC, rowid ASC LIMIT 1").get()
     return r ? rowToTask(r) : undefined
+  }
+
+  getSettings(): RetentionSettings {
+    const r = this.db.prepare('SELECT max_age_days, max_per_repo_group FROM settings WHERE id = 1')
+      .get() as { max_age_days: number; max_per_repo_group: number }
+    return { maxAgeDays: r.max_age_days, maxPerRepoGroup: r.max_per_repo_group }
+  }
+
+  updateSettings(patch: Partial<RetentionSettings>): RetentionSettings {
+    const cur = this.getSettings()
+    const next: RetentionSettings = {
+      maxAgeDays: patch.maxAgeDays ?? cur.maxAgeDays,
+      maxPerRepoGroup: patch.maxPerRepoGroup ?? cur.maxPerRepoGroup,
+    }
+    this.db.prepare('UPDATE settings SET max_age_days = ?, max_per_repo_group = ?, updated_at = ? WHERE id = 1')
+      .run(next.maxAgeDays, next.maxPerRepoGroup, new Date().toISOString())
+    return next
+  }
+
+  delete(id: string): void {
+    this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
+  }
+
+  // Clears finished tasks (done/failed/cancelled only — active tasks are never
+  // touched) that are either older than maxAgeDays, or are excess beyond
+  // maxPerRepoGroup within their repo group (the exact set of repos a task
+  // runs against). Excess is trimmed oldest-first.
+  prune(): { removedByAge: number; removedByLimit: number } {
+    const settings = this.getSettings()
+    const cutoff = new Date(Date.now() - settings.maxAgeDays * 24 * 60 * 60 * 1000).toISOString()
+    const placeholders = PRUNABLE_STATES.map(() => '?').join(',')
+
+    const aged = this.db.prepare(`SELECT id FROM tasks WHERE created_at < ? AND state IN (${placeholders})`)
+      .all(cutoff, ...PRUNABLE_STATES) as { id: string }[]
+    for (const { id } of aged) this.delete(id)
+
+    const remaining = this.db.prepare('SELECT id, repos, state, created_at FROM tasks')
+      .all() as { id: string; repos: string; state: TaskState; created_at: string }[]
+    const groups = new Map<string, typeof remaining>()
+    for (const row of remaining) {
+      const key = JSON.stringify((JSON.parse(row.repos) as string[]).slice().sort())
+      const group = groups.get(key)
+      if (group) group.push(row); else groups.set(key, [row])
+    }
+    let removedByLimit = 0
+    for (const rows of groups.values()) {
+      let excess = rows.length - settings.maxPerRepoGroup
+      if (excess <= 0) continue
+      const oldestFirst = rows.filter((r) => PRUNABLE_STATES.includes(r.state))
+        .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      for (const row of oldestFirst) {
+        if (excess <= 0) break
+        this.delete(row.id)
+        excess--
+        removedByLimit++
+      }
+    }
+    return { removedByAge: aged.length, removedByLimit }
   }
 }

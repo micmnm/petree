@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -7,6 +8,26 @@ import type { PetreeConfig } from '../src/config.js'
 import { TaskStore } from '../src/store.js'
 import { Scheduler } from '../src/scheduler.js'
 import { makeApp } from '../src/server.js'
+
+function seedWorkRepo(home: string, taskId: string, repo: string): string {
+  const root = mkdtempSync(join(tmpdir(), 'petree-remote-'))
+  const bare = join(root, 'origin.git')
+  execFileSync('git', ['init', '--bare', '-b', 'main', bare])
+  const seed = join(root, 'seed')
+  execFileSync('git', ['clone', bare, seed])
+  writeFileSync(join(seed, 'README.md'), 'base\n')
+  execFileSync('git', ['-C', seed, 'add', '.'])
+  execFileSync('git', ['-C', seed, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'base'])
+  execFileSync('git', ['-C', seed, 'push', 'origin', 'main'])
+  const workDir = join(home, 'work', taskId, repo)
+  mkdirSync(join(home, 'work', taskId), { recursive: true })
+  execFileSync('git', ['clone', '--branch', 'main', bare, workDir])
+  execFileSync('git', ['-C', workDir, 'checkout', '-b', `petree/${taskId}`])
+  writeFileSync(join(workDir, 'change.txt'), 'x\n')
+  execFileSync('git', ['-C', workDir, 'add', '-A'])
+  execFileSync('git', ['-C', workDir, '-c', 'user.email=p@p', '-c', 'user.name=p', 'commit', '-m', `petree ${taskId}: x`])
+  return bare
+}
 
 let server: Server
 let base: string
@@ -127,5 +148,37 @@ describe('API', () => {
       body: JSON.stringify({ prompt: 'x', repos: ['demo'], model: 'default' }),
     })
     expect((await res.json()).model).toBeNull()
+  })
+
+  it('returns a per-repo diff with a review command', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    seedWorkRepo(home, t.id, 'demo')
+    const res = await fetch(`${base}/api/tasks/${t.id}/diff`)
+    const arr = await res.json()
+    expect(arr[0].repo).toBe('demo')
+    expect(arr[0].hasChanges).toBe(true)
+    expect(arr[0].branch).toBe(`petree/${t.id}`)
+    expect(arr[0].patch).toContain('change.txt')
+    expect(arr[0].reviewCommand).toContain(`petree/${t.id}`)
+  })
+
+  it('pushes a task branch to a target and rejects the base branch', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    seedWorkRepo(home, t.id, 'demo')
+    const good = await fetch(`${base}/api/tasks/${t.id}/push`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repo: 'demo', target: `petree/${t.id}` }),
+    })
+    expect((await good.json()).ok).toBe(true)
+    const bad = await fetch(`${base}/api/tasks/${t.id}/push`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repo: 'demo', target: 'main' }),
+    })
+    expect(bad.status).toBe(400)
+    const unknown = await fetch(`${base}/api/tasks/${t.id}/push`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repo: 'nope', target: 'x' }),
+    })
+    expect(unknown.status).toBe(400)
   })
 })

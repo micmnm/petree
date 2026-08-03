@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
+import { repoStatus, diffBranch, pushBranch, taskBranch } from './gitops.js'
 import type { Scheduler } from './scheduler.js'
 import type { TaskStore } from './store.js'
 
@@ -67,6 +68,39 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     }
     const file = join(cfg.home, 'logs', `${req.params.id}.log`)
     res.type('text/plain').send(existsSync(file) ? readFileSync(file, 'utf8') : '')
+  })
+
+  app.get('/api/tasks/:id/diff', (req, res) => {
+    if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) { res.sendStatus(400); return }
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    const out = t.repos.map((repo) => {
+      const repoDir = join(cfg.home, 'work', t.id, repo)
+      const baseBranch = cfg.repos[repo]?.defaultBranch ?? 'main'
+      const branch = taskBranch(t.id)
+      if (!existsSync(repoDir)) {
+        return { repo, branch, baseBranch, hasChanges: false, stat: '', patch: '', reviewCommand: '' }
+      }
+      const st = repoStatus(repoDir, baseBranch)
+      const d = st.hasChanges ? diffBranch(repoDir, baseBranch) : { stat: '', patch: '' }
+      const reviewCommand = `git -C <your-repo> fetch ${repoDir} ${branch} && git checkout ${branch}`
+      return { repo, branch, baseBranch, hasChanges: st.hasChanges, stat: d.stat, patch: d.patch, reviewCommand }
+    })
+    res.json(out)
+  })
+
+  app.post('/api/tasks/:id/push', (req, res) => {
+    if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) { res.sendStatus(400); return }
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    const { repo, target } = (req.body ?? {}) as { repo?: string; target?: string }
+    if (!repo || !t.repos.includes(repo)) { res.status(400).json({ error: `unknown repo: ${repo}` }); return }
+    if (!target || target === (cfg.repos[repo]?.defaultBranch ?? 'main')) {
+      res.status(400).json({ error: 'refusing to push to the base branch' }); return
+    }
+    const repoDir = join(cfg.home, 'work', t.id, repo)
+    if (!existsSync(repoDir)) { res.status(400).json({ error: 'no work dir for task' }); return }
+    res.json(pushBranch(repoDir, t.id, target))
   })
 
   app.post('/api/tasks/:id/resume', (req, res) => {

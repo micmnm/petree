@@ -2,6 +2,8 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadConfig } from './config.js'
 import { makeLauncher } from './launcher.js'
+import { recover } from './recover.js'
+import { containerName, inspectContainerState } from './sandbox.js'
 import { Scheduler } from './scheduler.js'
 import { makeApp } from './server.js'
 import { TaskStore } from './store.js'
@@ -13,7 +15,15 @@ for (const dir of ['logs', 'work', 'shared/skills', 'shared/findings']) {
 const store = new TaskStore(join(cfg.home, 'petree.db'))
 const launcher = makeLauncher(cfg, store)
 const scheduler = new Scheduler(store, cfg.defaults.concurrency, launcher)
-setInterval(() => void scheduler.tick(), 2000)
+
+// Re-attach to (or requeue) turns orphaned by the previous server process
+// before the scheduler starts filling concurrency slots.
+void recover(store, launcher, {
+  inspect: (t) => inspectContainerState(['docker', 'inspect', '-f', '{{.State.Status}}', containerName(t.id)]),
+}).then(() => {
+  setInterval(() => void scheduler.tick(), 2000)
+})
+
 store.prune()
 setInterval(() => store.prune(), 60_000)
 

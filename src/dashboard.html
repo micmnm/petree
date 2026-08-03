@@ -140,7 +140,36 @@
       const logs = await (await fetch('/api/tasks/' + selected + '/logs')).text()
       body.innerHTML = `<pre class="log">${esc(logs)}</pre>`
     } else if (tab === 'Changes') {
-      body.innerHTML = '<p class="muted">loading changes…</p>' // filled in Task 6
+      body.innerHTML = '<p class="muted">loading changes…</p>'
+      const repos = await (await fetch('/api/tasks/' + selected + '/diff')).json()
+      body.innerHTML = repos.map((r) => {
+        if (!r.hasChanges) return `<div class="repoChange"><strong>${esc(r.repo)}</strong> <span class="muted">— no changes for this task</span></div>`
+        const cmd = r.reviewCommand
+        return `<div class="repoChange" style="margin-bottom:16px">
+          <div><strong>${esc(r.repo)}</strong> <span class="muted mono">${esc(r.branch)} vs ${esc(r.baseBranch)}</span></div>
+          <dt>review locally</dt>
+          <div class="cmd"><span>${esc(cmd)}</span>${copyBtn(cmd)}</div>
+          <dt>diff</dt>
+          <div><button class="copy" data-copy="${encodeURIComponent(r.patch)}">copy diff</button></div>
+          <pre class="diff">${esc(r.patch)}</pre>
+          <dt>push</dt>
+          <div class="field">
+            <input class="mono" data-target="${esc(r.repo)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line);border-radius:6px">
+            <button data-push="${esc(r.repo)}">Push branch</button>
+            <span class="pushout muted" data-out="${esc(r.repo)}"></span>
+          </div>
+        </div>`
+      }).join('')
+      body.querySelectorAll('[data-push]').forEach((btn) => btn.addEventListener('click', async () => {
+        const repo = btn.dataset.push
+        const target = body.querySelector(`[data-target="${repo}"]`).value
+        const out = body.querySelector(`[data-out="${repo}"]`)
+        out.textContent = 'pushing…'
+        const res = await (await fetch('/api/tasks/' + selected + '/push', {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo, target }),
+        })).json()
+        out.textContent = res.ok ? '✓ ' + (res.output || 'pushed').split('\n')[0] : '✗ ' + (res.output || 'failed').split('\n').slice(-2).join(' ')
+      }))
     }
     document.querySelectorAll('[data-resume]').forEach((b) => b.addEventListener('click', async () => {
       await fetch('/api/tasks/' + b.dataset.resume + '/resume', { method: 'POST' }); refresh()

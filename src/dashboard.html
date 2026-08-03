@@ -163,13 +163,16 @@
       }).join('')
       body.querySelectorAll('[data-push]').forEach((btn) => btn.addEventListener('click', async () => {
         const repo = btn.dataset.push
-        const target = body.querySelector(`[data-target="${repo}"]`).value
-        const out = body.querySelector(`[data-out="${repo}"]`)
+        const sel = CSS.escape(repo)
+        const target = body.querySelector(`[data-target="${sel}"]`).value
+        const out = body.querySelector(`[data-out="${sel}"]`)
         out.textContent = 'pushing…'
         const res = await (await fetch('/api/tasks/' + selected + '/push', {
           method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo, target }),
         })).json()
-        out.textContent = res.ok ? '✓ ' + (res.output || 'pushed').split('\n')[0] : '✗ ' + (res.output || 'failed').split('\n').slice(-2).join(' ')
+        // Validation failures (400s) come back as { error }, not { output } — fall back to it
+        // so the user sees the actual reason instead of a generic "failed".
+        out.textContent = res.ok ? '✓ ' + (res.output || 'pushed').split('\n')[0] : '✗ ' + (res.output || res.error || 'failed').split('\n').slice(-2).join(' ')
       }))
     }
     document.querySelectorAll('[data-resume]').forEach((b) => b.addEventListener('click', async () => {
@@ -181,10 +184,11 @@
     const tasks = await (await fetch('/api/tasks')).json()
     document.getElementById('tasks').innerHTML = tasks.map(taskRow).join('')
     renderTabs()
-    // Only auto-refresh live tabs; Changes/Result render on tab entry so the 3s
+    // Only auto-refresh live tabs; Changes renders on tab entry only so the 3s
     // poll can't reset the push-target input, re-run git diff, or detach the
-    // push-result node mid-push.
-    if (selected && (tab === 'Overview' || tab === 'Log')) await renderBody()
+    // push-result node mid-push. Result has no such editable state, so it's
+    // safe (and necessary) to keep it live while a run is still in progress.
+    if (selected && (tab === 'Overview' || tab === 'Log' || tab === 'Result')) await renderBody()
   }
   setInterval(refresh, 3000); refresh()
 </script>

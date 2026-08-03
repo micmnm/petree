@@ -45,6 +45,19 @@ describe('TaskStore', () => {
     expect(got.sessionId).toBe('sess-1')
   })
 
+  it('patch can set error directly on a terminal task without a transition', () => {
+    const t = store.create(input)
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'done')
+    const patched = store.patch(t.id, { error: 'commit failed for demo: boom' })
+    expect(patched.state).toBe('done')
+    expect(patched.error).toBe('commit failed for demo: boom')
+    // patch without touching error preserves the existing value
+    store.patch(t.id, { sessionId: 'sess-2' })
+    expect(store.get(t.id)?.error).toBe('commit failed for demo: boom')
+  })
+
   it('counts by state and pops queued FIFO', () => {
     const a = store.create(input)
     store.create(input)

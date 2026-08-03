@@ -80,12 +80,21 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     // Capture any file changes the agent made as a commit on the task branch,
     // per repo, on the host. Investigation tasks that changed nothing get no commit.
     const firstLine = task.prompt.split('\n')[0].slice(0, 72)
+    const commitErrors: string[] = []
     for (const repo of task.repos) {
       try {
         commitChanges(join(workDir, repo), task.id, `petree ${task.id}: ${firstLine}`)
       } catch (err) {
-        storeError = `commit failed for ${repo}: ${String(err)}`
+        commitErrors.push(`commit failed for ${repo}: ${String(err)}`)
       }
+    }
+    // The task is already in a terminal state by now (done/failed/paused), so this
+    // can't go through transition() — patch the error field directly, appending to
+    // whatever's already there rather than clobbering it.
+    if (commitErrors.length) {
+      const current = store.get(task.id)
+      const combined = [current?.error, ...commitErrors].filter(Boolean).join('; ')
+      safely(() => store.patch(task.id, { error: combined }))
     }
   }
 }

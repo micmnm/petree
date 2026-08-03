@@ -89,11 +89,11 @@ export class TaskStore {
     return this.get(id)!
   }
 
-  patch(id: string, fields: { sessionId?: string }): TaskRecord {
+  patch(id: string, fields: { sessionId?: string; error?: string }): TaskRecord {
     const t = this.get(id)
     if (!t) throw new Error(`no task ${id}`)
-    this.db.prepare('UPDATE tasks SET session_id = ?, updated_at = ? WHERE id = ?')
-      .run(fields.sessionId ?? t.sessionId, new Date().toISOString(), id)
+    this.db.prepare('UPDATE tasks SET session_id = ?, error = ?, updated_at = ? WHERE id = ?')
+      .run(fields.sessionId ?? t.sessionId, fields.error ?? t.error, new Date().toISOString(), id)
     return this.get(id)!
   }
 

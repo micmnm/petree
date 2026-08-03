@@ -182,4 +182,29 @@ describe('makeLauncher', () => {
     const branch = execFileSync('git', ['-C', repoDir, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim()
     expect(branch).toBe(`petree/${task.id}`)
   })
+
+  it('surfaces a commit failure on task.error without clobbering a successful result', async () => {
+    const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const cfg = {
+      home,
+      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', setup: [], test: [], skills: [], defaultModel: null } },
+      allowClone: [],
+    }
+    const store = new TaskStore(join(home, 'petree.db'))
+    const created = store.create({ prompt: 'edit the readme', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const task = store.transition(created.id, 'provisioning')
+    // fake "claude" that wrecks the repo's .git dir before exiting cleanly, so the
+    // post-run commit step fails
+    const wrecker = [process.execPath, '-e',
+      `const fs=require('fs');fs.rmSync(process.env.WD+'/demo/.git',{recursive:true,force:true});` +
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'done'}))`]
+    const launch = makeLauncher(cfg, store, { buildCommand: (t, workDir) => { process.env.WD = workDir; return wrecker } })
+    await launch(task)
+    const finished = store.get(task.id)!
+    expect(finished.state).toBe('done')
+    expect(finished.result).toBe('done')
+    expect(finished.error).toMatch(/commit failed for demo/)
+  })
 })

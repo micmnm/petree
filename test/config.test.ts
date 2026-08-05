@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { loadConfig, resolveModel } from '../src/config.js'
+import { loadConfig, parseConfigText, resolveModel } from '../src/config.js'
 
 function petreeHome(yamlText: string): string {
   const home = mkdtempSync(join(tmpdir(), 'petree-'))
@@ -48,6 +48,23 @@ repos:
   bad: { url: x }
 `)
     expect(() => loadConfig(home)).toThrow(/image/)
+  })
+})
+
+describe('parseConfigText', () => {
+  it('parses YAML text directly, without touching disk', () => {
+    const cfg = parseConfigText(`
+repos:
+  demo:
+    url: file:///tmp/demo
+    image: sandbox-node
+`)
+    expect(cfg.repos.demo.url).toBe('file:///tmp/demo')
+    expect(cfg.allowClone).toEqual([])
+  })
+
+  it('throws the same validation errors as loadConfig', () => {
+    expect(() => parseConfigText('repos:\n  bad: { url: x }\n')).toThrow(/image/)
   })
 })
 

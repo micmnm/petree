@@ -1,8 +1,8 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
-import { resolveModel } from './config.js'
+import { parseConfigText, resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
 import { repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch } from './gitops.js'
 import type { Launcher } from './launcher.js'
@@ -100,6 +100,35 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
         test: r.test,
       })),
     )
+  })
+
+  // Raw repos.yaml editor: cfg is a shared object reference held by the
+  // launcher/scheduler/store closures too, so mutating its fields in place
+  // (rather than replacing the reference) applies a save immediately without
+  // a restart.
+  app.get('/api/repos-yaml', (_req, res) => {
+    const file = join(cfg.home, 'repos.yaml')
+    res.json({ content: existsSync(file) ? readFileSync(file, 'utf8') : '' })
+  })
+
+  app.put('/api/repos-yaml', (req, res) => {
+    const { content } = (req.body ?? {}) as { content?: string }
+    if (typeof content !== 'string' || !content.trim()) {
+      res.status(400).json({ error: 'content is required' })
+      return
+    }
+    let parsed: Omit<PetreeConfig, 'home'>
+    try {
+      parsed = parseConfigText(content)
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) })
+      return
+    }
+    writeFileSync(join(cfg.home, 'repos.yaml'), content)
+    cfg.defaults = parsed.defaults
+    cfg.repos = parsed.repos
+    cfg.allowClone = parsed.allowClone
+    res.json({ ok: true })
   })
 
   app.get('/api/tasks/:id', (req, res) => {

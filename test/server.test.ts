@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Server } from 'node:http'
@@ -336,6 +336,52 @@ describe('API', () => {
     const pruneRes = await fetch(`${base}/api/prune`, { method: 'POST' })
     expect((await pruneRes.json()).removedByLimit).toBe(1)
     expect((await (await fetch(`${base}/api/tasks`)).json())).toHaveLength(1)
+  })
+
+  it('reads and writes repos.yaml, applying edits to the running config in place', async () => {
+    writeFileSync(join(home, 'repos.yaml'), 'repos:\n  demo:\n    url: x\n    image: sandbox-node\n')
+    const got = await (await fetch(`${base}/api/repos-yaml`)).json()
+    expect(got.content).toContain('demo')
+
+    const newYaml = 'repos:\n  demo:\n    url: x\n    image: sandbox-node\n  extra:\n    url: y\n    image: sandbox-node\n'
+    const put = await fetch(`${base}/api/repos-yaml`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: newYaml }),
+    })
+    expect(put.status).toBe(200)
+    expect(readFileSync(join(home, 'repos.yaml'), 'utf8')).toBe(newYaml)
+
+    const repos = await (await fetch(`${base}/api/repos`)).json()
+    expect(repos.map((r: { name: string }) => r.name).sort()).toEqual(['demo', 'extra'])
+
+    // a task created after the edit sees the new repo without a server restart
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', repos: ['extra'] }),
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it('rejects invalid repos.yaml content without touching the running config', async () => {
+    const bad = await fetch(`${base}/api/repos-yaml`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: 'repos:\n  bad:\n    url: x\n' }),
+    })
+    expect(bad.status).toBe(400)
+    expect((await bad.json()).error).toMatch(/image/)
+
+    // the original 'demo' repo (seeded in beforeEach) still resolves
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', repos: ['demo'] }),
+    })
+    expect(res.status).toBe(201)
+
+    const empty = await fetch(`${base}/api/repos-yaml`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content: '' }),
+    })
+    expect(empty.status).toBe(400)
   })
 
   it('rejects /next with a missing prompt, unknown model, wrong state, or unknown id', async () => {

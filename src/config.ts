@@ -44,10 +44,11 @@ export interface PetreeConfig {
   allowClone: string[]
 }
 
-export function loadConfig(
-  home: string = process.env.PETREE_HOME ?? join(homedir(), '.petree'),
-): PetreeConfig {
-  const raw = (yaml.load(readFileSync(join(home, 'repos.yaml'), 'utf8')) ?? {}) as Record<string, unknown>
+// Split out from loadConfig so the dashboard's repos.yaml editor can validate
+// a candidate document (parse + same repo checks) before it's ever written
+// to disk or applied to the running config.
+export function parseConfigText(text: string): Omit<PetreeConfig, 'home'> {
+  const raw = (yaml.load(text) ?? {}) as Record<string, unknown>
   const d = (raw.defaults ?? {}) as Record<string, unknown>
   const repos: Record<string, RepoConfig> = {}
   for (const [name, value] of Object.entries((raw.repos ?? {}) as Record<string, Record<string, unknown>>)) {
@@ -66,7 +67,6 @@ export function loadConfig(
     }
   }
   return {
-    home,
     defaults: {
       timeoutMinutes: Number(d.timeout_minutes ?? 30),
       tokenBudget: Number(d.token_budget ?? 500_000),
@@ -77,6 +77,12 @@ export function loadConfig(
     repos,
     allowClone: (raw.allow_clone as string[]) ?? [],
   }
+}
+
+export function loadConfig(
+  home: string = process.env.PETREE_HOME ?? join(homedir(), '.petree'),
+): PetreeConfig {
+  return { home, ...parseConfigText(readFileSync(join(home, 'repos.yaml'), 'utf8')) }
 }
 
 export function resolveModel(

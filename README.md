@@ -17,8 +17,24 @@ Spec: docs/superpowers/specs/2026-07-30-petree-sandbox-orchestrator-design.md
    (`gh auth login`) on the host to enable the "Create PR" button on a task's
    Result tab. Without it, you can still push branches and open PRs manually.
 
-## Run
+## Run locally
 
+The quickest way, after the one-time [Setup](#setup) above:
+
+    ./scripts/start.sh
+
+The script asks whether to pull the latest changes first (default yes,
+fast-forward only; if the pull fails — no network, diverged branch, local
+conflicts — it reports the git error and stops instead of starting on an
+unknown state). It then switches to Node 22 via nvm if you have it, installs
+dependencies, and starts the dashboard on http://localhost:4100.
+Pass `--pull` or `--no-pull` to skip the question (e.g. `--no-pull` while
+working on local changes; when run non-interactively it pulls by default).
+
+Or run the steps by hand:
+
+    nvm use              # Node 22 — better-sqlite3's native module needs it
+    npm install
     npm run dev          # dashboard on http://localhost:4100
 
 Create a task from the dashboard (prompt + repo names). Tasks run unattended

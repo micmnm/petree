@@ -40,7 +40,7 @@ beforeEach(async () => {
   const cfg: PetreeConfig = {
     home,
     defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-    repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+    repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null } },
     allowClone: [],
   }
   store = new TaskStore(join(home, 'db'))

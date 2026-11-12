@@ -6,11 +6,21 @@ export type TaskState =
   | 'paused-limit' | 'paused-rate-limit' | 'waiting-for-you'
   | 'done' | 'failed' | 'cancelled'
 
+export type Stage = 'investigate' | 'spec' | 'build'
+export const STAGES: Stage[] = ['investigate', 'spec', 'build']
+
+export interface Comment {
+  text: string
+  at: string
+  consumed: boolean
+}
+
 export interface Turn {
   prompt: string
   result: string | null
   tokensUsed: number
   endedAt: string
+  stage: Stage
 }
 
 export interface TaskRecord {
@@ -33,6 +43,8 @@ export interface TaskRecord {
   retryAt: string | null
   startedAt: string | null
   logOffset: number
+  stage: Stage
+  comments: Comment[]
 }
 
 // States a task must reach before it becomes eligible for automatic
@@ -45,13 +57,26 @@ export interface RetentionSettings {
   maxPerRepoGroup: number
 }
 
-// States a finished task's turn can be archived from, then requeued with a
-// follow-up prompt (used by followUp() and the /next route).
-export const FOLLOWUP_STATES: TaskState[] = ['done', 'failed', 'cancelled']
+// States a turn can be archived from, then requeued with a follow-up prompt
+// (used by followUp() and the /next route). 'waiting-for-you' is the gate.
+export const FOLLOWUP_STATES: TaskState[] = ['done', 'failed', 'cancelled', 'waiting-for-you']
 
 // States from which /resume may re-run the same prompt. Deliberately excludes
-// 'done' — a done task's turn must be archived via /next, not re-run in place.
-export const RESUMABLE_STATES: TaskState[] = ['paused-limit', 'paused-rate-limit', 'waiting-for-you', 'failed', 'cancelled']
+// 'done' — a done task's turn must be archived via /next, not re-run in place —
+// and 'waiting-for-you', which only a follow-up (gate decision) leaves.
+export const RESUMABLE_STATES: TaskState[] = ['paused-limit', 'paused-rate-limit', 'failed', 'cancelled']
+
+// Same stage is always fine; forward only through the gate; back only once finished.
+export function canMoveStage(state: TaskState, from: Stage, to: Stage): boolean {
+  const d = STAGES.indexOf(to) - STAGES.indexOf(from)
+  if (d === 0) return true
+  if (state === 'waiting-for-you') return d > 0
+  return (state === 'done' || state === 'failed' || state === 'cancelled') && d < 0
+}
+
+export function threadTitle(t: TaskRecord): string {
+  return (t.turns[0]?.prompt ?? t.prompt).split('\n')[0].slice(0, 72)
+}
 
 const TRANSITIONS: Record<TaskState, TaskState[]> = {
   queued: ['provisioning', 'failed', 'cancelled'],
@@ -59,7 +84,7 @@ const TRANSITIONS: Record<TaskState, TaskState[]> = {
   running: ['done', 'queued', 'failed', 'paused-limit', 'paused-rate-limit', 'waiting-for-you', 'cancelled'],
   'paused-limit': ['queued', 'failed'],
   'paused-rate-limit': ['queued', 'failed'],
-  'waiting-for-you': ['queued', 'failed'],
+  'waiting-for-you': ['queued', 'failed', 'cancelled'],
   done: ['queued'],
   failed: ['queued'],
   cancelled: ['queued'],
@@ -78,7 +103,8 @@ function rowToTask(r: any): TaskRecord {
     state: r.state, sessionId: r.session_id, tokensUsed: r.tokens_used,
     tokenBudget: r.token_budget, timeoutMinutes: r.timeout_minutes,
     error: r.error, result: r.result ?? null, model: r.model ?? null,
-    turns: JSON.parse(r.turns ?? '[]'),
+    turns: (JSON.parse(r.turns ?? '[]') as Turn[]).map((t) => ({ ...t, stage: t.stage ?? 'build' })),
+    stage: r.stage, comments: JSON.parse(r.comments ?? '[]'),
     createdAt: r.created_at, updatedAt: r.updated_at,
     restarts: r.restarts ?? 0, retryAt: r.retry_at ?? null,
     startedAt: r.started_at ?? null, logOffset: r.log_offset ?? 0,
@@ -104,6 +130,9 @@ export class TaskStore {
     if (!cols.includes('retry_at')) this.db.exec('ALTER TABLE tasks ADD COLUMN retry_at TEXT')
     if (!cols.includes('started_at')) this.db.exec('ALTER TABLE tasks ADD COLUMN started_at TEXT')
     if (!cols.includes('log_offset')) this.db.exec('ALTER TABLE tasks ADD COLUMN log_offset INTEGER NOT NULL DEFAULT 0')
+    // Default 'build' so pre-threads rows read as already-building tasks.
+    if (!cols.includes('stage')) this.db.exec("ALTER TABLE tasks ADD COLUMN stage TEXT NOT NULL DEFAULT 'build'")
+    if (!cols.includes('comments')) this.db.exec('ALTER TABLE tasks ADD COLUMN comments TEXT')
 
     this.db.exec(`CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -114,13 +143,14 @@ export class TaskStore {
       VALUES (1, 3, 5, ?)`).run(new Date().toISOString())
   }
 
-  create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number; model?: string | null }): TaskRecord {
+  create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number; model?: string | null; stage?: Stage }): TaskRecord {
     const now = new Date().toISOString()
     const id = randomUUID().slice(0, 8)
     this.db.prepare(`INSERT INTO tasks
-      (id, prompt, repos, mode, state, token_budget, timeout_minutes, model, created_at, updated_at)
-      VALUES (?, ?, ?, 'unattended', 'queued', ?, ?, ?, ?, ?)`)
-      .run(id, input.prompt, JSON.stringify(input.repos), input.tokenBudget, input.timeoutMinutes, input.model ?? null, now, now)
+      (id, prompt, repos, mode, state, token_budget, timeout_minutes, model, stage, created_at, updated_at)
+      VALUES (?, ?, ?, 'unattended', 'queued', ?, ?, ?, ?, ?, ?)`)
+      .run(id, input.prompt, JSON.stringify(input.repos), input.tokenBudget, input.timeoutMinutes, input.model ?? null,
+        input.stage ?? 'investigate', now, now)
     return this.get(id)!
   }
 
@@ -167,22 +197,46 @@ export class TaskStore {
     return this.get(id)!
   }
 
-  // Archive the finished turn and requeue the task with a follow-up prompt.
-  // sessionId is kept — it is what lets the next run resume the conversation.
-  followUp(id: string, prompt: string, model?: string | null): TaskRecord {
+  // Comments never change state or prompt; followUp folds the pending ones in.
+  addComment(id: string, text: string): TaskRecord {
     const t = this.get(id)
     if (!t) throw new Error(`no task ${id}`)
-    if (!FOLLOWUP_STATES.includes(t.state)) {
-      throw new Error(`cannot follow up from state ${t.state}`)
-    }
-    const turns: Turn[] = [
-      ...t.turns,
-      { prompt: t.prompt, result: t.result, tokensUsed: t.tokensUsed, endedAt: new Date().toISOString() },
-    ]
-    this.db.prepare(`UPDATE tasks SET prompt = ?, model = ?, tokens_used = 0, result = NULL,
-      turns = ?, state = 'queued', restarts = 0, retry_at = NULL, updated_at = ? WHERE id = ?`)
-      .run(prompt, model !== undefined ? model : t.model, JSON.stringify(turns), new Date().toISOString(), id)
+    const comments = [...t.comments, { text, at: new Date().toISOString(), consumed: false }]
+    this.db.prepare('UPDATE tasks SET comments = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify(comments), new Date().toISOString(), id)
     return this.get(id)!
+  }
+
+  // Archive the finished turn and requeue the task with a follow-up prompt,
+  // folding pending comments in and optionally moving the stage.
+  // sessionId is kept — it is what lets the next run resume the conversation.
+  followUp(id: string, prompt: string, model?: string | null, stage?: Stage): TaskRecord {
+    return this.db.transaction(() => {
+      const t = this.get(id)
+      if (!t) throw new Error(`no task ${id}`)
+      if (!FOLLOWUP_STATES.includes(t.state)) {
+        throw new Error(`cannot follow up from state ${t.state}`)
+      }
+      const to = stage ?? t.stage
+      if (!canMoveStage(t.state, t.stage, to)) {
+        throw new Error(`illegal stage move ${t.stage} -> ${to} from state ${t.state}`)
+      }
+      const turns: Turn[] = [
+        ...t.turns,
+        { prompt: t.prompt, result: t.result, tokensUsed: t.tokensUsed, endedAt: new Date().toISOString(), stage: t.stage },
+      ]
+      const pending = t.comments.filter((c) => !c.consumed)
+      const full = pending.length
+        ? [prompt, `## Comments from the user since the last turn\n\n${pending.map((c) => `- ${c.text}`).join('\n')}`]
+          .filter(Boolean).join('\n\n')
+        : prompt
+      const comments = t.comments.map((c) => ({ ...c, consumed: true }))
+      this.db.prepare(`UPDATE tasks SET prompt = ?, model = ?, tokens_used = 0, result = NULL,
+        turns = ?, stage = ?, comments = ?, state = 'queued', restarts = 0, retry_at = NULL, updated_at = ? WHERE id = ?`)
+        .run(full, model !== undefined ? model : t.model, JSON.stringify(turns), to, JSON.stringify(comments),
+          new Date().toISOString(), id)
+      return this.get(id)!
+    })()
   }
 
   // Requeue a task orphaned by a server restart (its container is gone).

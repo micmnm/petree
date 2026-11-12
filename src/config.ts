@@ -12,6 +12,7 @@ export interface RepoConfig {
   setup: string[]
   build: string[]
   test: string[]
+  run: string[]
   skills: string[]
   defaultModel: string | null
 }
@@ -62,6 +63,7 @@ export function parseConfigText(text: string): Omit<PetreeConfig, 'home'> {
       setup: toList(value.setup),
       build: toList(value.build),
       test: toList(value.test),
+      run: toList(value.run),
       skills: toList(value.skills),
       defaultModel: value.default_model != null ? String(value.default_model) : null,
     }

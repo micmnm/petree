@@ -9,7 +9,7 @@ import { buildSandboxCommands, containerName, inspectContainerState, readToken }
 const cfg: PetreeConfig = {
   home: '/petree-home',
   defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-  repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+  repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null } },
   allowClone: [],
 }
 
@@ -17,7 +17,7 @@ const task: TaskRecord = {
   id: 'abc123', prompt: 'fix the bug', repos: ['demo'], mode: 'unattended',
   state: 'provisioning', sessionId: null, tokensUsed: 0, tokenBudget: 500000,
   timeoutMinutes: 30, error: null, result: null, model: null, turns: [], createdAt: '', updatedAt: '',
-  restarts: 0, retryAt: null, startedAt: null, logOffset: 0,
+  restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'build', comments: [],
 }
 
 describe('buildSandboxCommands', () => {

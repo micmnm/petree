@@ -6,7 +6,7 @@ import { composePrompt } from '../src/prompt.js'
 function repo(over: Partial<RepoConfig> = {}): RepoConfig {
   return {
     url: 'x', defaultBranch: 'main', image: 'sandbox-node',
-    instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null,
+    instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null,
     ...over,
   }
 }
@@ -25,7 +25,7 @@ function task(over: Partial<TaskRecord> = {}): TaskRecord {
     id: 'abc123', prompt: 'fix the bug', repos: ['demo'], mode: 'unattended',
     state: 'provisioning', sessionId: null, tokensUsed: 0, tokenBudget: 500000,
     timeoutMinutes: 30, error: null, result: null, model: null, turns: [], createdAt: '', updatedAt: '',
-    restarts: 0, retryAt: null, startedAt: null, logOffset: 0,
+    restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'build', comments: [],
     ...over,
   }
 }

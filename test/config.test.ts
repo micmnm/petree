@@ -104,6 +104,18 @@ repos:
   })
 })
 
+describe('run commands', () => {
+  it('parses run as a command list and defaults to []', () => {
+    const cfg = parseConfigText(`
+repos:
+  demo: { url: x, image: sandbox-node, run: pnpm dev }
+  bare: { url: y, image: sandbox-node }
+`)
+    expect(cfg.repos.demo.run).toEqual(['pnpm dev'])
+    expect(cfg.repos.bare.run).toEqual([])
+  })
+})
+
 describe('default_model', () => {
   it('parses default_model at defaults and repo level', () => {
     const home = petreeHome(`

@@ -48,7 +48,8 @@
 **Files:**
 - Modify: `src/store.ts`
 - Modify (TaskRecord literals gain `stage: 'build', comments: []`): `test/sandbox.test.ts`, `test/prompt.test.ts`, any other test building a `TaskRecord` literal (`grep -rn "logOffset: 0" test/`)
-- Test: `test/store.test.ts`
+- Modify (moved here from Task 3 so parallel tasks never share files): `src/config.ts` — `RepoConfig.run: string[]` parsed with `toList(value.run)`; every `RepoConfig` literal in `test/` gains `run: []` (`grep -rn "skills: \[\]" test/`)
+- Test: `test/store.test.ts`, `test/config.test.ts` (`run: pnpm dev` → `['pnpm dev']`; absent → `[]`)
 
 **Interfaces:**
 - Produces:
@@ -119,21 +120,19 @@
 ### Task 3: Sandbox, image, workspace, launcher finalization
 
 **Files:**
-- Modify: `src/sandbox.ts`, `src/launcher.ts`, `src/git.ts`, `src/config.ts`, `src/index.ts`, `scripts/build-images.sh`, `README.md`
+- Modify: `src/sandbox.ts`, `src/launcher.ts`, `src/git.ts`, `src/index.ts`, `scripts/build-images.sh`, `README.md` (`RepoConfig.run` already exists from Task 1)
 - Create: `images/full.Dockerfile`
-- Test: `test/sandbox.test.ts`, `test/launcher.test.ts`, `test/git.test.ts`, `test/config.test.ts`, `test/restart.test.ts` (reattach case)
+- Test: `test/sandbox.test.ts`, `test/launcher.test.ts`, `test/git.test.ts`, `test/restart.test.ts` (reattach case)
 
 **Interfaces:**
 - Consumes: `Stage`, `threadTitle` (Task 1)
 - Produces:
-  - `RepoConfig.run: string[]` (parsed like `setup`)
   - `export function pickImage(repos: string[], cfg: PetreeConfig): string` — throws `Error` naming repos+images on an unsupported mix
   - `buildSandboxCommands` uses `pickImage`; mounts skills at `/home/dev/.claude/skills:ro`, notes at `/petree/notes:ro`; no findings mount
 
 - [ ] **Step 1: Write failing tests**:
   - sandbox: create cmd contains `/petree-home/shared/skills:/home/dev/.claude/skills:ro` and `/petree-home/notes:/petree/notes:ro`, not `/petree/findings`.
   - `pickImage(['a','b'])` with both `sandbox-node` → `'sandbox-node'`; node + dotnet → `'sandbox-full'`; node + `sandbox-python` → throws `/sandbox-python/`.
-  - config: `run: pnpm dev` parses to `['pnpm dev']`; absent → `[]`.
   - git: after `prepareWorkspace`, `git rev-list --count HEAD` in the clone equals the fixture repo's commit count with a fixture of 2 commits (proves no `--depth 1`).
   - launcher: a task with `stage: 'investigate'` and fake scenario `ok` ends `waiting-for-you` with `result` set; `stage: 'build'` ends `done`.
   - launcher: commit message on the branch equals `petree <id>: <threadTitle>` after a `followUp` with an empty prompt.

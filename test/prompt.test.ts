@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { PetreeConfig, RepoConfig } from '../src/config.js'
 import type { TaskRecord } from '../src/store.js'
-import { composePrompt } from '../src/prompt.js'
+import { composePrompt, STAGE_INSTRUCTIONS } from '../src/prompt.js'
 
 function repo(over: Partial<RepoConfig> = {}): RepoConfig {
   return {
@@ -31,8 +31,45 @@ function task(over: Partial<TaskRecord> = {}): TaskRecord {
 }
 
 describe('composePrompt', () => {
-  it('returns the prompt untouched when nothing is configured', () => {
-    expect(composePrompt(task(), config({ demo: repo() }))).toBe('fix the bug')
+  it('puts the stored prompt first, then the stage block', () => {
+    const out = composePrompt(task(), config({ demo: repo() }))
+    expect(out.startsWith('fix the bug')).toBe(true)
+    expect(out).toContain('## Stage: build')
+    expect(out).toContain(STAGE_INSTRUCTIONS.build)
+  })
+
+  it('omits the prompt when empty (approve) and starts at the stage block', () => {
+    const out = composePrompt(task({ prompt: '' }), config({ demo: repo() }))
+    expect(out.startsWith('## Stage: ')).toBe(true)
+  })
+
+  it('gives each stage its own instructions', () => {
+    const cfg = config({ demo: repo() })
+    const inv = composePrompt(task({ stage: 'investigate' }), cfg)
+    expect(inv).toContain('/work/_thread/findings.md')
+    expect(inv).toContain('do not modify')
+    const spec = composePrompt(task({ stage: 'spec' }), cfg)
+    expect(spec).toContain('spec-driven-development')
+    expect(spec).toContain('/work/_thread/spec.md')
+    const build = composePrompt(task({ stage: 'build' }), cfg)
+    expect(build).toContain('planning-and-task-breakdown')
+    expect(build).toContain('in parallel')
+    expect(build).toContain('test-driven-development')
+  })
+
+  it('points at notes, repo CLAUDE.md and the suggestion dir for each repo', () => {
+    const out = composePrompt(task({ repos: ['demo', 'api'] }), config({ demo: repo(), api: repo() }))
+    for (const r of ['demo', 'api']) {
+      expect(out).toContain(`/petree/notes/${r}/INDEX.md`)
+      expect(out).toContain(`/work/${r}/CLAUDE.md`)
+      expect(out).toContain(`/work/_thread/notes/${r}/`)
+    }
+  })
+
+  it('keeps repo conventions after the stage block', () => {
+    const out = composePrompt(task(), config({ demo: repo({ instructions: 'Be careful.' }) }))
+    expect(out).toContain('## Repo conventions')
+    expect(out.indexOf('## Repo conventions')).toBeGreaterThan(out.indexOf('## Stage: build'))
   })
 
   it('appends repo instructions after the task prompt', () => {
@@ -82,6 +119,6 @@ describe('composePrompt', () => {
 
   it('ignores repo names that are no longer in the registry', () => {
     const out = composePrompt(task({ repos: ['gone'] }), config({ demo: repo({ test: ['npm test'] }) }))
-    expect(out).toBe('fix the bug')
+    expect(out).not.toContain('## Repo conventions')
   })
 })

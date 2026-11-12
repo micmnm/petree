@@ -201,7 +201,10 @@
   import { renderActivity } from './activity.js'
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
   let selected = null, tab = 'Overview', resultShownFor = null
-  const TABS = ['Overview', 'Result', 'Changes', 'Log']
+  // Spec/Findings/Notes tabs appear only when the thread has that content
+  let threadInfo = { spec: '', findings: '', suggestions: [] }
+  const tabsFor = () => ['Overview', ...(threadInfo.spec ? ['Spec'] : []), ...(threadInfo.findings ? ['Findings'] : []),
+    ...(threadInfo.suggestions.length ? ['Notes'] : []), 'Result', 'Changes', 'Log']
   // Log view preferences survive the 3s poll and page reloads
   let logView = localStorage.getItem('petree-logview') || 'Activity'
   let followLog = localStorage.getItem('petree-logfollow') !== 'off'
@@ -214,6 +217,11 @@
 
   // copy button: returns HTML; clicking copies decodeURIComponent of data-copy
   function copyBtn(text) { return `<button class="copy" data-copy="${encodeURIComponent(text)}">copy</button>` }
+  // Local panel for one /diff entry: folder, branch and run commands, each copyable
+  const localBlock = (r) => `<div class="local" style="margin:6px 0"><dt>local</dt>
+    <div class="cmd"><span>${esc(r.folder)}</span>${copyBtn(r.folder)}</div>
+    <div class="small muted">branch <span class="mono">${esc(r.branch)}</span></div>
+    ${(r.run || []).map((c) => `<div class="cmd" style="margin-top:4px"><span>run: ${esc(c)}</span>${copyBtn(c)}</div>`).join('')}</div>`
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('.copy'); if (!b) return
     try { await navigator.clipboard.writeText(decodeURIComponent(b.dataset.copy)); const o = b.textContent; b.textContent = 'copied'; setTimeout(() => (b.textContent = o), 1200) } catch {}
@@ -355,12 +363,12 @@
   }
   document.getElementById('tasks').addEventListener('click', (e) => {
     const tr = e.target.closest('tr[data-id]'); if (!tr) return
-    selected = tr.dataset.id; tab = 'Overview'; refresh()
+    selected = tr.dataset.id; tab = 'Overview'; threadInfo = { spec: '', findings: '', suggestions: [] }; refresh()
   })
 
   function renderTabs() {
     document.getElementById('tabs').innerHTML = selected
-      ? TABS.map((n) => `<button class="${n === tab ? 'active' : ''}" data-tab="${n}">${n}</button>`).join('') : ''
+      ? tabsFor().map((n) => `<button class="${n === tab ? 'active' : ''}" data-tab="${n}">${n}</button>`).join('') : ''
   }
   document.getElementById('tabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-tab]'); if (!b) return; tab = b.dataset.tab; renderBody()
@@ -370,8 +378,42 @@
     const body = document.getElementById('tabbody')
     if (!selected) { body.innerHTML = '<p class="muted">Select a thread to see details.</p>'; return }
     const t = await (await fetch('/api/tasks/' + selected)).json()
+    const th = await fetch('/api/tasks/' + selected + '/thread')
+    if (th.ok) threadInfo = await th.json()
+    if (!tabsFor().includes(tab)) tab = 'Overview'
     renderTabs()
-    if (tab === 'Overview') {
+    if (tab === 'Spec' || tab === 'Findings') {
+      body.innerHTML = `<div class="result">${renderMarkdown(tab === 'Spec' ? threadInfo.spec : threadInfo.findings)}</div>`
+    } else if (tab === 'Notes') {
+      body.innerHTML = threadInfo.suggestions.map((s, i) => {
+        const summary = (s.text.split('\n').find((l) => l.trim()) || '').replace(/^#+\s*/, '').slice(0, 100)
+        return `<div class="card note" style="margin-bottom:8px;padding:12px" data-repo="${esc(s.repo)}" data-exists="${s.exists}" data-orig="${esc(s.topic)}">
+          <div><strong>${esc(s.repo)}</strong>${s.exists ? ' <span class="badge waiting-for-you">replaces existing note</span>' : ''}</div>
+          <dt>topic</dt><input class="note-topic mono" value="${esc(s.topic)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px">
+          <dt>summary (one line)</dt><input class="note-summary" value="${esc(summary)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px">
+          <dt>text</dt><textarea class="note-text" style="min-height:8rem">${esc(s.text)}</textarea>
+          <div class="field" style="margin-top:8px"><button class="primary" data-note-accept>Accept</button><button data-note-drop>Drop</button></div>
+        </div>`
+      }).join('')
+      body.querySelectorAll('.note').forEach((card) => {
+        const post = (action, payload) => fetch('/api/tasks/' + selected + '/notes/' + action, {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: card.dataset.repo, ...payload }),
+        })
+        const done = async (res) => {
+          if (!res.ok) { alert((await res.json()).error || 'failed'); return }
+          renderBody()
+        }
+        const topic = () => card.querySelector('.note-topic').value
+        card.querySelector('[data-note-accept]').addEventListener('click', async () => {
+          if (card.dataset.exists === 'true' && !confirm(`Replace the existing note ${topic()}?`)) return
+          const res = await post('accept', { topic: topic(), text: card.querySelector('.note-text').value, summary: card.querySelector('.note-summary').value })
+          // accept only clears the suggestion under the edited topic; clear the original too
+          if (res.ok && topic() !== card.dataset.orig) await post('drop', { topic: card.dataset.orig })
+          done(res)
+        })
+        card.querySelector('[data-note-drop]').addEventListener('click', async () => done(await post('drop', { topic: card.dataset.orig })))
+      })
+    } else if (tab === 'Overview') {
       const resume = ['paused-limit', 'paused-rate-limit', 'failed', 'cancelled'].includes(t.state)
         ? `<button data-resume="${esc(t.id)}">resume</button>` : ''
       const stop = ['queued', 'provisioning', 'running'].includes(t.state)
@@ -435,16 +477,13 @@
           <div class="result">${renderMarkdown(t.result)}</div>
           <div class="card" id="prSection" style="margin-top:16px;padding:12px"><p class="muted">loading repos…</p></div>`
         const repos = await (await fetch('/api/tasks/' + selected + '/diff')).json()
-        const changed = repos.filter((r) => r.hasChanges)
-        const prSection = document.getElementById('prSection')
-        prSection.innerHTML = changed.length
-          ? `<dt>open a pull request</dt>` + changed.map((r) => `<div class="field" style="margin:6px 0">
-              <strong>${esc(r.repo)}</strong>
+            const prSection = document.getElementById('prSection')
+        prSection.innerHTML = repos.map((r) => `<div style="margin-bottom:10px"><strong>${esc(r.repo)}</strong>${localBlock(r)}
+            ${r.hasChanges ? `<div class="field" style="margin:6px 0">
               <input class="mono" data-pr-target="${esc(r.repo)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line);border-radius:6px">
               <button data-pr="${esc(r.repo)}">Create PR</button>
               <span class="prout muted" data-prout="${esc(r.repo)}"></span>
-            </div>`).join('')
-          : '<p class="muted">No changes to open a PR for.</p>'
+            </div>` : '<p class="muted small">No changes to open a PR for.</p>'}</div>`).join('')
         prSection.querySelectorAll('[data-pr]').forEach((btn) => btn.addEventListener('click', async () => {
           const repo = btn.dataset.pr
           const sel = CSS.escape(repo)
@@ -492,6 +531,7 @@
         const cmd = r.reviewCommand
         return `<div class="repoChange" style="margin-bottom:16px">
           <div><strong>${esc(r.repo)}</strong> <span class="muted mono">${esc(r.branch)} vs ${esc(r.baseBranch)}</span></div>
+          ${localBlock(r)}
           <dt>review locally</dt>
           <div class="cmd"><span>${esc(cmd)}</span>${copyBtn(cmd)}</div>
           <dt>summary</dt><pre class="diff" style="max-height:none">${esc(r.stat)}</pre>
@@ -586,7 +626,7 @@
     const active = document.activeElement
     const typing = active && document.getElementById('tabbody').contains(active) &&
       ['TEXTAREA', 'INPUT', 'SELECT'].includes(active.tagName)
-    if (selected && !typing && (tab === 'Overview' || tab === 'Log' || resultLive)) await renderBody()
+    if (selected && !typing && (['Overview', 'Spec', 'Findings', 'Log'].includes(tab) || resultLive)) await renderBody()
   }
   setInterval(refresh, 3000); refresh()
 </script>

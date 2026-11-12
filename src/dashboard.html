@@ -405,10 +405,15 @@
         }
         const topic = () => card.querySelector('.note-topic').value
         card.querySelector('[data-note-accept]').addEventListener('click', async () => {
-          if (card.dataset.exists === 'true' && !confirm(`Replace the existing note ${topic()}?`)) return
-          const res = await post('accept', { topic: topic(), text: card.querySelector('.note-text').value, summary: card.querySelector('.note-summary').value })
+          const t = topic()
+          const renamed = t !== card.dataset.orig
+          // exists is known only for the original topic; a renamed one may collide silently
+          const msg = renamed ? `If a note "${t}" already exists it will be replaced. Continue?`
+            : card.dataset.exists === 'true' ? `Replace the existing note ${t}?` : ''
+          if (msg && !confirm(msg)) return
+          const res = await post('accept', { topic: t, text: card.querySelector('.note-text').value, summary: card.querySelector('.note-summary').value })
           // accept only clears the suggestion under the edited topic; clear the original too
-          if (res.ok && topic() !== card.dataset.orig) await post('drop', { topic: card.dataset.orig })
+          if (res.ok && renamed) await post('drop', { topic: card.dataset.orig })
           done(res)
         })
         card.querySelector('[data-note-drop]').addEventListener('click', async () => done(await post('drop', { topic: card.dataset.orig })))

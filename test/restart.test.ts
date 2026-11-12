@@ -64,7 +64,7 @@ function setup() {
 describe('restart survival (end to end, fake docker)', () => {
   it('a turn that finished while the server was down completes on recover', async () => {
     const { home, cfg, store } = setup()
-    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30, stage: 'build' })
     store.transition(t.id, 'provisioning')
     await prepareWorkspace(cfg, t.repos, join(home, 'work', t.id), t.id)
     store.transition(t.id, 'running')
@@ -86,7 +86,7 @@ describe('restart survival (end to end, fake docker)', () => {
 
   it('a mid-flight turn continues after restart without duplicate tokens or log lines', async () => {
     const { home, dockerHome, cfg, store } = setup()
-    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30, stage: 'build' })
     store.transition(t.id, 'provisioning')
     await prepareWorkspace(cfg, t.repos, join(home, 'work', t.id), t.id)
     store.transition(t.id, 'running')
@@ -111,6 +111,20 @@ describe('restart survival (end to end, fake docker)', () => {
     const log = readFileSync(join(home, 'logs', `${t.id}.log`), 'utf8')
     expect(log.match(/sess-123/g)).toHaveLength(1)
     expect(log.match(/too late/g)).toHaveLength(1)
+  })
+
+  it('an investigate turn reattached after restart ends waiting-for-you', async () => {
+    const { home, cfg, store } = setup()
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30, stage: 'investigate' })
+    store.transition(t.id, 'provisioning')
+    await prepareWorkspace(cfg, t.repos, join(home, 'work', t.id), t.id)
+    store.transition(t.id, 'running')
+    store.patch(t.id, { startedAt: new Date().toISOString(), logOffset: 0 })
+    execFileSync(process.execPath, [shim, 'run', `petree-${t.id}`, 'ok'])
+    execFileSync(process.execPath, [shim, 'wait', `petree-${t.id}`])
+    const launcher = makeLauncher(cfg, store, { buildCommands: shimCommands('ok') })
+    await launcher.reattach(store.get(t.id)!)
+    expect(store.get(t.id)?.state).toBe('waiting-for-you')
   })
 
   it('a vanished container requeues with backoff and relaunches later', async () => {

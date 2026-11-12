@@ -34,6 +34,17 @@ describe('prepareWorkspace', () => {
     expect(branch).toBe('petree/abc123')
   })
 
+  it('clones full history (no shallow clone)', async () => {
+    const fixture = makeFixtureRepo()
+    writeFileSync(join(fixture, 'b.txt'), 'b')
+    execFileSync('git', ['-C', fixture, 'add', '.'])
+    execFileSync('git', ['-C', fixture, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'second'])
+    const workDir = join(mkdtempSync(join(tmpdir(), 'petree-work-')), 'w')
+    await prepareWorkspace(cfgWith(`file://${fixture}`), ['demo'], workDir, 'abc123')
+    const count = execFileSync('git', ['-C', join(workDir, 'demo'), 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' }).trim()
+    expect(count).toBe('2')
+  })
+
   it('throws on unknown repo names', async () => {
     await expect(prepareWorkspace(cfgWith('file:///x'), ['nope'], '/tmp/unused-dir', 'abc123')).rejects.toThrow(/unknown repo/)
   })

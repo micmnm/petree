@@ -13,7 +13,10 @@ Spec: docs/superpowers/specs/2026-07-30-petree-sandbox-orchestrator-design.md
    `~/.petree/token` and `chmod 600 ~/.petree/token`.
    Never put ANTHROPIC_API_KEY in the environment — it would bypass your
    Max subscription and bill the API directly.
-5. (Optional) install and authenticate the [GitHub CLI](https://cli.github.com)
+5. Copy agent skills into `~/.petree/shared/skills/`:
+   `cp -R ~/.claude/plugins/cache/addy-agent-skills/agent-skills/<version>/skills/* ~/.petree/shared/skills/`
+   — copy, not symlink (a symlink would dangle inside the container).
+6. (Optional) install and authenticate the [GitHub CLI](https://cli.github.com)
    (`gh auth login`) on the host to enable the "Create PR" button on a task's
    Result tab. Without it, you can still push branches and open PRs manually.
 
@@ -62,9 +65,15 @@ repos:
     setup: ["pnpm install"]         # run before making changes
     build: ["pnpm build"]           # must pass before reporting success
     test: ["pnpm test", "pnpm typecheck"]
+    run: ["pnpm dev"]               # how to start the app, for the agent to verify changes
 ```
 
-All four keys are optional; a command list may also be a bare string
+Per-repo notes live in `~/.petree/notes/<repo>/` (an `INDEX.md` plus topic
+files); they are mounted read-only into every sandbox at `/petree/notes`.
+A thread touching repos with different images (node + dotnet) runs in the
+combined `sandbox-full` image.
+
+All five keys are optional; a command list may also be a bare string
 (`test: pnpm test`). Repos with none of them behave exactly as before — the
 prompt is passed through untouched.
 

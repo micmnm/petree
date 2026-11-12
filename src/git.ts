@@ -24,7 +24,7 @@ export async function prepareWorkspace(cfg: PetreeConfig, repoNames: string[], w
     const repo = cfg.repos[name]
     await execFileAsync(
       'git',
-      ['clone', '--depth', '1', '--branch', repo.defaultBranch, repo.url, join(workDir, name)],
+      ['clone', '--branch', repo.defaultBranch, repo.url, join(workDir, name)],
     )
     createTaskBranch(join(workDir, name), taskId)
   }

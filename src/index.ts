@@ -9,7 +9,7 @@ import { makeApp } from './server.js'
 import { TaskStore } from './store.js'
 
 const cfg = loadConfig()
-for (const dir of ['logs', 'work', 'shared/skills', 'shared/findings']) {
+for (const dir of ['logs', 'work', 'shared/skills', 'notes']) {
   mkdirSync(join(cfg.home, dir), { recursive: true })
 }
 const store = new TaskStore(join(cfg.home, 'petree.db'))

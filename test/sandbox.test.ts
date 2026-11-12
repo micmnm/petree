@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import type { PetreeConfig } from '../src/config.js'
 import type { TaskRecord } from '../src/store.js'
-import { buildSandboxCommands, containerName, inspectContainerState, readToken } from '../src/sandbox.js'
+import { buildSandboxCommands, containerName, inspectContainerState, pickImage, readToken } from '../src/sandbox.js'
 
 const cfg: PetreeConfig = {
   home: '/petree-home',
@@ -35,9 +35,24 @@ describe('buildSandboxCommands', () => {
     expect(cmds.create).toContain('sandbox-node')
     expect(cmds.create.join(' ')).toContain('-e CLAUDE_CODE_OAUTH_TOKEN=tok-1')
     expect(cmds.create.join(' ')).toContain('/tmp/work/abc123:/work')
-    expect(cmds.create.join(' ')).toContain('/petree-home/shared/skills:/petree/skills:ro')
     expect(cmds.create.join(' ')).toContain('--output-format stream-json')
     expect(cmds.create.join(' ')).not.toContain('ANTHROPIC_API_KEY')
+  })
+
+  it('mounts skills and notes read-only, with no findings mount', () => {
+    const cmd = buildSandboxCommands(task, cfg, '/tmp/w', 'tok').create.join(' ')
+    expect(cmd).toContain('/petree-home/shared/skills:/home/dev/.claude/skills:ro')
+    expect(cmd).toContain('/petree-home/notes:/petree/notes:ro')
+    expect(cmd).not.toContain('/petree/findings')
+  })
+
+  it('uses the combined image for a multi-stack task', () => {
+    const multi: PetreeConfig = {
+      ...cfg,
+      repos: { a: cfg.repos.demo, b: { ...cfg.repos.demo, image: 'sandbox-dotnet' } },
+    }
+    const cmds = buildSandboxCommands({ ...task, repos: ['a', 'b'] }, multi, '/w', 't')
+    expect(cmds.create).toContain('sandbox-full')
   })
 
   it('mounts the per-task session dir at /home/dev/.claude', () => {
@@ -94,12 +109,30 @@ describe('buildSandboxCommands', () => {
 
   it('passes the bare prompt when the repo has no conventions', () => {
     const cmds = buildSandboxCommands(task, cfg, '/w', 't')
-    expect(cmds.create[cmds.create.indexOf('-p') + 1]).toBe('fix the bug')
+    const prompt = cmds.create[cmds.create.indexOf('-p') + 1]
+    expect(prompt.startsWith('fix the bug')).toBe(true)
+    expect(prompt).toContain('## Stage: build')
   })
 
   it('omits --model when the task model is null', () => {
     const cmds = buildSandboxCommands({ ...task, model: null }, cfg, '/w', 't')
     expect(cmds.create).not.toContain('--model')
+  })
+})
+
+describe('pickImage', () => {
+  const two = (a: string, b: string): PetreeConfig => ({
+    ...cfg,
+    repos: { a: { ...cfg.repos.demo, image: a }, b: { ...cfg.repos.demo, image: b } },
+  })
+  it('returns the shared image when repos agree', () => {
+    expect(pickImage(['a', 'b'], two('sandbox-node', 'sandbox-node'))).toBe('sandbox-node')
+  })
+  it('combines node and dotnet into sandbox-full', () => {
+    expect(pickImage(['a', 'b'], two('sandbox-node', 'sandbox-dotnet'))).toBe('sandbox-full')
+  })
+  it('throws naming repos and images on an unsupported mix', () => {
+    expect(() => pickImage(['a', 'b'], two('sandbox-node', 'sandbox-python'))).toThrow(/sandbox-python/)
   })
 })
 

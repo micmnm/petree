@@ -6,7 +6,7 @@ import { prepareWorkspace } from './git.js'
 import { commitChanges } from './gitops.js'
 import { CliRunner } from './runner.js'
 import { buildSandboxCommands, readToken, type SandboxCommands } from './sandbox.js'
-import type { TaskRecord, TaskStore } from './store.js'
+import { threadTitle, type TaskRecord, type TaskStore } from './store.js'
 
 export interface LauncherOptions {
   buildCommands?: (task: TaskRecord, workDir: string) => SandboxCommands
@@ -85,7 +85,11 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
         if (e.type === 'log') logStream.write(e.line + '\n')
         else if (e.type === 'session') safely(() => store.patch(task.id, { sessionId: e.sessionId }))
         else if (e.type === 'usage') safely(() => store.addUsage(task.id, e.tokens))
-        else if (e.type === 'done') safely(() => { store.setResult(task.id, e.result); store.transition(task.id, 'done') })
+        // Stage is read from the store, not the launch-time snapshot (reattach passes a stale one).
+        else if (e.type === 'done') safely(() => {
+          store.setResult(task.id, e.result)
+          store.transition(task.id, store.get(task.id)!.stage === 'build' ? 'done' : 'waiting-for-you')
+        })
         else if (e.type === 'limit') safely(() => store.transition(task.id, 'paused-limit', { error: e.reason }))
         else if (e.type === 'error') safely(() => store.transition(task.id, 'failed', { error: e.message }))
       })
@@ -116,11 +120,15 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
 
     // Capture any file changes the agent made as a commit on the task branch,
     // per repo, on the host. Investigation tasks that changed nothing get no commit.
-    const firstLine = task.prompt.split('\n')[0].slice(0, 72)
+    const latest = store.get(task.id) ?? task
+    const title = threadTitle(latest)
     const commitErrors: string[] = []
     for (const repo of task.repos) {
       try {
-        commitChanges(join(workDir, repo), task.id, `petree ${task.id}: ${firstLine}`)
+        const committed = commitChanges(join(workDir, repo), task.id, `petree ${task.id}: ${title}`)
+        if (committed && latest.stage !== 'build') {
+          commitErrors.push(`${latest.stage} turn changed files in ${repo}`)
+        }
       } catch (err) {
         commitErrors.push(`commit failed for ${repo}: ${String(err)}`)
       }

@@ -5,7 +5,7 @@ export interface Suggestion { repo: string; topic: string; text: string; exists:
 
 export class NoteInputError extends Error {}
 
-const SLUG = /^[a-z0-9][a-z0-9_-]*$/
+const SLUG = /^[a-z0-9-]+$/
 
 function check(repo: string, topic: string, repos: string[]): void {
   if (!repos.includes(repo)) throw new NoteInputError(`unknown repo: ${repo}`)

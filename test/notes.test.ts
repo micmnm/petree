@@ -34,6 +34,7 @@ describe('listSuggestions', () => {
   it('lists slug .md files for listed repos and flags existing', () => {
     suggest('demo', 'run-locally.md', 'text')
     suggest('demo', 'Bad Name.md')
+    suggest('demo', 'a_b.md')
     suggest('other', 'x.md')
     mkdirSync(join(workDir, '_thread', 'notes', 'demo', 'nested'))
     writeFileSync(join(workDir, '_thread', 'notes', 'demo', 'nested', 'y.md'), 'y')
@@ -68,6 +69,7 @@ describe('acceptNote', () => {
 
   it('rejects bad topic or repo without writing', () => {
     expect(() => acceptNote(notesHome, workDir, { ...note, topic: '../x' }, repos)).toThrow(NoteInputError)
+    expect(() => acceptNote(notesHome, workDir, { ...note, topic: 'a_b' }, repos)).toThrow(NoteInputError)
     expect(() => acceptNote(notesHome, workDir, { ...note, repo: 'other' }, repos)).toThrow(NoteInputError)
     expect(existsSync(join(notesHome, 'demo'))).toBe(false)
     expect(existsSync(join(notesHome, 'other'))).toBe(false)
@@ -80,5 +82,6 @@ describe('dropSuggestion', () => {
     dropSuggestion(workDir, 'demo', 'a', repos)
     expect(existsSync(p)).toBe(false)
     expect(() => dropSuggestion(workDir, 'demo', '../a', repos)).toThrow(NoteInputError)
+    expect(() => dropSuggestion(workDir, 'demo', 'a_b', repos)).toThrow(NoteInputError)
   })
 })

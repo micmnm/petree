@@ -163,7 +163,7 @@ export class TaskStore {
     return this.db.prepare('SELECT * FROM tasks ORDER BY created_at DESC, rowid DESC').all().map(rowToTask)
   }
 
-  transition(id: string, to: TaskState, patch: { error?: string | null } = {}): TaskRecord {
+  transition(id: string, to: TaskState, patch: { error?: string | null; model?: string | null } = {}): TaskRecord {
     const t = this.get(id)
     if (!t) throw new Error(`no task ${id}`)
     if (!TRANSITIONS[t.state].includes(to)) throw new Error(`illegal transition ${t.state} -> ${to}`)
@@ -171,13 +171,26 @@ export class TaskStore {
     // by hand (resume/follow-up) must not stay gated behind an old backoff.
     // recoveryRequeue() re-applies its own counter right after this call.
     const clearBackoff = t.state === 'running' || to === 'queued'
-    this.db.prepare(`UPDATE tasks SET state = ?, error = ?, updated_at = ?,
+    this.db.prepare(`UPDATE tasks SET state = ?, error = ?, model = ?, updated_at = ?,
         restarts = CASE WHEN ? THEN 0 ELSE restarts END,
         retry_at = CASE WHEN ? THEN NULL ELSE retry_at END
       WHERE id = ?`)
-      .run(to, patch.error !== undefined ? patch.error : t.error, new Date().toISOString(),
+      .run(to, patch.error !== undefined ? patch.error : t.error,
+        patch.model !== undefined ? patch.model : t.model, new Date().toISOString(),
         clearBackoff ? 1 : 0, clearBackoff ? 1 : 0, id)
     return this.get(id)!
+  }
+
+  // Re-run the same prompt/turn in place, optionally on a different model.
+  // Unlike followUp(), does not archive a turn or reset tokensUsed — the
+  // task picks up where it left off, same session, just possibly a new model.
+  resume(id: string, model?: string | null): TaskRecord {
+    const t = this.get(id)
+    if (!t) throw new Error(`no task ${id}`)
+    if (!RESUMABLE_STATES.includes(t.state)) {
+      throw new Error(`cannot resume from state ${t.state}`)
+    }
+    return this.transition(id, 'queued', { model })
   }
 
   patch(id: string, fields: { sessionId?: string; error?: string; startedAt?: string; logOffset?: number }): TaskRecord {

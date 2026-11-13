@@ -117,6 +117,50 @@ describe('API', () => {
     expect(after.turns).toHaveLength(0)
   })
 
+  it('resumes with a valid model, updating the task model and requeuing', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1, model: 'haiku' })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'paused-limit')
+    const res = await fetch(`${base}/api/tasks/${t.id}/resume`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'opus' }),
+    })
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body.state).toBe('queued')
+    expect(body.model).toBe('opus')
+  })
+
+  it('resumes with no model key exactly as before (same model, same prompt, requeued)', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1, model: 'haiku' })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'paused-limit')
+    const res = await fetch(`${base}/api/tasks/${t.id}/resume`, { method: 'POST' })
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body.state).toBe('queued')
+    expect(body.model).toBe('haiku')
+    expect(body.prompt).toBe('p')
+  })
+
+  it('rejects an unknown model on resume with 400 and leaves state unchanged', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1, model: 'haiku' })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'paused-limit')
+    const res = await fetch(`${base}/api/tasks/${t.id}/resume`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4' }),
+    })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toEqual({ error: 'unknown model: gpt-4' })
+    const after = store.get(t.id)!
+    expect(after.state).toBe('paused-limit')
+    expect(after.model).toBe('haiku')
+  })
+
   it('stops a queued task directly, without touching the launcher', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     const res = await fetch(`${base}/api/tasks/${t.id}/stop`, { method: 'POST' })

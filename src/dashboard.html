@@ -41,7 +41,8 @@
   .badge { padding: 2px 8px; border-radius: 20px; font-size: .78rem; background: #eee; white-space: nowrap; }
   .badge.running { background: #cfe8ff; } .badge.done { background: #d4f3d4; } .badge.failed { background: #ffd7d7; }
   .badge[class*="paused"], .badge.waiting-for-you { background: #ffe9b8; }
-  .badge.cancelled { background: #e3e3de; }
+  .badge.cancelled { background: #e3e3de; } .badge.stage { background: #eef6ff; border: 1px solid var(--line); }
+  .comment { margin: 4px 0; white-space: pre-wrap; } .comment.pending { border-left: 3px solid var(--st-warning); padding-left: 8px; }
   .mono { font-family: var(--mono); }
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); padding: 0 var(--sp); }
   .tabs button { border: none; background: none; border-radius: 0; padding: 10px 12px; color: var(--muted); border-bottom: 2px solid transparent; }
@@ -116,6 +117,8 @@
   @media (max-width: 820px) { .layout { flex-direction: column; } .left, .right { flex: 1 1 100%; } }
   /* settings: popup modal, not an inline panel */
   .modal-overlay { position: fixed; inset: 0; background: rgba(20,20,16,.35); display: flex; align-items: center; justify-content: center; padding: calc(var(--sp)*2); z-index: 100; }
+  /* display:flex above beats the UA's [hidden]{display:none} — restore it explicitly */
+  .modal-overlay[hidden] { display: none; }
   .modal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); width: min(640px, 100%); max-height: 88vh; overflow: auto; padding: calc(var(--sp)*2.5); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
   .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: calc(var(--sp)*1.5); }
   .modal-head h2 { margin: 0; font-size: 1rem; }
@@ -125,7 +128,7 @@
   #reposYamlText { min-height: 40vh; font-family: var(--mono); font-size: .82rem; resize: vertical; overflow: auto; white-space: pre; }
 </style>
 <header style="display:flex;align-items:center;justify-content:space-between">
-  <h1>🧫 Petree</h1>
+  <h1>🧫 Petree <span class="badge waiting-for-you" id="needsYou" hidden></span></h1>
   <button type="button" id="settingsBtn">⚙ settings</button>
 </header>
 <div class="modal-overlay" id="settingsOverlay" hidden>
@@ -134,7 +137,7 @@
       <h2 id="settingsTitle">⚙ Settings</h2>
       <button type="button" class="modal-close" id="settingsClose" aria-label="close">×</button>
     </div>
-    <p class="muted small" style="margin:0 0 8px">Finished tasks (done/failed/cancelled) are cleared automatically. Active tasks are never cleared.</p>
+    <p class="muted small" style="margin:0 0 8px">Finished threads (done/failed/cancelled) are cleared automatically. Active threads are never cleared.</p>
     <div class="field">
       <label class="k" for="maxAgeDays">clear after</label>
       <input type="number" id="maxAgeDays" min="1" step="1" style="width:5rem">
@@ -143,7 +146,7 @@
     <div class="field">
       <label class="k" for="maxPerRepoGroup">keep per repo group</label>
       <input type="number" id="maxPerRepoGroup" min="1" step="1" style="width:5rem">
-      <span class="muted">tasks (oldest finished ones beyond this are cleared)</span>
+      <span class="muted">threads (oldest finished ones beyond this are cleared)</span>
     </div>
     <div class="field">
       <button class="primary" type="button" id="saveSettings">Save</button>
@@ -152,7 +155,7 @@
     </div>
     <div class="modal-section">
       <h3>repos.yaml</h3>
-      <p class="muted small" style="margin:0 0 8px">Edits apply immediately to new tasks — no restart required.</p>
+      <p class="muted small" style="margin:0 0 8px">Edits apply immediately to new threads — no restart required.</p>
       <textarea id="reposYamlText" spellcheck="false"></textarea>
       <div class="field" style="margin-top:8px">
         <button class="primary" type="button" id="saveReposYaml">Save repos.yaml</button>
@@ -163,9 +166,10 @@
 </div>
 <div class="wrap">
   <form class="create card" id="create">
-    <textarea name="prompt" id="prompt" placeholder="task prompt — Cmd/Ctrl+Enter to start" required></textarea>
+    <textarea name="prompt" id="prompt" placeholder="thread prompt — Cmd/Ctrl+Enter to start" required></textarea>
     <div class="field repos-field">
       <label class="k">repos</label>
+      <div class="seg" id="tagFilter" hidden></div>
       <div class="combo" id="repoCombo">
         <div class="combo-tags" id="repoTags"></div>
         <input type="text" id="repoSearch" placeholder="search repos…" autocomplete="off">
@@ -178,14 +182,18 @@
         <option value="default">default</option><option value="haiku">haiku</option>
         <option value="sonnet">sonnet</option><option value="opus">opus</option>
       </select>
-      <button class="primary" type="submit" style="margin-left:auto">Start task</button>
+      <label class="k" for="stage">stage</label>
+      <select id="stage">
+        <option value="investigate" selected>investigate</option><option value="spec">spec</option><option value="build">build</option>
+      </select>
+      <button class="primary" type="submit" style="margin-left:auto">Start thread</button>
     </div>
   </form>
   <div class="layout">
-    <div class="left card"><table><thead><tr><th>id</th><th>state</th><th>repos</th><th>tokens</th></tr></thead><tbody id="tasks"></tbody></table></div>
+    <div class="left card"><table><thead><tr><th>id</th><th>thread</th><th>stage</th><th>state</th><th>repos</th><th>tokens</th></tr></thead><tbody id="tasks"></tbody></table></div>
     <div class="right card">
       <div class="tabs" id="tabs"></div>
-      <div class="tabbody" id="tabbody"><p class="muted">Select a task to see details.</p></div>
+      <div class="tabbody" id="tabbody"><p class="muted">Select a thread to see details.</p></div>
     </div>
   </div>
 </div>
@@ -194,7 +202,10 @@
   import { renderActivity } from './activity.js'
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
   let selected = null, tab = 'Overview', resultShownFor = null
-  const TABS = ['Overview', 'Result', 'Changes', 'Log']
+  // Spec/Findings/Notes tabs appear only when the thread has that content
+  let threadInfo = { spec: '', findings: '', suggestions: [] }
+  const tabsFor = () => ['Overview', ...(threadInfo.spec ? ['Spec'] : []), ...(threadInfo.findings ? ['Findings'] : []),
+    ...(threadInfo.suggestions.length ? ['Notes'] : []), 'Result', 'Changes', 'Log']
   // Log view preferences survive the 3s poll and page reloads
   let logView = localStorage.getItem('petree-logview') || 'Activity'
   let followLog = localStorage.getItem('petree-logfollow') !== 'off'
@@ -207,6 +218,11 @@
 
   // copy button: returns HTML; clicking copies decodeURIComponent of data-copy
   function copyBtn(text) { return `<button class="copy" data-copy="${encodeURIComponent(text)}">copy</button>` }
+  // Local panel for one /diff entry: folder, branch and run commands, each copyable
+  const localBlock = (r) => `<div class="local" style="margin:6px 0"><dt>local</dt>
+    <div class="cmd"><span>${esc(r.folder)}</span>${copyBtn(r.folder)}</div>
+    <div class="small muted">branch <span class="mono">${esc(r.branch)}</span></div>
+    ${(r.run || []).map((c) => `<div class="cmd" style="margin-top:4px"><span>run: ${esc(c)}</span>${copyBtn(c)}</div>`).join('')}</div>`
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('.copy'); if (!b) return
     try { await navigator.clipboard.writeText(decodeURIComponent(b.dataset.copy)); const o = b.textContent; b.textContent = 'copied'; setTimeout(() => (b.textContent = o), 1200) } catch {}
@@ -239,13 +255,23 @@
           ${cmdLine('setup', r.setup)}${cmdLine('build', r.build)}${cmdLine('test', r.test)}</div>`).join('')
       : ''
   }
+  let activeTag = ''
+  const tagFilter = document.getElementById('tagFilter')
   function renderRepoMenu() {
+    const tags = [...new Set(allRepos.flatMap((r) => r.tags || []))].sort()
+    if (!tags.includes(activeTag)) activeTag = ''
+    tagFilter.hidden = tags.length === 0
+    tagFilter.innerHTML = ['', ...tags].map((t) => `<button type="button" class="${t === activeTag ? 'on' : ''}" data-tag="${esc(t)}">${esc(t || 'all')}</button>`).join('')
     const q = repoSearch.value.trim().toLowerCase()
-    const matches = allRepos.filter((r) => r.name.toLowerCase().includes(q))
+    const matches = allRepos.filter((r) => r.name.toLowerCase().includes(q) && (!activeTag || (r.tags || []).includes(activeTag)))
     repoMenu.innerHTML = matches.length
-      ? matches.map((r) => `<div class="opt ${selectedRepos.includes(r.name) ? 'sel' : ''}" data-repo="${esc(r.name)}">${selectedRepos.includes(r.name) ? '✓ ' : ''}${esc(r.name)}</div>`).join('')
+      ? matches.map((r) => `<div class="opt ${selectedRepos.includes(r.name) ? 'sel' : ''}" data-repo="${esc(r.name)}">${selectedRepos.includes(r.name) ? '✓ ' : ''}${esc(r.name)}${(r.tags || []).map((t) => ` <span class="badge">${esc(t)}</span>`).join('')}</div>`).join('')
       : '<div class="empty">no matching repos</div>'
   }
+  tagFilter.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-tag]'); if (!b) return
+    activeTag = b.dataset.tag; renderRepoMenu(); repoMenu.hidden = false
+  })
   function toggleRepo(name) {
     const i = selectedRepos.indexOf(name)
     if (i === -1) selectedRepos.push(name); else selectedRepos.splice(i, 1)
@@ -335,25 +361,28 @@
   document.getElementById('create').addEventListener('submit', async (e) => {
     e.preventDefault()
     if (!selectedRepos.length) { alert('select at least one repo'); return }
-    await fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: prompt.value, repos: selectedRepos, model: document.getElementById('model').value }) })
+    await fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: prompt.value, repos: selectedRepos, model: document.getElementById('model').value, stage: document.getElementById('stage').value }) })
     prompt.value = ''; localStorage.removeItem('petree-draft'); autosize()
     selectedRepos = []; renderRepoTags(); renderRepoMenu()
     refresh()
   })
 
+  // Mirrors threadTitle() in src/store.ts.
+  const threadTitle = (t) => ((t.turns || [])[0]?.prompt ?? t.prompt).split('\n')[0].slice(0, 72)
+
   function taskRow(t) {
     return `<tr class="${t.id === selected ? 'sel' : ''}" data-id="${esc(t.id)}">
-      <td class="mono">${esc(t.id)}</td><td><span class="badge ${esc(t.state)}">${esc(t.state)}</span></td>
+      <td class="mono">${esc(t.id)}</td><td>${esc(threadTitle(t))}</td><td><span class="badge stage">${esc(t.stage)}</span></td><td><span class="badge ${esc(t.state)}">${esc(t.state)}</span></td>
       <td>${esc(t.repos.join(', '))}</td><td>${esc(t.tokensUsed)}</td></tr>`
   }
   document.getElementById('tasks').addEventListener('click', (e) => {
     const tr = e.target.closest('tr[data-id]'); if (!tr) return
-    selected = tr.dataset.id; tab = 'Overview'; refresh()
+    selected = tr.dataset.id; tab = 'Overview'; threadInfo = { spec: '', findings: '', suggestions: [] }; refresh(true)
   })
 
   function renderTabs() {
     document.getElementById('tabs').innerHTML = selected
-      ? TABS.map((n) => `<button class="${n === tab ? 'active' : ''}" data-tab="${n}">${n}</button>`).join('') : ''
+      ? tabsFor().map((n) => `<button class="${n === tab ? 'active' : ''}" data-tab="${n}">${n}</button>`).join('') : ''
   }
   document.getElementById('tabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-tab]'); if (!b) return; tab = b.dataset.tab; renderBody()
@@ -361,11 +390,50 @@
 
   async function renderBody() {
     const body = document.getElementById('tabbody')
-    if (!selected) { body.innerHTML = '<p class="muted">Select a task to see details.</p>'; return }
+    if (!selected) { body.innerHTML = '<p class="muted">Select a thread to see details.</p>'; return }
     const t = await (await fetch('/api/tasks/' + selected)).json()
+    const th = await fetch('/api/tasks/' + selected + '/thread')
+    if (th.ok) threadInfo = await th.json()
+    if (!tabsFor().includes(tab)) tab = 'Overview'
     renderTabs()
-    if (tab === 'Overview') {
-      const resume = ['paused-limit', 'paused-rate-limit', 'waiting-for-you', 'failed', 'cancelled'].includes(t.state)
+    if (tab === 'Spec' || tab === 'Findings') {
+      body.innerHTML = `<div class="result">${renderMarkdown(tab === 'Spec' ? threadInfo.spec : threadInfo.findings)}</div>`
+    } else if (tab === 'Notes') {
+      body.innerHTML = threadInfo.suggestions.map((s, i) => {
+        const summary = (s.text.split('\n').find((l) => l.trim()) || '').replace(/^#+\s*/, '').slice(0, 100)
+        return `<div class="card note" style="margin-bottom:8px;padding:12px" data-repo="${esc(s.repo)}" data-exists="${s.exists}" data-orig="${esc(s.topic)}">
+          <div><strong>${esc(s.repo)}</strong>${s.exists ? ' <span class="badge waiting-for-you">replaces existing note</span>' : ''}</div>
+          <dt>topic</dt><input class="note-topic mono" value="${esc(s.topic)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px">
+          <dt>summary (one line)</dt><input class="note-summary" value="${esc(summary)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px">
+          <dt>text</dt><textarea class="note-text" style="min-height:8rem">${esc(s.text)}</textarea>
+          <div class="field" style="margin-top:8px"><button class="primary" data-note-accept>Accept</button><button data-note-drop>Drop</button></div>
+        </div>`
+      }).join('')
+      body.querySelectorAll('.note').forEach((card) => {
+        const post = (action, payload) => fetch('/api/tasks/' + selected + '/notes/' + action, {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: card.dataset.repo, ...payload }),
+        })
+        const done = async (res) => {
+          if (!res.ok) { alert((await res.json()).error || 'failed'); return }
+          renderBody()
+        }
+        const topic = () => card.querySelector('.note-topic').value
+        card.querySelector('[data-note-accept]').addEventListener('click', async () => {
+          const t = topic()
+          const renamed = t !== card.dataset.orig
+          // exists is known only for the original topic; a renamed one may collide silently
+          const msg = renamed ? `If a note "${t}" already exists it will be replaced. Continue?`
+            : card.dataset.exists === 'true' ? `Replace the existing note ${t}?` : ''
+          if (msg && !confirm(msg)) return
+          const res = await post('accept', { topic: t, text: card.querySelector('.note-text').value, summary: card.querySelector('.note-summary').value })
+          // accept only clears the suggestion under the edited topic; clear the original too
+          if (res.ok && renamed) await post('drop', { topic: card.dataset.orig })
+          done(res)
+        })
+        card.querySelector('[data-note-drop]').addEventListener('click', async () => done(await post('drop', { topic: card.dataset.orig })))
+      })
+    } else if (tab === 'Overview') {
+      const resume = ['paused-limit', 'paused-rate-limit', 'failed', 'cancelled'].includes(t.state)
         ? `<select id="resumeModel">
             ${['default', 'haiku', 'sonnet', 'opus'].map((m) => `<option value="${m}" ${(t.model || 'default') === m ? 'selected' : ''}>${m}</option>`).join('')}
           </select>
@@ -373,26 +441,44 @@
       const stop = ['queued', 'provisioning', 'running'].includes(t.state)
         ? `<button data-stop="${esc(t.id)}">stop</button>` : ''
       body.innerHTML = `<dl>
-        <dt>state</dt><dd><span class="badge ${esc(t.state)}">${esc(t.state)}</span> ${resume} ${stop}</dd>
+        <dt>stage / state</dt><dd><span class="badge stage">${esc(t.stage)}</span> <span class="badge ${esc(t.state)}">${esc(t.state)}</span> ${resume} ${stop}</dd>
         <dt>id</dt><dd class="mono">${esc(t.id)} ${copyBtn(t.id)}</dd>
-        <dt>prompt</dt><dd>${esc(t.prompt)}</dd>
+        <dt>thread</dt><dd>${esc(threadTitle(t))}</dd>
+        <dt>current turn</dt><dd>${esc(t.prompt)}</dd>
         <dt>repos</dt><dd>${esc(t.repos.join(', '))}</dd>
         <dt>model</dt><dd>${esc(t.model || 'default')}</dd>
         <dt>tokens</dt><dd>${esc(t.tokensUsed)} / ${esc(t.tokenBudget)}</dd>
         <dt>session</dt><dd class="mono">${esc(t.sessionId || '—')} ${t.sessionId ? copyBtn(t.sessionId) : ''}</dd>
         <dt>created / updated</dt><dd class="mono">${esc(t.createdAt)} · ${esc(t.updatedAt)}</dd>
-        ${t.state === 'failed' && t.error ? `<dt>error</dt><dd class="err">${esc(t.error)}</dd>` : ''}
+        ${t.error ? `<dt>${t.state === 'failed' ? 'failed:' : 'note:'}</dt><dd class="err">${esc(t.error)}</dd>` : ''}
+        ${(t.turns || []).length ? `<dt>turns</dt><dd>${t.turns.map((turn, i) => `<div>${i + 1}. <span class="badge stage">${esc(turn.stage)}</span> ${esc(turn.prompt.split('\n')[0].slice(0, 80))}</div>`).join('')}</dd>` : ''}
+        <dt>comments</dt><dd>${(t.comments || []).map((c) => `<div class="comment${c.consumed ? '' : ' pending'}">
+          <span class="muted small mono">${esc(c.at)}${c.consumed ? '' : ' · will be included in the next turn'}</span>
+          <div>${esc(c.text)}</div></div>`).join('') || '<span class="muted">none</span>'}
+          <div style="margin-top:8px"><textarea id="commentText" placeholder="add a comment — included in the next turn"></textarea>
+          <button data-comment="${esc(t.id)}">Add comment</button></div></dd>
       </dl>
+        ${t.state === 'waiting-for-you' ? `
+        <div class="card" data-gate-card style="margin-top:16px;padding:12px">
+          <dt>review the ${esc(t.stage)} stage, then decide</dt>
+          <textarea id="gatePrompt" placeholder="optional note for the next turn"></textarea>
+          <div class="field" style="margin-top:8px">
+            ${t.stage === 'investigate' ? `<button class="primary" data-gate="spec" data-id="${esc(t.id)}">Approve → spec</button>` : ''}
+            ${t.stage !== 'build' ? `<button class="primary" data-gate="build" data-id="${esc(t.id)}">Approve → build</button>` : ''}
+            <button data-gate="" data-id="${esc(t.id)}">Continue this stage</button>
+            <button data-stop="${esc(t.id)}" style="margin-left:auto">Drop</button>
+          </div>
+        </div>` : ''}
         ${['done', 'failed', 'cancelled'].includes(t.state) ? `
         <div class="card" style="margin-top:16px;padding:12px">
           <dt>next prompt</dt>
-          <textarea id="nextPrompt" placeholder="follow-up prompt — continues this task's session, branch and workspace"></textarea>
+          <textarea id="nextPrompt" placeholder="follow-up prompt — continues this thread's session, branch and workspace"></textarea>
           <div class="field" style="margin-top:8px">
             <label class="k">model</label>
             <select id="nextModel">
               ${['default', 'haiku', 'sonnet', 'opus'].map((m) => `<option value="${m}" ${(t.model || 'default') === m ? 'selected' : ''}>${m}</option>`).join('')}
             </select>
-            <button class="primary" data-next="${esc(t.id)}" style="margin-left:auto">Continue task</button>
+            <button class="primary" data-next="${esc(t.id)}" style="margin-left:auto">Continue thread</button>
           </div>
         </div>` : ''}`
     } else if (tab === 'Result') {
@@ -414,16 +500,13 @@
           <div class="result">${renderMarkdown(t.result)}</div>
           <div class="card" id="prSection" style="margin-top:16px;padding:12px"><p class="muted">loading repos…</p></div>`
         const repos = await (await fetch('/api/tasks/' + selected + '/diff')).json()
-        const changed = repos.filter((r) => r.hasChanges)
-        const prSection = document.getElementById('prSection')
-        prSection.innerHTML = changed.length
-          ? `<dt>open a pull request</dt>` + changed.map((r) => `<div class="field" style="margin:6px 0">
-              <strong>${esc(r.repo)}</strong>
+            const prSection = document.getElementById('prSection')
+        prSection.innerHTML = repos.map((r) => `<div style="margin-bottom:10px"><strong>${esc(r.repo)}</strong>${localBlock(r)}
+            ${r.hasChanges ? `<div class="field" style="margin:6px 0">
               <input class="mono" data-pr-target="${esc(r.repo)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line);border-radius:6px">
               <button data-pr="${esc(r.repo)}">Create PR</button>
               <span class="prout muted" data-prout="${esc(r.repo)}"></span>
-            </div>`).join('')
-          : '<p class="muted">No changes to open a PR for.</p>'
+            </div>` : '<p class="muted small">No changes to open a PR for.</p>'}</div>`).join('')
         prSection.querySelectorAll('[data-pr]').forEach((btn) => btn.addEventListener('click', async () => {
           const repo = btn.dataset.pr
           const sel = CSS.escape(repo)
@@ -471,6 +554,7 @@
         const cmd = r.reviewCommand
         return `<div class="repoChange" style="margin-bottom:16px">
           <div><strong>${esc(r.repo)}</strong> <span class="muted mono">${esc(r.branch)} vs ${esc(r.baseBranch)}</span></div>
+          ${localBlock(r)}
           <dt>review locally</dt>
           <div class="cmd"><span>${esc(cmd)}</span>${copyBtn(cmd)}</div>
           <dt>summary</dt><pre class="diff" style="max-height:none">${esc(r.stat)}</pre>
@@ -503,11 +587,31 @@
       await fetch('/api/tasks/' + b.dataset.resume + '/resume', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ model: document.getElementById('resumeModel').value }),
-      }); refresh()
+      }); refresh(true)
     }))
     document.querySelectorAll('[data-stop]').forEach((b) => b.addEventListener('click', async () => {
-      if (!confirm('Stop this task? This will kill it.')) return
-      await fetch('/api/tasks/' + b.dataset.stop + '/stop', { method: 'POST' }); refresh()
+      const gate = b.closest('[data-gate-card]')
+      if (!confirm(gate ? 'Drop this thread? It can be continued later.' : 'Stop this thread? This will kill it.')) return
+      await fetch('/api/tasks/' + b.dataset.stop + '/stop', { method: 'POST' }); refresh(true)
+    }))
+    document.querySelectorAll('[data-comment]').forEach((b) => b.addEventListener('click', async () => {
+      const ta = document.getElementById('commentText')
+      if (!ta.value.trim()) return
+      const res = await fetch('/api/tasks/' + b.dataset.comment + '/comments', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: ta.value }),
+      })
+      if (!res.ok) { alert((await res.json()).error || 'comment failed'); return }
+      refresh(true)
+    }))
+    document.querySelectorAll('[data-gate]').forEach((b) => b.addEventListener('click', async () => {
+      const body = { prompt: document.getElementById('gatePrompt').value }
+      if (b.dataset.gate) body.stage = b.dataset.gate
+      const res = await fetch('/api/tasks/' + b.dataset.id + '/next', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
+      })
+      if (!res.ok) { alert((await res.json()).error || 'failed'); return }
+      resultShownFor = null
+      refresh(true)
     }))
     document.querySelectorAll('[data-next]').forEach((b) => b.addEventListener('click', async () => {
       const ta = document.getElementById('nextPrompt')
@@ -518,7 +622,7 @@
       })
       if (!res.ok) { alert((await res.json()).error || 'follow-up failed'); return }
       resultShownFor = null
-      refresh()
+      refresh(true)
     }))
     const nextTa = document.getElementById('nextPrompt')
     if (nextTa) nextTa.addEventListener('keydown', (e) => {
@@ -526,8 +630,15 @@
     })
   }
 
-  async function refresh() {
+  async function refresh(switched = false) {
     const tasks = await (await fetch('/api/tasks')).json()
+    // waiting-for-you first; Array.sort is stable so the server order holds within each group
+    const waiting = (t) => (t.state === 'waiting-for-you' ? 0 : 1)
+    tasks.sort((a, b) => waiting(a) - waiting(b))
+    const needs = tasks.filter((t) => t.state === 'waiting-for-you').length
+    const badge = document.getElementById('needsYou')
+    badge.hidden = !needs; badge.textContent = `needs you: ${needs}`
+    document.title = needs ? `(${needs}) petree` : 'Petree'
     document.getElementById('tasks').innerHTML = tasks.map(taskRow).join('')
     renderTabs()
     // Only auto-refresh live tabs; Changes renders on tab entry only so the 3s
@@ -542,7 +653,9 @@
     const active = document.activeElement
     const typing = active && document.getElementById('tabbody').contains(active) &&
       ['TEXTAREA', 'INPUT', 'SELECT'].includes(active.tagName)
-    if (selected && !typing && (tab === 'Overview' || tab === 'Log' || resultLive)) await renderBody()
+    // Unsent drafts in the Overview forms must survive the poll even after focus moves away.
+    const drafting = !switched && ['commentText', 'gatePrompt', 'nextPrompt'].some((id) => document.getElementById(id)?.value)
+    if (selected && !typing && !drafting && (['Overview', 'Spec', 'Findings', 'Log'].includes(tab) || resultLive)) await renderBody()
   }
   setInterval(refresh, 3000); refresh()
 </script>

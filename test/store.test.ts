@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { TaskStore, RESUMABLE_STATES } from '../src/store.js'
+import { TaskStore, canMoveStage, threadTitle, RESUMABLE_STATES, FOLLOWUP_STATES } from '../src/store.js'
 
 let store: TaskStore
 beforeEach(() => {
@@ -383,6 +383,120 @@ describe('restart recovery', () => {
     const f = store.followUp(t.id, 'next step')
     expect(f.restarts).toBe(0)
     expect(f.retryAt).toBeNull()
+  })
+
+  it('followUp clears the previous turn error', () => {
+    const t = store.create(input)
+    toRunning(store, t.id)
+    store.transition(t.id, 'waiting-for-you', { error: 'investigate turn changed files in demo' })
+    expect(store.get(t.id)?.error).toContain('changed files')
+    expect(store.followUp(t.id, 'next').error).toBeNull()
+  })
+})
+
+describe('threads', () => {
+  function waiting(): string {
+    const t = store.create(input)
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'waiting-for-you')
+    return t.id
+  }
+
+  it('creates tasks at the investigate stage with no comments', () => {
+    const t = store.create(input)
+    expect(t.stage).toBe('investigate')
+    expect(t.comments).toEqual([])
+    expect(store.create({ ...input, stage: 'build' }).stage).toBe('build')
+  })
+
+  it('reads rows from a pre-threads database as build with no comments', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'petree-db-')), 'old.db')
+    const old = new Database(file)
+    old.exec(`CREATE TABLE tasks (
+      id TEXT PRIMARY KEY, prompt TEXT NOT NULL, repos TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'unattended', state TEXT NOT NULL,
+      session_id TEXT, tokens_used INTEGER NOT NULL DEFAULT 0,
+      token_budget INTEGER NOT NULL, timeout_minutes INTEGER NOT NULL,
+      error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result TEXT, model TEXT)`)
+    old.prepare(`INSERT INTO tasks (id, prompt, repos, state, token_budget, timeout_minutes, created_at, updated_at)
+      VALUES ('old1', 'p', '["demo"]', 'done', 1, 1, 'x', 'x')`).run()
+    old.close()
+    const t = new TaskStore(file).get('old1')!
+    expect(t.stage).toBe('build')
+    expect(t.comments).toEqual([])
+  })
+
+  it('addComment keeps state and prompt', () => {
+    const t = store.create(input)
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    const c = store.addComment(t.id, 'hey')
+    expect(c.state).toBe('running')
+    expect(c.prompt).toBe('do it')
+    expect(c.comments).toHaveLength(1)
+    expect(c.comments[0]).toMatchObject({ text: 'hey', consumed: false })
+  })
+
+  it('followUp folds pending comments into the prompt, consumes them and advances the stage', () => {
+    const id = waiting()
+    store.addComment(id, 'c1')
+    store.addComment(id, 'c2')
+    const f = store.followUp(id, 'more', undefined, 'spec')
+    expect(f.prompt).toBe('more\n\n## Comments from the user since the last turn\n\n- c1\n- c2')
+    expect(f.comments.map((c) => c.consumed)).toEqual([true, true])
+    expect(f.stage).toBe('spec')
+    expect(f.state).toBe('queued')
+    expect(f.turns.at(-1)?.stage).toBe('investigate')
+  })
+
+  it('followUp with an empty prompt and no comments leaves the prompt empty', () => {
+    const id = waiting()
+    const f = store.followUp(id, '', undefined, 'build')
+    expect(f.prompt).toBe('')
+    expect(f.stage).toBe('build')
+  })
+
+  it('comments added after followUp stay pending and out of the prompt', () => {
+    const id = waiting()
+    store.followUp(id, 'go', undefined, 'spec')
+    const c = store.addComment(id, 'late')
+    expect(c.comments[0].consumed).toBe(false)
+    expect(c.prompt).toBe('go')
+  })
+
+  it('canMoveStage gates forward moves on waiting-for-you', () => {
+    expect(canMoveStage('waiting-for-you', 'investigate', 'build')).toBe(true)
+    expect(canMoveStage('waiting-for-you', 'spec', 'investigate')).toBe(false)
+    expect(canMoveStage('done', 'build', 'spec')).toBe(true)
+    expect(canMoveStage('done', 'spec', 'build')).toBe(false)
+    expect(canMoveStage('running', 'spec', 'build')).toBe(false)
+    expect(canMoveStage('running', 'spec', 'spec')).toBe(true)
+  })
+
+  it('followUp rejects an illegal stage move', () => {
+    const id = waiting()
+    store.followUp(id, 'go', undefined, 'spec')
+    store.transition(id, 'provisioning')
+    store.transition(id, 'running')
+    store.transition(id, 'waiting-for-you')
+    expect(() => store.followUp(id, 'back', undefined, 'investigate')).toThrow(/illegal stage move/)
+  })
+
+  it('waiting-for-you can be cancelled and is not resumable', () => {
+    const id = waiting()
+    expect(store.transition(id, 'cancelled').state).toBe('cancelled')
+    expect(RESUMABLE_STATES).not.toContain('waiting-for-you')
+    expect(FOLLOWUP_STATES).toContain('waiting-for-you')
+  })
+
+  it('threadTitle is the first line of the first turn prompt, cut to 72 chars', () => {
+    const id = waiting()
+    expect(threadTitle(store.get(id)!)).toBe('do it')
+    store.followUp(id, 'second', undefined, 'spec')
+    expect(threadTitle(store.get(id)!)).toBe('do it')
+    const long = store.create({ ...input, prompt: `${'x'.repeat(100)}\nrest` })
+    expect(threadTitle(long)).toBe('x'.repeat(72))
   })
 })
 

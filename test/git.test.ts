@@ -19,7 +19,7 @@ function cfgWith(url: string): PetreeConfig {
   return {
     home: '/unused',
     defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-    repos: { demo: { url, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+    repos: { demo: { url, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
     allowClone: [],
   }
 }
@@ -32,6 +32,17 @@ describe('prepareWorkspace', () => {
     expect(existsSync(join(workDir, 'demo', 'README.md'))).toBe(true)
     const branch = execFileSync('git', ['-C', join(workDir, 'demo'), 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim()
     expect(branch).toBe('petree/abc123')
+  })
+
+  it('clones full history (no shallow clone)', async () => {
+    const fixture = makeFixtureRepo()
+    writeFileSync(join(fixture, 'b.txt'), 'b')
+    execFileSync('git', ['-C', fixture, 'add', '.'])
+    execFileSync('git', ['-C', fixture, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'second'])
+    const workDir = join(mkdtempSync(join(tmpdir(), 'petree-work-')), 'w')
+    await prepareWorkspace(cfgWith(`file://${fixture}`), ['demo'], workDir, 'abc123')
+    const count = execFileSync('git', ['-C', join(workDir, 'demo'), 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' }).trim()
+    expect(count).toBe('2')
   })
 
   it('throws on unknown repo names', async () => {

@@ -40,7 +40,10 @@ beforeEach(async () => {
   const cfg: PetreeConfig = {
     home,
     defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-    repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+    repos: {
+      demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: ['npm start'], skills: [], tags: [], defaultModel: null },
+      odd: { url: 'x', defaultBranch: 'main', image: 'custom-img', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null },
+    },
     allowClone: [],
   }
   store = new TaskStore(join(home, 'db'))
@@ -219,7 +222,7 @@ describe('API', () => {
     const repos = await (await fetch(`${base}/api/repos`)).json()
     expect(repos).toContainEqual({
       name: 'demo', defaultBranch: 'main', image: 'sandbox-node', defaultModel: null,
-      instructions: '', setup: [], build: [], test: [],
+      instructions: '', setup: [], build: [], test: [], run: ['npm start'], tags: [],
     })
   })
 
@@ -258,6 +261,8 @@ describe('API', () => {
     expect(arr[0].branch).toBe(`petree/${t.id}`)
     expect(arr[0].patch).toContain('change.txt')
     expect(arr[0].reviewCommand).toContain(`petree/${t.id}`)
+    expect(arr[0].folder).toBe(join(home, 'work', t.id, 'demo'))
+    expect(arr[0].run).toEqual(['npm start'])
   })
 
   it('pushes a task branch to a target and rejects the base branch', async () => {
@@ -455,5 +460,100 @@ describe('API', () => {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'x' }),
     })
     expect(missing.status).toBe(404)
+  })
+})
+
+const post = (path: string, body: unknown) =>
+  fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+
+function gated(stage?: 'investigate' | 'spec' | 'build') {
+  const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1, stage })
+  store.transition(t.id, 'provisioning')
+  store.transition(t.id, 'running')
+  store.transition(t.id, 'waiting-for-you')
+  return t
+}
+
+describe('thread API', () => {
+  it('creates a task at a given stage, 400 on unknown stage or unsupported image mix', async () => {
+    const ok = await post('/api/tasks', { prompt: 'x', repos: ['demo'], stage: 'spec' })
+    expect(ok.status).toBe(201)
+    expect((await ok.json()).stage).toBe('spec')
+    expect((await post('/api/tasks', { prompt: 'x', repos: ['demo'], stage: 'ship' })).status).toBe(400)
+    expect((await post('/api/tasks', { prompt: 'x', repos: ['demo', 'odd'] })).status).toBe(400)
+  })
+
+  it('adds comments, 400 on empty text, 404 on unknown task', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    const ok = await post(`/api/tasks/${t.id}/comments`, { text: 'hello' })
+    expect(ok.status).toBe(201)
+    expect((await ok.json()).comments[0]).toMatchObject({ text: 'hello', consumed: false })
+    expect((await post(`/api/tasks/${t.id}/comments`, { text: '  ' })).status).toBe(400)
+    expect((await post('/api/tasks/deadbeef/comments', { text: 'x' })).status).toBe(404)
+  })
+
+  it('/next: empty prompt needs pending comments or a stage change', async () => {
+    const t = gated()
+    expect((await post(`/api/tasks/${t.id}/next`, {})).status).toBe(400)
+    expect((await post(`/api/tasks/${t.id}/next`, { stage: 'investigate' })).status).toBe(400)
+    const moved = await post(`/api/tasks/${t.id}/next`, { stage: 'spec' })
+    expect(moved.status).toBe(200)
+    const body = await moved.json()
+    expect(body.state).toBe('queued')
+    expect(body.stage).toBe('spec')
+
+    const c = gated()
+    await post(`/api/tasks/${c.id}/comments`, { text: 'tweak' })
+    const folded = await post(`/api/tasks/${c.id}/next`, {})
+    expect(folded.status).toBe(200)
+    expect((await folded.json()).prompt).toContain('tweak')
+  })
+
+  it('/next: 400 on illegal or unknown stage, 409 on non-follow-up state', async () => {
+    const t = gated('spec')
+    expect((await post(`/api/tasks/${t.id}/next`, { prompt: 'x', stage: 'investigate' })).status).toBe(400)
+    expect((await post(`/api/tasks/${t.id}/next`, { prompt: 'x', stage: 'bogus' })).status).toBe(400)
+    const q = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    expect((await post(`/api/tasks/${q.id}/next`, { prompt: 'x' })).status).toBe(409)
+  })
+
+  it('/stop drops a waiting-for-you task to cancelled', async () => {
+    const t = gated()
+    const res = await post(`/api/tasks/${t.id}/stop`, {})
+    expect((await res.json()).state).toBe('cancelled')
+  })
+
+  it('serves thread files and suggestions', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    const empty = await (await fetch(`${base}/api/tasks/${t.id}/thread`)).json()
+    expect(empty).toEqual({ spec: null, findings: null, suggestions: [] })
+    const dir = join(home, 'work', t.id, '_thread')
+    mkdirSync(join(dir, 'notes', 'demo'), { recursive: true })
+    writeFileSync(join(dir, 'spec.md'), 'the spec')
+    writeFileSync(join(dir, 'notes', 'demo', 'topic.md'), 'note text')
+    const got = await (await fetch(`${base}/api/tasks/${t.id}/thread`)).json()
+    expect(got.spec).toBe('the spec')
+    expect(got.findings).toBeNull()
+    expect(got.suggestions).toEqual([{ repo: 'demo', topic: 'topic', text: 'note text', exists: false }])
+    expect((await fetch(`${base}/api/tasks/deadbeef/thread`)).status).toBe(404)
+  })
+
+  it('accepts and drops note suggestions, 400 on bad input', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    const dir = join(home, 'work', t.id, '_thread', 'notes', 'demo')
+    mkdirSync(dir, { recursive: true })
+    writeFileSync(join(dir, 'a.md'), 'A')
+    writeFileSync(join(dir, 'b.md'), 'B')
+    const acc = await post(`/api/tasks/${t.id}/notes/accept`, { repo: 'demo', topic: 'a', text: 'A', summary: 'sum' })
+    expect(acc.status).toBe(200)
+    expect(await acc.json()).toEqual({ ok: true })
+    expect(readFileSync(join(home, 'notes', 'demo', 'a.md'), 'utf8')).toBe('A')
+    const drop = await post(`/api/tasks/${t.id}/notes/drop`, { repo: 'demo', topic: 'b' })
+    expect(drop.status).toBe(200)
+    const left = await (await fetch(`${base}/api/tasks/${t.id}/thread`)).json()
+    expect(left.suggestions).toEqual([])
+    expect((await post(`/api/tasks/${t.id}/notes/accept`, { repo: 'nope', topic: 'a', text: 'A', summary: 's' })).status).toBe(400)
+    expect((await post(`/api/tasks/${t.id}/notes/drop`, { repo: 'demo', topic: '../x' })).status).toBe(400)
+    expect((await post('/api/tasks/deadbeef/notes/drop', { repo: 'demo', topic: 'a' })).status).toBe(404)
   })
 })

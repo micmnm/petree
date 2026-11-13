@@ -19,6 +19,19 @@ export function containerName(taskId: string): string {
   return `petree-${taskId}`
 }
 
+const FULL_IMAGE_PARTS = ['sandbox-node', 'sandbox-dotnet', 'sandbox-full']
+
+// One image per thread: repos sharing an image use it, node+dotnet mixes run in
+// the combined image, anything else is unsupported.
+export function pickImage(repos: string[], cfg: PetreeConfig): string {
+  const images = [...new Set(repos.map((r) => cfg.repos[r].image))]
+  if (images.length === 1) return images[0]
+  if (images.every((i) => FULL_IMAGE_PARTS.includes(i))) return 'sandbox-full'
+  throw new Error(
+    `unsupported image mix: ${repos.map((r) => `${r}=${cfg.repos[r].image}`).join(', ')} (no combined image for these)`,
+  )
+}
+
 export interface SandboxCommands {
   containerName: string
   create: string[]
@@ -38,14 +51,14 @@ export function buildSandboxCommands(
   workDir: string,
   oauthToken: string,
 ): SandboxCommands {
-  const image = cfg.repos[task.repos[0]].image
+  const image = pickImage(task.repos, cfg)
   const name = containerName(task.id)
   const create = [
     'docker', 'run', '-d', '--init',
     '--name', name,
     '-v', `${workDir}:/work`,
-    '-v', `${join(cfg.home, 'shared', 'skills')}:/petree/skills:ro`,
-    '-v', `${join(cfg.home, 'shared', 'findings')}:/petree/findings`,
+    '-v', `${join(cfg.home, 'shared', 'skills')}:/home/dev/.claude/skills:ro`,
+    '-v', `${join(cfg.home, 'notes')}:/petree/notes:ro`,
     '-v', `${join(cfg.home, 'sessions', task.id)}:/home/dev/.claude`,
     '-e', `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`,
     '-w', '/work',

@@ -7,7 +7,7 @@ import { beforeEach, describe, it, expect } from 'vitest'
 import type { PetreeConfig } from '../src/config.js'
 import { prepareWorkspace } from '../src/git.js'
 import { TaskStore } from '../src/store.js'
-import type { TaskRecord } from '../src/store.js'
+import type { Stage, TaskRecord } from '../src/store.js'
 import { makeLauncher } from '../src/launcher.js'
 import type { SandboxCommands } from '../src/sandbox.js'
 import { inspectContainerState } from '../src/sandbox.js'
@@ -36,7 +36,7 @@ function makeFixtureRepo(): string {
   return dir
 }
 
-function setup(input: { tokenBudget?: number; timeoutMinutes?: number } = {}): {
+function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: Stage } = {}): {
   home: string
   cfg: PetreeConfig
   store: TaskStore
@@ -46,7 +46,7 @@ function setup(input: { tokenBudget?: number; timeoutMinutes?: number } = {}): {
   const cfg: PetreeConfig = {
     home,
     defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-    repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+    repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
     allowClone: [],
   }
   const store = new TaskStore(join(home, 'petree.db'))
@@ -55,6 +55,7 @@ function setup(input: { tokenBudget?: number; timeoutMinutes?: number } = {}): {
     repos: ['demo'],
     tokenBudget: input.tokenBudget ?? 500000,
     timeoutMinutes: input.timeoutMinutes ?? 30,
+    stage: input.stage ?? 'build',
   })
   const task = store.transition(created.id, 'provisioning')
   return { home, cfg, store, task }
@@ -81,6 +82,51 @@ describe('makeLauncher', () => {
     expect(existsSync(join(home, 'work', task.id, 'demo', 'README.md'))).toBe(true)
     expect(readFileSync(join(home, 'logs', `${task.id}.log`), 'utf8')).toContain('sess-123')
     expect(existsSync(join(home, 'sessions', task.id))).toBe(true)
+  })
+
+  it('ends an investigate turn in waiting-for-you with the result set', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'investigate' })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })
+    await launch(task)
+    const finished = store.get(task.id)!
+    expect(finished.state).toBe('waiting-for-you')
+    expect(finished.result).toBe('all tests pass')
+  })
+
+  it('titles the commit after the thread, not the follow-up prompt', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'build' })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    process.env.WD = join(home, 'work', task.id)
+    const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })
+    const writer = (file: string) => JSON.stringify([process.execPath, '-e',
+      `require('fs').writeFileSync(process.env.WD+'/demo/${file}','x');` +
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'r'}))`])
+    try {
+      process.env.FAKE_CONTAINER_EXEC = writer('t1.txt')
+      await launch(task)
+      store.followUp(task.id, '')
+      process.env.FAKE_CONTAINER_EXEC = writer('t2.txt')
+      await launch(store.transition(task.id, 'provisioning'))
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    const repoDir = join(home, 'work', task.id, 'demo')
+    const msg = execFileSync('git', ['-C', repoDir, 'log', '-1', '--pretty=%s'], { encoding: 'utf8' }).trim()
+    expect(msg).toBe(`petree ${task.id}: p`)
+  })
+
+  it('flags an investigate turn that changed repo files', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'investigate' })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const workDir = join(home, 'work', task.id)
+    await prepareWorkspace(cfg, ['demo'], workDir, task.id)
+    writeFileSync(join(workDir, 'demo', 'x.txt'), 'x')
+    const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })
+    await launch(task)
+    expect(store.get(task.id)?.error).toContain('investigate turn changed files in demo')
+    expect(store.get(task.id)?.state).toBe('waiting-for-you')
   })
 
   it('pauses the task when a limit is hit', async () => {
@@ -214,11 +260,11 @@ describe('makeLauncher', () => {
     const cfg = {
       home,
       defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
       allowClone: [],
     }
     const store = new TaskStore(join(home, 'petree.db'))
-    const created = store.create({ prompt: 'edit the readme', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const created = store.create({ prompt: 'edit the readme', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30, stage: 'build' })
     const task = store.transition(created.id, 'provisioning')
     // fake "claude" that writes a file into /work/demo then emits a clean done
     process.env.FAKE_CONTAINER_EXEC = JSON.stringify([process.execPath, '-e',
@@ -245,11 +291,11 @@ describe('makeLauncher', () => {
     const cfg = {
       home,
       defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
       allowClone: [],
     }
     const store = new TaskStore(join(home, 'petree.db'))
-    const created = store.create({ prompt: 'edit the readme', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const created = store.create({ prompt: 'edit the readme', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30, stage: 'build' })
     const task = store.transition(created.id, 'provisioning')
     // fake "claude" that wrecks the repo's .git dir before exiting cleanly, so the
     // post-run commit step fails
@@ -276,11 +322,11 @@ describe('makeLauncher', () => {
     const cfg: PetreeConfig = {
       home,
       defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
       allowClone: [],
     }
     const store = new TaskStore(join(home, 'petree.db'))
-    const created = store.create({ prompt: 'investigate', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const created = store.create({ prompt: 'investigate', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30, stage: 'build' })
     const writer = (file: string) => [process.execPath, '-e',
       `const fs=require('fs');fs.writeFileSync(process.env.WD+'/demo/${file}','x');` +
       `console.log(JSON.stringify({type:'result',subtype:'success',result:'done ${file}'}))`]
@@ -314,7 +360,7 @@ describe('makeLauncher', () => {
     expect(branch).toBe(`petree/${created.id}`)
     const subjects = execFileSync('git', ['-C', repoDir, 'log', '--pretty=%s'], { encoding: 'utf8' }).trim().split('\n')
     expect(subjects.filter((s) => s.startsWith(`petree ${created.id}`)).length).toBe(2)
-    expect(subjects[0]).toContain('implement it')
+    expect(subjects[0]).toBe(`petree ${created.id}: investigate`)
   })
 
   it('reattach on a live container finalizes the turn without double-counting', async () => {
@@ -351,11 +397,11 @@ describe('makeLauncher', () => {
     const cfg: PetreeConfig = {
       home,
       defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
       allowClone: [],
     }
     const store = new TaskStore(join(home, 'petree.db'))
-    const created = store.create({ prompt: 'edit the readme', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30 })
+    const created = store.create({ prompt: 'edit the readme', repos: ['demo'], tokenBudget: 500000, timeoutMinutes: 30, stage: 'build' })
     const name = `petree-${created.id}`
     const launch = makeLauncher(cfg, store, {
       buildCommands: (t) => shimCommands('ok', `petree-${t.id}`),

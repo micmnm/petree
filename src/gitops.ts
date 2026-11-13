@@ -3,7 +3,8 @@ import { execFileSync } from 'node:child_process'
 const IDENT = ['-c', 'user.name=Petree', '-c', 'user.email=petree@localhost']
 
 function git(repoDir: string, args: string[], opts: { ident?: boolean } = {}): string {
-  const full = ['-C', repoDir, ...(opts.ident ? IDENT : []), ...args]
+  // The agent can write the repo's .git, so neutralise hooks and fsmonitor (both run host commands).
+  const full = ['-C', repoDir, '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', ...(opts.ident ? IDENT : []), ...args]
   // Node's default maxBuffer (1 MiB) would otherwise throw ENOBUFS on a large diff/patch.
   return execFileSync('git', full, {
     encoding: 'utf8',

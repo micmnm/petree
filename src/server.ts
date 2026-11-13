@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
@@ -163,6 +163,35 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       return { repo, branch, baseBranch, hasChanges: st.hasChanges, stat: d.stat, patch: d.patch, reviewCommand }
     })
     res.json(out)
+  })
+
+  app.get('/api/tasks/:id/thread', (req, res) => {
+    if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) { res.sendStatus(400); return }
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    const dir = join(cfg.home, 'work', t.id, '_thread')
+    // lstatSync (not statSync) so a symlink planted by the sandboxed agent — e.g. via
+    // prompt injection — can't be read as if it were a plain file it wrote itself.
+    const isPlainFile = (file: string) => { try { return lstatSync(file).isFile() } catch { return false } }
+    const read = (name: string) => {
+      const file = join(dir, name)
+      return isPlainFile(file) ? readFileSync(file, 'utf8') : null
+    }
+    const notesDir = join(dir, 'notes')
+    const notes: { repo: string; name: string; content: string }[] = []
+    if (existsSync(notesDir)) {
+      for (const repo of readdirSync(notesDir, { withFileTypes: true })) {
+        if (!repo.isDirectory()) continue
+        const repoDir = join(notesDir, repo.name)
+        for (const file of readdirSync(repoDir)) {
+          if (!file.endsWith('.md')) continue
+          const full = join(repoDir, file)
+          if (!isPlainFile(full)) continue
+          notes.push({ repo: repo.name, name: file.slice(0, -3), content: readFileSync(full, 'utf8') })
+        }
+      }
+    }
+    res.json({ findings: read('findings.md'), spec: read('spec.md'), notes })
   })
 
   app.post('/api/tasks/:id/push', (req, res) => {

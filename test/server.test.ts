@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Server } from 'node:http'
@@ -411,5 +411,85 @@ describe('API', () => {
       method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'x' }),
     })
     expect(missing.status).toBe(404)
+  })
+
+  it('returns an all-empty thread shape when no _thread dir exists', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    const res = await fetch(`${base}/api/tasks/${t.id}/thread`)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ findings: null, spec: null, notes: [] })
+  })
+
+  it('returns findings.md when only findings exists', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    mkdirSync(join(home, 'work', t.id, '_thread'), { recursive: true })
+    writeFileSync(join(home, 'work', t.id, '_thread', 'findings.md'), '# findings\n')
+    const res = await fetch(`${base}/api/tasks/${t.id}/thread`)
+    const body = await res.json()
+    expect(body.findings).toBe('# findings\n')
+    expect(body.spec).toBeNull()
+    expect(body.notes).toEqual([])
+  })
+
+  it('returns spec.md when only spec exists', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    mkdirSync(join(home, 'work', t.id, '_thread'), { recursive: true })
+    writeFileSync(join(home, 'work', t.id, '_thread', 'spec.md'), '# spec\n')
+    const res = await fetch(`${base}/api/tasks/${t.id}/thread`)
+    const body = await res.json()
+    expect(body.findings).toBeNull()
+    expect(body.spec).toBe('# spec\n')
+    expect(body.notes).toEqual([])
+  })
+
+  it('returns both findings.md and spec.md when both exist', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    mkdirSync(join(home, 'work', t.id, '_thread'), { recursive: true })
+    writeFileSync(join(home, 'work', t.id, '_thread', 'findings.md'), '# findings\n')
+    writeFileSync(join(home, 'work', t.id, '_thread', 'spec.md'), '# spec\n')
+    const res = await fetch(`${base}/api/tasks/${t.id}/thread`)
+    const body = await res.json()
+    expect(body.findings).toBe('# findings\n')
+    expect(body.spec).toBe('# spec\n')
+    expect(body.notes).toEqual([])
+  })
+
+  it('lists notes grouped by repo subdirectory', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    mkdirSync(join(home, 'work', t.id, '_thread', 'notes', 'repoA'), { recursive: true })
+    mkdirSync(join(home, 'work', t.id, '_thread', 'notes', 'repoB'), { recursive: true })
+    writeFileSync(join(home, 'work', t.id, '_thread', 'notes', 'repoA', 'noteX.md'), 'content x\n')
+    writeFileSync(join(home, 'work', t.id, '_thread', 'notes', 'repoB', 'noteY.md'), 'content y\n')
+    const res = await fetch(`${base}/api/tasks/${t.id}/thread`)
+    const body = await res.json()
+    expect(body.notes).toHaveLength(2)
+    expect(body.notes).toContainEqual({ repo: 'repoA', name: 'noteX', content: 'content x\n' })
+    expect(body.notes).toContainEqual({ repo: 'repoB', name: 'noteY', content: 'content y\n' })
+  })
+
+  it('404s on an unknown task id for /thread', async () => {
+    const res = await fetch(`${base}/api/tasks/00000000-0000-0000-0000-000000000000/thread`)
+    expect(res.status).toBe(404)
+  })
+
+  it('400s on a malformed task id for /thread', async () => {
+    const res = await fetch(`${base}/api/tasks/..%2f..%2fsecret/thread`)
+    expect(res.status).toBe(400)
+  })
+
+  it('refuses to follow a symlink planted as findings.md, spec.md, or a note', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    const secret = join(home, 'secret.txt')
+    writeFileSync(secret, 'top secret')
+    const threadDir = join(home, 'work', t.id, '_thread')
+    mkdirSync(join(threadDir, 'notes', 'repoA'), { recursive: true })
+    symlinkSync(secret, join(threadDir, 'spec.md'))
+    symlinkSync(secret, join(threadDir, 'findings.md'))
+    symlinkSync(secret, join(threadDir, 'notes', 'repoA', 'evil.md'))
+    const res = await fetch(`${base}/api/tasks/${t.id}/thread`)
+    const body = await res.json()
+    expect(body.spec).toBeNull()
+    expect(body.findings).toBeNull()
+    expect(body.notes).toEqual([])
   })
 })

@@ -14,8 +14,11 @@
   header { padding: calc(var(--sp)*2) calc(var(--sp)*3); border-bottom: 1px solid var(--line); background: var(--surface); }
   header h1 { margin: 0; font-size: 1.15rem; letter-spacing: .5px; }
   .wrap { padding: calc(var(--sp)*2) calc(var(--sp)*3); }
-  .layout { display: flex; gap: calc(var(--sp)*3); align-items: flex-start; }
-  .left { flex: 1 1 42%; min-width: 0; } .right { flex: 1 1 58%; min-width: 0; }
+  .layout { display: flex; gap: calc(var(--sp)*3); }
+  .left { flex: 1 1 42%; min-width: 0; display: flex; flex-direction: column; }
+  .right { flex: 1 1 58%; min-width: 0; display: flex; flex-direction: column; }
+  .tablescroll { flex: 1; overflow-y: auto; }
+  .tablescroll thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
   .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
   form.create { padding: calc(var(--sp)*2); display: flex; flex-direction: column; gap: var(--sp); margin-bottom: calc(var(--sp)*2); }
   textarea { width: 100%; padding: var(--sp); font: inherit; border: 1px solid var(--line); border-radius: 6px; resize: none; overflow: hidden; min-height: 3rem; }
@@ -46,7 +49,7 @@
   .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); padding: 0 var(--sp); }
   .tabs button { border: none; background: none; border-radius: 0; padding: 10px 12px; color: var(--muted); border-bottom: 2px solid transparent; }
   .tabs button.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
-  .tabbody { padding: calc(var(--sp)*2); }
+  .tabbody { padding: calc(var(--sp)*2); flex: 1; overflow-y: auto; }
   dl { margin: 0; } dt { color: var(--muted); font-size: .78rem; margin-top: 10px; } dd { margin: 2px 0 0; }
   .result h1,.result h2,.result h3 { font-size: 1rem; margin: .7rem 0 .3rem; }
   .result pre, pre.diff, pre.log { background: #16160f; color: #e6e6d8; padding: 12px; border-radius: 6px; overflow: auto; font-family: var(--mono); font-size: .82rem; }
@@ -113,7 +116,7 @@
   .ev-more summary { font-size: .72rem; color: var(--muted); cursor: pointer; }
   .ev-more pre { background: #16160f; color: #e6e6d8; padding: 8px; border-radius: 6px; margin: 4px 0 0;
                  max-height: 30vh; overflow: auto; font-family: var(--mono); font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-  @media (max-width: 820px) { .layout { flex-direction: column; } .left, .right { flex: 1 1 100%; } }
+  @media (max-width: 820px) { .layout { flex-direction: column; height: auto !important; } .left, .right { flex: 1 1 100%; } .tablescroll { overflow-y: visible; } }
   /* settings: popup modal, not an inline panel */
   .modal-overlay { position: fixed; inset: 0; background: rgba(20,20,16,.35); display: flex; align-items: center; justify-content: center; padding: calc(var(--sp)*2); z-index: 100; }
   .modal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); width: min(640px, 100%); max-height: 88vh; overflow: auto; padding: calc(var(--sp)*2.5); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
@@ -161,6 +164,15 @@
     </div>
   </div>
 </div>
+<div class="modal-overlay" id="viewerOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+    <div class="modal-head">
+      <h2 id="viewerTitle"></h2>
+      <button type="button" class="modal-close" id="viewerClose" aria-label="close">×</button>
+    </div>
+    <div class="result" id="viewerBody"></div>
+  </div>
+</div>
 <div class="wrap">
   <form class="create card" id="create">
     <textarea name="prompt" id="prompt" placeholder="task prompt — Cmd/Ctrl+Enter to start" required></textarea>
@@ -182,7 +194,9 @@
     </div>
   </form>
   <div class="layout">
-    <div class="left card"><table><thead><tr><th>id</th><th>state</th><th>repos</th><th>tokens</th></tr></thead><tbody id="tasks"></tbody></table></div>
+    <div class="left card">
+      <div class="tablescroll"><table><thead><tr><th>id</th><th>state</th><th>repos</th><th>tokens</th></tr></thead><tbody id="tasks"></tbody></table></div>
+    </div>
     <div class="right card">
       <div class="tabs" id="tabs"></div>
       <div class="tabbody" id="tabbody"><p class="muted">Select a task to see details.</p></div>
@@ -194,7 +208,22 @@
   import { renderActivity } from './activity.js'
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
   let selected = null, tab = 'Overview', resultShownFor = null
-  const TABS = ['Overview', 'Result', 'Changes', 'Log']
+  let lastThread = { findings: null, spec: null, notes: [] }
+  const TABS = ['Overview', 'Spec', 'Notes', 'Result', 'Changes', 'Log']
+
+  // The two-column layout is bounded to the viewport so a long tab body scrolls
+  // internally instead of pushing the task list/tab bar off-screen (see
+  // .tablescroll / .tabbody overflow rules). Computed from the layout's actual
+  // on-screen position rather than a hardcoded offset, since the create-form's
+  // textarea autosizes and would make any fixed number wrong.
+  const layoutEl = document.querySelector('.layout')
+  function sizeLayout() {
+    if (window.matchMedia('(max-width: 820px)').matches) { layoutEl.style.height = ''; return }
+    const top = layoutEl.getBoundingClientRect().top
+    const bottomMargin = 16 // matches .wrap's bottom padding, so .layout ends flush with the page
+    layoutEl.style.height = `calc(100vh - ${top}px - ${bottomMargin}px)`
+  }
+  window.addEventListener('resize', sizeLayout)
   // Log view preferences survive the 3s poll and page reloads
   let logView = localStorage.getItem('petree-logview') || 'Activity'
   let followLog = localStorage.getItem('petree-logfollow') !== 'off'
@@ -238,6 +267,7 @@
           ${r.instructions ? `<div class="conv-text">${esc(r.instructions)}</div>` : ''}
           ${cmdLine('setup', r.setup)}${cmdLine('build', r.build)}${cmdLine('test', r.test)}</div>`).join('')
       : ''
+    sizeLayout()
   }
   function renderRepoMenu() {
     const q = repoSearch.value.trim().toLowerCase()
@@ -301,7 +331,25 @@
   settingsBtn.addEventListener('click', openSettings)
   document.getElementById('settingsClose').addEventListener('click', closeSettings)
   settingsOverlay.addEventListener('click', (e) => { if (e.target === settingsOverlay) closeSettings() })
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !settingsOverlay.hidden) closeSettings() })
+
+  // shared "full view" modal — opened from the Spec/Notes tabs (and generically
+  // reusable later for Result/Changes) to show one full rendered markdown document
+  const viewerOverlay = document.getElementById('viewerOverlay')
+  const viewerTitle = document.getElementById('viewerTitle')
+  const viewerBody = document.getElementById('viewerBody')
+  function openViewer(title, markdownContent) {
+    viewerTitle.textContent = title
+    viewerBody.innerHTML = renderMarkdown(markdownContent || '')
+    viewerOverlay.hidden = false
+  }
+  function closeViewer() { viewerOverlay.hidden = true }
+  document.getElementById('viewerClose').addEventListener('click', closeViewer)
+  viewerOverlay.addEventListener('click', (e) => { if (e.target === viewerOverlay) closeViewer() })
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return
+    if (!viewerOverlay.hidden) closeViewer()
+    else if (!settingsOverlay.hidden) closeSettings()
+  })
   document.getElementById('saveSettings').addEventListener('click', async () => {
     const res = await fetch('/api/settings', {
       method: 'PUT', headers: { 'content-type': 'application/json' },
@@ -328,7 +376,7 @@
   })
 
   const prompt = document.getElementById('prompt')
-  const autosize = () => { prompt.style.height = 'auto'; prompt.style.height = prompt.scrollHeight + 'px' }
+  const autosize = () => { prompt.style.height = 'auto'; prompt.style.height = prompt.scrollHeight + 'px'; sizeLayout() }
   prompt.value = localStorage.getItem('petree-draft') || ''; autosize()
   prompt.addEventListener('input', () => { localStorage.setItem('petree-draft', prompt.value); autosize() })
   prompt.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); document.getElementById('create').requestSubmit() } })
@@ -348,22 +396,45 @@
   }
   document.getElementById('tasks').addEventListener('click', (e) => {
     const tr = e.target.closest('tr[data-id]'); if (!tr) return
-    selected = tr.dataset.id; tab = 'Overview'; refresh()
+    selected = tr.dataset.id; tab = 'Overview'
+    lastThread = { findings: null, spec: null, notes: [] } // avoid flashing the previous task's Spec/Notes tabs before the new thread loads
+    refresh()
   })
 
-  function renderTabs() {
+  // Spec/Notes are only shown when the task actually has thread artifacts —
+  // most tasks don't use this convention, so an empty tab would just be clutter.
+  const tabVisible = (n, thread) =>
+    n === 'Spec' ? !!(thread.spec || thread.findings) : n === 'Notes' ? (thread.notes || []).length > 0 : true
+  function renderTabs(thread = lastThread) {
+    const visible = TABS.filter((n) => tabVisible(n, thread))
+    if (!visible.includes(tab)) tab = 'Overview'
     document.getElementById('tabs').innerHTML = selected
-      ? TABS.map((n) => `<button class="${n === tab ? 'active' : ''}" data-tab="${n}">${n}</button>`).join('') : ''
+      ? visible.map((n) => `<button class="${n === tab ? 'active' : ''}" data-tab="${n}">${n}</button>`).join('') : ''
   }
   document.getElementById('tabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-tab]'); if (!b) return; tab = b.dataset.tab; renderBody()
   })
 
+  // First ~400 chars of the raw markdown, cut at a word boundary — simple stand-in
+  // for "first heading + first paragraph" that still renders sensibly through renderMarkdown.
+  function summarize(md, max = 400) {
+    const text = String(md).trim()
+    return text.length <= max ? text : text.slice(0, max).replace(/\s+\S*$/, '') + '…'
+  }
+  const kebabToTitle = (s) => s.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+  function firstLineSummary(content, max = 140) {
+    const line = String(content).split('\n').map((l) => l.trim()).find((l) => l && !l.startsWith('#'))
+    if (!line) return ''
+    return line.length > max ? line.slice(0, max).replace(/\s+\S*$/, '') + '…' : line
+  }
+
   async function renderBody() {
     const body = document.getElementById('tabbody')
-    if (!selected) { body.innerHTML = '<p class="muted">Select a task to see details.</p>'; return }
+    if (!selected) { body.innerHTML = '<p class="muted">Select a task to see details.</p>'; renderTabs(); return }
     const t = await (await fetch('/api/tasks/' + selected)).json()
-    renderTabs()
+    const thread = await (await fetch('/api/tasks/' + selected + '/thread')).json()
+    lastThread = thread
+    renderTabs(thread)
     if (tab === 'Overview') {
       const resume = ['paused-limit', 'paused-rate-limit', 'waiting-for-you', 'failed', 'cancelled'].includes(t.state)
         ? `<button data-resume="${esc(t.id)}">resume</button>` : ''
@@ -392,6 +463,34 @@
             <button class="primary" data-next="${esc(t.id)}" style="margin-left:auto">Continue task</button>
           </div>
         </div>` : ''}`
+    } else if (tab === 'Spec') {
+      const { spec, findings } = thread
+      if (!spec && !findings) {
+        body.innerHTML = '<p class="muted">No spec or findings for this task.</p>'
+      } else {
+        const primary = spec || findings
+        const label = spec ? 'spec' : 'findings (draft — spec not written yet)'
+        body.innerHTML = `<div class="muted small" style="margin-bottom:8px">${esc(label)}</div>
+          <div class="result">${renderMarkdown(summarize(primary))}</div>
+          <div class="field" style="margin-top:10px">
+            <button data-open-spec>Open full ${esc(spec ? 'spec' : 'findings')} ↗</button>
+            ${spec && findings ? '<button class="small" data-open-findings>view earlier findings</button>' : ''}
+          </div>`
+        body.querySelector('[data-open-spec]').addEventListener('click', () => openViewer(spec ? 'Spec' : 'Findings (draft)', primary))
+        const findingsBtn = body.querySelector('[data-open-findings]')
+        if (findingsBtn) findingsBtn.addEventListener('click', () => openViewer('Findings (earlier)', findings))
+      }
+    } else if (tab === 'Notes') {
+      const notes = thread.notes || []
+      body.innerHTML = notes.length ? notes.map((n, i) => `
+        <div class="card" style="margin-bottom:8px;padding:10px;cursor:pointer" data-note="${i}">
+          <div class="field" style="margin-bottom:4px"><span class="chip">${esc(n.repo)}</span><strong>${esc(kebabToTitle(n.name))}</strong></div>
+          <div class="muted small">${esc(firstLineSummary(n.content))}</div>
+        </div>`).join('') : '<p class="muted">No notes for this task.</p>'
+      body.querySelectorAll('[data-note]').forEach((el) => el.addEventListener('click', () => {
+        const n = notes[Number(el.dataset.note)]
+        openViewer(kebabToTitle(n.name), n.content)
+      }))
     } else if (tab === 'Result') {
       const history = (t.turns || []).map((turn, i) => `
         <details class="card" style="margin-bottom:8px;padding:8px">

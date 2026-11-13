@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
@@ -10,6 +10,10 @@ import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
 import { acceptNote, dropSuggestion, listSuggestions, NoteInputError, readThreadFile, readThreadStatus } from './notes.js'
 import { pickImage } from './sandbox.js'
+import {
+  DEFAULT_KEYS, REPO_KEYS, NotEditable, addRepo, hashText, pickFields, readRepoFields,
+  removeRepo, repoEditable, replaceRepo, setDefaults,
+} from './repos-yaml.js'
 import { FOLLOWUP_STATES, RESUMABLE_STATES, STAGES, canMoveStage, threadTitle } from './store.js'
 import type { Stage, TaskStore, TaskRecord } from './store.js'
 import type { Response } from 'express'
@@ -152,6 +156,101 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     cfg.repos = parsed.repos
     cfg.allowClone = parsed.allowClone
     res.json({ ok: true })
+  })
+
+  // Structured repo editing: splice one block into repos.yaml (see repos-yaml.ts),
+  // validate the whole result, then write atomically and apply to cfg in place.
+  const reposFile = () => join(cfg.home, 'repos.yaml')
+  const readReposText = () => (existsSync(reposFile()) ? readFileSync(reposFile(), 'utf8') : '')
+  const REPO_NAME = /^[\w.-]+$/
+
+  // Replies with the error and returns false unless the write may proceed.
+  function applyEdit(res: Response, edit: () => string): boolean {
+    let next: string
+    try {
+      next = edit()
+    } catch (err) {
+      res.status(err instanceof NotEditable ? 422 : 400).json({ error: err instanceof Error ? err.message : String(err) })
+      return false
+    }
+    let parsed: Omit<PetreeConfig, 'home'>
+    try {
+      parsed = parseConfigText(next)
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) })
+      return false
+    }
+    const tmp = `${reposFile()}.tmp`
+    writeFileSync(tmp, next)
+    renameSync(tmp, reposFile())
+    cfg.defaults = parsed.defaults
+    cfg.repos = parsed.repos
+    cfg.allowClone = parsed.allowClone
+    return true
+  }
+
+  // A mismatch (or a missing hash where one is required) means the file moved on.
+  function hashOk(res: Response, text: string, hash: unknown, required: boolean): boolean {
+    if (hash === undefined && !required) return true
+    if (hash === hashText(text)) return true
+    res.status(409).json({ error: 'repos.yaml changed on disk — reload' })
+    return false
+  }
+
+  app.get('/api/repos/:name', (req, res) => {
+    const { name } = req.params
+    if (!Object.hasOwn(cfg.repos, name)) { res.sendStatus(404); return }
+    const text = readReposText()
+    res.json({ name, fields: readRepoFields(text, name), editable: repoEditable(text, name) === true, hash: hashText(text) })
+  })
+
+  app.put('/api/repos/:name', (req, res) => {
+    const { name } = req.params
+    const { fields, hash } = (req.body ?? {}) as { fields?: Record<string, unknown>; hash?: unknown }
+    if (!Object.hasOwn(cfg.repos, name)) { res.sendStatus(404); return }
+    if (!fields || typeof fields !== 'object') { res.status(400).json({ error: 'fields is required' }); return }
+    const text = readReposText()
+    if (!hashOk(res, text, hash, true)) return
+    if (applyEdit(res, () => replaceRepo(text, name, pickFields(fields, REPO_KEYS)))) res.json({ ok: true, hash: hashText(readReposText()) })
+  })
+
+  app.post('/api/repos', (req, res) => {
+    const { name, fields, hash } = (req.body ?? {}) as { name?: string; fields?: Record<string, unknown>; hash?: unknown }
+    if (typeof name !== 'string' || !REPO_NAME.test(name) || !fields || typeof fields !== 'object') {
+      res.status(400).json({ error: 'name and fields are required' })
+      return
+    }
+    if (Object.hasOwn(cfg.repos, name)) { res.status(409).json({ error: `repo ${name} already exists` }); return }
+    const text = readReposText()
+    if (!hashOk(res, text, hash, false)) return
+    if (applyEdit(res, () => addRepo(text, name, pickFields(fields, REPO_KEYS)))) res.status(201).json({ ok: true, hash: hashText(readReposText()) })
+  })
+
+  app.delete('/api/repos/:name', (req, res) => {
+    const { name } = req.params
+    if (!Object.hasOwn(cfg.repos, name)) { res.sendStatus(404); return }
+    const text = readReposText()
+    if (!hashOk(res, text, req.query.hash, true)) return
+    // ponytail: "in use" = any non-terminal thread; refine once bins/archive land (§5.6)
+    if (store.list().some((t) => t.repos.includes(name) && !['done', 'failed', 'cancelled'].includes(t.state))) {
+      res.status(409).json({ error: `repo ${name} is used by an active thread` })
+      return
+    }
+    if (applyEdit(res, () => removeRepo(text, name))) res.json({ ok: true, hash: hashText(readReposText()) })
+  })
+
+  app.put('/api/defaults', (req, res) => {
+    const { hash, ...rest } = (req.body ?? {}) as Record<string, unknown>
+    const patch = pickFields(rest, DEFAULT_KEYS)
+    for (const [k, v] of Object.entries(patch)) {
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
+        res.status(400).json({ error: `${k} must be a non-negative number` })
+        return
+      }
+    }
+    const text = readReposText()
+    if (!hashOk(res, text, hash, false)) return
+    if (applyEdit(res, () => setDefaults(text, patch))) res.json({ ok: true, hash: hashText(readReposText()) })
   })
 
   app.get('/api/tasks/:id', (req, res) => {

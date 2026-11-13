@@ -458,6 +458,66 @@ describe('API', () => {
     expect(empty.status).toBe(400)
   })
 
+  describe('structured repo editing', () => {
+    const FILE = '# keep me\nrepos:\n  demo:\n    url: x\n    image: sandbox-node\n  odd:\n    url: x\n    image: custom-img\n'
+    const send = (method: string, path: string, body?: unknown) => fetch(`${base}${path}`, {
+      method, headers: { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body),
+    })
+    const disk = () => readFileSync(join(home, 'repos.yaml'), 'utf8')
+    const hashOf = async (name = 'demo') => (await (await fetch(`${base}/api/repos/${name}`)).json()).hash
+
+    beforeEach(() => writeFileSync(join(home, 'repos.yaml'), FILE))
+
+    it('edits a repo, keeping the rest of the file and updating the running config', async () => {
+      const got = await (await fetch(`${base}/api/repos/demo`)).json()
+      expect(got).toMatchObject({ editable: true, fields: { url: 'x', image: 'sandbox-node' } })
+      const put = await send('PUT', '/api/repos/demo', { hash: got.hash, fields: { url: 'new', image: 'sandbox-node', tags: ['t'] } })
+      expect(put.status).toBe(200)
+      expect(disk()).toBe('# keep me\nrepos:\n  demo:\n    url: new\n    image: sandbox-node\n    tags:\n      - t\n  odd:\n    url: x\n    image: custom-img\n')
+      const repos = await (await fetch(`${base}/api/repos`)).json()
+      expect(repos.find((r: { name: string }) => r.name === 'demo').tags).toEqual(['t'])
+    })
+
+    it('adds, edits defaults, and deletes', async () => {
+      expect((await send('POST', '/api/repos', { name: 'extra', fields: { url: 'q', image: 'i' } })).status).toBe(201)
+      expect((await send('POST', '/api/repos', { name: 'extra', fields: { url: 'q', image: 'i' } })).status).toBe(409)
+      expect((await send('PUT', '/api/defaults', { concurrency: 5 })).status).toBe(200)
+      expect(disk()).toContain('defaults:\n  concurrency: 5\n')
+      expect((await send('DELETE', `/api/repos/extra?hash=${await hashOf()}`)).status).toBe(200)
+      expect(disk()).not.toContain('extra')
+    })
+
+    it('refuses anchored blocks with 422', async () => {
+      writeFileSync(join(home, 'repos.yaml'), 'repos:\n  demo: &d\n    url: x\n    image: sandbox-node\n')
+      const got = await (await fetch(`${base}/api/repos/demo`)).json()
+      expect(got.editable).toBe(false)
+      const put = await send('PUT', '/api/repos/demo', { hash: got.hash, fields: { url: 'y', image: 'i' } })
+      expect(put.status).toBe(422)
+    })
+
+    it('rejects an invalid result with 400 and leaves the file untouched', async () => {
+      const put = await send('PUT', '/api/repos/demo', { hash: await hashOf(), fields: { url: 'y' } })
+      expect(put.status).toBe(400)
+      expect((await put.json()).error).toMatch(/image/)
+      expect(disk()).toBe(FILE)
+    })
+
+    it('answers 409 when the file changed since the hash was read', async () => {
+      const hash = await hashOf()
+      writeFileSync(join(home, 'repos.yaml'), `${FILE}# hand edit\n`)
+      const put = await send('PUT', '/api/repos/demo', { hash, fields: { url: 'y', image: 'i' } })
+      expect(put.status).toBe(409)
+      expect(disk()).toBe(`${FILE}# hand edit\n`)
+    })
+
+    it('refuses to delete a repo an active thread uses', async () => {
+      await send('POST', '/api/tasks', { prompt: 'x', repos: ['demo'] })
+      const del = await send('DELETE', `/api/repos/demo?hash=${await hashOf()}`)
+      expect(del.status).toBe(409)
+      expect(disk()).toBe(FILE)
+    })
+  })
+
   it('rejects /next with a missing prompt, unknown model, wrong state, or unknown id', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     store.transition(t.id, 'provisioning')

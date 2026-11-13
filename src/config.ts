@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import yaml from 'js-yaml'
+import { loadAll as loadYamlAll, CORE_SCHEMA, mergeTag } from 'js-yaml'
 
 export interface RepoConfig {
   url: string
@@ -47,11 +47,28 @@ export interface PetreeConfig {
   allowClone: string[]
 }
 
+// js-yaml 5 loads with CORE_SCHEMA (strict YAML 1.2), which no longer enables
+// !!merge. repos.yaml is hand-written and sharing settings between repos via an
+// anchor and `<<:` is natural, so keep the merge tag; without it those keys land
+// as a literal "<<" property and the merged settings silently disappear.
+const SCHEMA = CORE_SCHEMA.withTags(mergeTag)
+
+// An empty or fully commented-out repos.yaml means "no repos configured", but
+// js-yaml 5's load() throws on input holding no document where v4 returned
+// undefined. loadAll() reports document-less input as an empty list instead,
+// which beats a text heuristic: only the parser can tell a comment-only file
+// from a real document. Multiple documents stay an error, as they were in v4.
+function loadReposYaml(text: string): unknown {
+  const docs = loadYamlAll(text, { schema: SCHEMA })
+  if (docs.length > 1) throw new Error('expected a single YAML document in repos.yaml')
+  return docs[0]
+}
+
 // Split out from loadConfig so the dashboard's repos.yaml editor can validate
 // a candidate document (parse + same repo checks) before it's ever written
 // to disk or applied to the running config.
 export function parseConfigText(text: string): Omit<PetreeConfig, 'home'> {
-  const raw = (yaml.load(text) ?? {}) as Record<string, unknown>
+  const raw = (loadReposYaml(text) ?? {}) as Record<string, unknown>
   const d = (raw.defaults ?? {}) as Record<string, unknown>
   const repos: Record<string, RepoConfig> = {}
   for (const [name, value] of Object.entries((raw.repos ?? {}) as Record<string, Record<string, unknown>>)) {

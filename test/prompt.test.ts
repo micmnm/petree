@@ -64,6 +64,17 @@ describe('composePrompt', () => {
     expect(ask).toBeLessThan(build.indexOf('/work/_thread/spec.md'))
   })
 
+  it('asks for the status file once per stage, after the notes and before conventions', () => {
+    const cfg = config({ demo: repo({ instructions: 'Be careful.' }) })
+    for (const stage of ['investigate', 'spec', 'build'] as const) {
+      const out = composePrompt(task({ stage }), cfg)
+      expect(out.split('## Thread status').length).toBe(2)
+      expect(out).toContain('/work/_thread/status.txt')
+      expect(out.indexOf('## Thread status')).toBeGreaterThan(out.indexOf('## Suggesting notes'))
+      expect(out.indexOf('## Thread status')).toBeLessThan(out.indexOf('## Repo conventions'))
+    }
+  })
+
   it('points at notes, repo CLAUDE.md and the suggestion dir for each repo', () => {
     const out = composePrompt(task({ repos: ['demo', 'api'] }), config({ demo: repo(), api: repo() }))
     for (const r of ['demo', 'api']) {

@@ -73,6 +73,15 @@ function notesSections(repos: string[]): string[] {
   ]
 }
 
+const STATUS_SECTION = [
+  '## Thread status (do this last, every turn)',
+  '',
+  'Overwrite `/work/_thread/status.txt` with exactly three lines:',
+  'topic: <the thread\'s subject in at most 6 words>',
+  'status: <one sentence: where the thread stands after this turn>',
+  'needs-you: <one sentence: the decision or action you need from the user, or "nothing">',
+]
+
 export function composePrompt(task: TaskRecord, cfg: PetreeConfig): string {
   const head = [
     ...(task.prompt ? [task.prompt, ''] : []),
@@ -81,6 +90,8 @@ export function composePrompt(task: TaskRecord, cfg: PetreeConfig): string {
     STAGE_INSTRUCTIONS[task.stage],
     '',
     ...notesSections(task.repos),
+    '',
+    ...STATUS_SECTION,
   ]
   const conventions = repoConventions(task, cfg)
   return [...head, ...(conventions ? ['', conventions] : [])].join('\n')

@@ -483,6 +483,14 @@ describe('thread API', () => {
     expect((await post('/api/tasks', { prompt: 'x', repos: ['demo', 'odd'] })).status).toBe(400)
   })
 
+  it('attaches a card to the task list and to a single task', async () => {
+    const t = gated('spec')
+    const one = await (await fetch(`${base}/api/tasks/${t.id}`)).json()
+    expect(one.card).toMatchObject({ group: 'your-move', line: 'Spec ready' })
+    const list = await (await fetch(`${base}/api/tasks`)).json()
+    expect(list.find((x: { id: string }) => x.id === t.id).card.group).toBe('your-move')
+  })
+
   it('adds comments, 400 on empty text, 404 on unknown task', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     const ok = await post(`/api/tasks/${t.id}/comments`, { text: 'hello' })

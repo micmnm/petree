@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, existsSync, readFileSync, symlinkSync, writeFil
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, beforeEach } from 'vitest'
-import { NoteInputError, acceptNote, dropSuggestion, listSuggestions, readThreadFile } from '../src/notes.js'
+import { NoteInputError, acceptNote, dropSuggestion, listSuggestions, readThreadFile, readThreadStatus } from '../src/notes.js'
 
 let notesHome: string
 let workDir: string
@@ -27,6 +27,53 @@ describe('readThreadFile', () => {
     mkdirSync(join(workDir, '_thread'))
     writeFileSync(join(workDir, '_thread', 'spec.md'), 'hello')
     expect(readThreadFile(workDir, 'spec.md')).toBe('hello')
+  })
+})
+
+describe('readThreadStatus', () => {
+  const since = new Date(Date.now() - 60_000).toISOString()
+  const write = (text: string) => {
+    mkdirSync(join(workDir, '_thread'), { recursive: true })
+    writeFileSync(join(workDir, '_thread', 'status.txt'), text)
+  }
+
+  it('parses the first line per key, ignores unknown lines', () => {
+    write('topic: First\ntopic: Second\nmood: great\nstatus: Spec written.\nneeds-you: Approve the spec.\n')
+    expect(readThreadStatus(workDir, since)).toEqual({ topic: 'First', status: 'Spec written.', needsYou: 'Approve the spec.' })
+  })
+
+  it('clips long values', () => {
+    write(`topic: ${'a'.repeat(100)}\nstatus: ${'b'.repeat(200)}\nneeds-you: ${'c'.repeat(200)}`)
+    const s = readThreadStatus(workDir, since)!
+    expect([s.topic.length, s.status.length, s.needsYou!.length]).toEqual([60, 140, 160])
+  })
+
+  it('maps nothing, none and empty needs-you to null', () => {
+    for (const v of ['nothing', 'None.', '']) {
+      write(`topic: t\nstatus: s\nneeds-you: ${v}`)
+      expect(readThreadStatus(workDir, since)!.needsYou).toBeNull()
+    }
+  })
+
+  it('returns null when missing, garbled, or without a turn start', () => {
+    expect(readThreadStatus(workDir, since)).toBeNull()
+    write('just some prose')
+    expect(readThreadStatus(workDir, since)).toBeNull()
+    write('topic: t')
+    expect(readThreadStatus(workDir, null)).toBeNull()
+  })
+
+  it('returns null when written before the turn started', () => {
+    write('topic: t\nstatus: s\nneeds-you: nothing')
+    expect(readThreadStatus(workDir, new Date(Date.now() + 60_000).toISOString())).toBeNull()
+  })
+
+  it('returns null for a symlink pointing outside workDir', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'petree-out-'))
+    writeFileSync(join(outside, 's.txt'), 'topic: leak')
+    mkdirSync(join(workDir, '_thread'))
+    symlinkSync(join(outside, 's.txt'), join(workDir, '_thread', 'status.txt'))
+    expect(readThreadStatus(workDir, since)).toBeNull()
   })
 })
 

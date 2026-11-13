@@ -7,7 +7,8 @@ import type { PetreeConfig } from './config.js'
 import { repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch } from './gitops.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
-import { acceptNote, dropSuggestion, listSuggestions, NoteInputError, readThreadFile } from './notes.js'
+import { cardFor } from './inbox.js'
+import { acceptNote, dropSuggestion, listSuggestions, NoteInputError, readThreadFile, readThreadStatus } from './notes.js'
 import { pickImage } from './sandbox.js'
 import { FOLLOWUP_STATES, RESUMABLE_STATES, STAGES, canMoveStage, threadTitle } from './store.js'
 import type { Stage, TaskStore, TaskRecord } from './store.js'
@@ -82,7 +83,10 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     res.status(201).json(task)
   })
 
-  app.get('/api/tasks', (_req, res) => { res.json(store.list()) })
+  const withCard = (t: TaskRecord) =>
+    ({ ...t, card: cardFor(t, readThreadStatus(join(cfg.home, 'work', t.id), t.startedAt), cfg) })
+
+  app.get('/api/tasks', (_req, res) => { res.json(store.list().map(withCard)) })
 
   app.get('/api/settings', (_req, res) => { res.json(store.getSettings()) })
 
@@ -148,7 +152,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
 
   app.get('/api/tasks/:id', (req, res) => {
     const t = store.get(req.params.id)
-    if (t) res.json(t)
+    if (t) res.json(withCard(t))
     else res.sendStatus(404)
   })
 

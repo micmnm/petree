@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, sep } from 'node:path'
 
 export interface Suggestion { repo: string; topic: string; text: string; exists: boolean }
@@ -51,6 +51,38 @@ export function readThreadFile(workDir: string, name: 'spec.md' | 'findings.md')
     return readFileSync(p, 'utf8')
   } catch {
     return null
+  }
+}
+
+export interface ThreadStatus { topic: string; status: string; needsYou: string | null }
+
+const STATUS_KEYS = { topic: 60, status: 140, 'needs-you': 160 } as const
+
+// Parses `_thread/status.txt`; null when missing, escaping workDir, or written
+// before `since` (the turn's startedAt), so a card never shows a previous turn's text.
+export function readThreadStatus(workDir: string, since: string | null): ThreadStatus | null {
+  const p = join(workDir, '_thread', 'status.txt')
+  if (!since || !contained(p, workDir)) return null
+  let text: string
+  try {
+    if (statSync(p).mtimeMs < Date.parse(since)) return null
+    text = readFileSync(p, 'utf8')
+  } catch {
+    return null
+  }
+  const found: Partial<Record<keyof typeof STATUS_KEYS, string>> = {}
+  for (const line of text.split('\n')) {
+    const m = /^([\w-]+):(.*)$/.exec(line)
+    const key = m?.[1].toLowerCase() as keyof typeof STATUS_KEYS | undefined
+    if (!m || !key || !(key in STATUS_KEYS) || key in found) continue
+    found[key] = m[2].trim().slice(0, STATUS_KEYS[key])
+  }
+  if (!Object.keys(found).length) return null
+  const needs = found['needs-you'] ?? ''
+  return {
+    topic: found.topic ?? '',
+    status: found.status ?? '',
+    needsYou: !needs || /^(nothing|none)\.?$/i.test(needs) ? null : needs,
   }
 }
 

@@ -112,6 +112,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
         build: r.build,
         test: r.test,
         run: r.run,
+        tags: r.tags,
       })),
     )
   })

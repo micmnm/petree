@@ -14,6 +14,8 @@ export interface RepoConfig {
   test: string[]
   run: string[]
   skills: string[]
+  /** Free-form labels (e.g. work, personal) used to filter repos in the dashboard. */
+  tags: string[]
   defaultModel: string | null
 }
 
@@ -65,6 +67,7 @@ export function parseConfigText(text: string): Omit<PetreeConfig, 'home'> {
       test: toList(value.test),
       run: toList(value.run),
       skills: toList(value.skills),
+      tags: toList(value.tags),
       defaultModel: value.default_model != null ? String(value.default_model) : null,
     }
   }

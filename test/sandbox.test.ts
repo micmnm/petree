@@ -9,7 +9,7 @@ import { buildSandboxCommands, containerName, inspectContainerState, pickImage, 
 const cfg: PetreeConfig = {
   home: '/petree-home',
   defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-  repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null } },
+  repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
   allowClone: [],
 }
 

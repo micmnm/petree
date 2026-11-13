@@ -116,6 +116,20 @@ repos:
   })
 })
 
+describe('tags', () => {
+  it('parses tags from a list or bare string and defaults to []', () => {
+    const cfg = parseConfigText(`
+repos:
+  a: { url: x, image: sandbox-node, tags: [work, backend] }
+  b: { url: y, image: sandbox-node, tags: personal }
+  c: { url: z, image: sandbox-node }
+`)
+    expect(cfg.repos.a.tags).toEqual(['work', 'backend'])
+    expect(cfg.repos.b.tags).toEqual(['personal'])
+    expect(cfg.repos.c.tags).toEqual([])
+  })
+})
+
 describe('default_model', () => {
   it('parses default_model at defaults and repo level', () => {
     const home = petreeHome(`

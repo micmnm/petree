@@ -66,6 +66,7 @@ repos:
     build: ["pnpm build"]           # must pass before reporting success
     test: ["pnpm test", "pnpm typecheck"]
     run: ["pnpm dev"]               # shown in the dashboard's Local panel; never run or sent to the agent
+    tags: [work]                    # badge + filter chip in the dashboard's repo picker; never sent to the agent
 ```
 
 Per-repo notes live in `~/.petree/notes/<repo>/` (an `INDEX.md` plus topic
@@ -73,8 +74,8 @@ files); they are mounted read-only into every sandbox at `/petree/notes`.
 A thread touching repos with different images (node + dotnet) runs in the
 `sandbox-full` image (the dotnet image, which also carries Node 22 and claude).
 
-All five keys are optional; a command list may also be a bare string
-(`test: pnpm test`). Repos with none of them behave exactly as before — the
+All six keys are optional; a command list or `tags` may also be a bare string
+(`test: pnpm test`, `tags: work`). Repos with none of them behave exactly as before — the
 prompt is passed through untouched.
 
 The composed prompt is built at launch, not at task creation, so editing

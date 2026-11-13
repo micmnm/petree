@@ -41,8 +41,8 @@ beforeEach(async () => {
     home,
     defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
     repos: {
-      demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: ['npm start'], skills: [], defaultModel: null },
-      odd: { url: 'x', defaultBranch: 'main', image: 'custom-img', instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null },
+      demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: ['npm start'], skills: [], tags: [], defaultModel: null },
+      odd: { url: 'x', defaultBranch: 'main', image: 'custom-img', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null },
     },
     allowClone: [],
   }
@@ -178,7 +178,7 @@ describe('API', () => {
     const repos = await (await fetch(`${base}/api/repos`)).json()
     expect(repos).toContainEqual({
       name: 'demo', defaultBranch: 'main', image: 'sandbox-node', defaultModel: null,
-      instructions: '', setup: [], build: [], test: [], run: ['npm start'],
+      instructions: '', setup: [], build: [], test: [], run: ['npm start'], tags: [],
     })
   })
 

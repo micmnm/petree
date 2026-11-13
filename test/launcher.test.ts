@@ -46,7 +46,7 @@ function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: S
   const cfg: PetreeConfig = {
     home,
     defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-    repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null } },
+    repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
     allowClone: [],
   }
   const store = new TaskStore(join(home, 'petree.db'))
@@ -260,7 +260,7 @@ describe('makeLauncher', () => {
     const cfg = {
       home,
       defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null } },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
       allowClone: [],
     }
     const store = new TaskStore(join(home, 'petree.db'))
@@ -291,7 +291,7 @@ describe('makeLauncher', () => {
     const cfg = {
       home,
       defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null } },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
       allowClone: [],
     }
     const store = new TaskStore(join(home, 'petree.db'))
@@ -322,7 +322,7 @@ describe('makeLauncher', () => {
     const cfg: PetreeConfig = {
       home,
       defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null } },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
       allowClone: [],
     }
     const store = new TaskStore(join(home, 'petree.db'))
@@ -397,7 +397,7 @@ describe('makeLauncher', () => {
     const cfg: PetreeConfig = {
       home,
       defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
-      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null } },
+      repos: { demo: { url: `file://${makeFixtureRepo()}`, defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null } },
       allowClone: [],
     }
     const store = new TaskStore(join(home, 'petree.db'))

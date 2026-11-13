@@ -6,7 +6,7 @@ import { composePrompt, STAGE_INSTRUCTIONS } from '../src/prompt.js'
 function repo(over: Partial<RepoConfig> = {}): RepoConfig {
   return {
     url: 'x', defaultBranch: 'main', image: 'sandbox-node',
-    instructions: '', setup: [], build: [], test: [], run: [], skills: [], defaultModel: null,
+    instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null,
     ...over,
   }
 }

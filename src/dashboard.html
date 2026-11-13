@@ -169,6 +169,7 @@
     <textarea name="prompt" id="prompt" placeholder="thread prompt — Cmd/Ctrl+Enter to start" required></textarea>
     <div class="field repos-field">
       <label class="k">repos</label>
+      <div class="seg" id="tagFilter" hidden></div>
       <div class="combo" id="repoCombo">
         <div class="combo-tags" id="repoTags"></div>
         <input type="text" id="repoSearch" placeholder="search repos…" autocomplete="off">
@@ -254,13 +255,23 @@
           ${cmdLine('setup', r.setup)}${cmdLine('build', r.build)}${cmdLine('test', r.test)}</div>`).join('')
       : ''
   }
+  let activeTag = ''
+  const tagFilter = document.getElementById('tagFilter')
   function renderRepoMenu() {
+    const tags = [...new Set(allRepos.flatMap((r) => r.tags || []))].sort()
+    if (!tags.includes(activeTag)) activeTag = ''
+    tagFilter.hidden = tags.length === 0
+    tagFilter.innerHTML = ['', ...tags].map((t) => `<button type="button" class="${t === activeTag ? 'on' : ''}" data-tag="${esc(t)}">${esc(t || 'all')}</button>`).join('')
     const q = repoSearch.value.trim().toLowerCase()
-    const matches = allRepos.filter((r) => r.name.toLowerCase().includes(q))
+    const matches = allRepos.filter((r) => r.name.toLowerCase().includes(q) && (!activeTag || (r.tags || []).includes(activeTag)))
     repoMenu.innerHTML = matches.length
-      ? matches.map((r) => `<div class="opt ${selectedRepos.includes(r.name) ? 'sel' : ''}" data-repo="${esc(r.name)}">${selectedRepos.includes(r.name) ? '✓ ' : ''}${esc(r.name)}</div>`).join('')
+      ? matches.map((r) => `<div class="opt ${selectedRepos.includes(r.name) ? 'sel' : ''}" data-repo="${esc(r.name)}">${selectedRepos.includes(r.name) ? '✓ ' : ''}${esc(r.name)}${(r.tags || []).map((t) => ` <span class="badge">${esc(t)}</span>`).join('')}</div>`).join('')
       : '<div class="empty">no matching repos</div>'
   }
+  tagFilter.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-tag]'); if (!b) return
+    activeTag = b.dataset.tag; renderRepoMenu(); repoMenu.hidden = false
+  })
   function toggleRepo(name) {
     const i = selectedRepos.indexOf(name)
     if (i === -1) selectedRepos.push(name); else selectedRepos.splice(i, 1)

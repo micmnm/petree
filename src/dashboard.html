@@ -366,7 +366,10 @@
     renderTabs()
     if (tab === 'Overview') {
       const resume = ['paused-limit', 'paused-rate-limit', 'waiting-for-you', 'failed', 'cancelled'].includes(t.state)
-        ? `<button data-resume="${esc(t.id)}">resume</button>` : ''
+        ? `<select id="resumeModel">
+            ${['default', 'haiku', 'sonnet', 'opus'].map((m) => `<option value="${m}" ${(t.model || 'default') === m ? 'selected' : ''}>${m}</option>`).join('')}
+          </select>
+          <button data-resume="${esc(t.id)}">resume</button>` : ''
       const stop = ['queued', 'provisioning', 'running'].includes(t.state)
         ? `<button data-stop="${esc(t.id)}">stop</button>` : ''
       body.innerHTML = `<dl>
@@ -497,7 +500,10 @@
       }))
     }
     document.querySelectorAll('[data-resume]').forEach((b) => b.addEventListener('click', async () => {
-      await fetch('/api/tasks/' + b.dataset.resume + '/resume', { method: 'POST' }); refresh()
+      await fetch('/api/tasks/' + b.dataset.resume + '/resume', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ model: document.getElementById('resumeModel').value }),
+      }); refresh()
     }))
     document.querySelectorAll('[data-stop]').forEach((b) => b.addEventListener('click', async () => {
       if (!confirm('Stop this task? This will kill it.')) return

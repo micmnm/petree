@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { TaskStore } from '../src/store.js'
+import { TaskStore, RESUMABLE_STATES } from '../src/store.js'
 
 let store: TaskStore
 beforeEach(() => {
@@ -384,4 +384,65 @@ describe('restart recovery', () => {
     expect(f.restarts).toBe(0)
     expect(f.retryAt).toBeNull()
   })
+})
+
+describe('TaskStore.resume', () => {
+  it('requeues with a new model, same prompt, same turns/tokensUsed', () => {
+    const t = store.create({ ...input, model: 'haiku' })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.addUsage(t.id, 42)
+    store.patch(t.id, { sessionId: 'sess-1' })
+    store.transition(t.id, 'paused-limit')
+    const r = store.resume(t.id, 'opus')
+    expect(r.state).toBe('queued')
+    expect(r.model).toBe('opus')
+    expect(r.prompt).toBe('do it')
+    expect(r.tokensUsed).toBe(42)
+    expect(r.turns).toHaveLength(0)
+    expect(r.sessionId).toBe('sess-1')
+  })
+
+  it('keeps the current model when none is given', () => {
+    const t = store.create({ ...input, model: 'haiku' })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'failed', { error: 'boom' })
+    const r = store.resume(t.id)
+    expect(r.state).toBe('queued')
+    expect(r.model).toBe('haiku')
+  })
+
+  it('clears restarts and retryAt on resume, like a manual requeue', () => {
+    const t = store.create(input)
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.recoveryRequeue(t.id)
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'cancelled')
+    const r = store.resume(t.id, 'sonnet')
+    expect(r.restarts).toBe(0)
+    expect(r.retryAt).toBeNull()
+  })
+
+  it('throws when resuming from a non-resumable state', () => {
+    const t = store.create(input)
+    expect(() => store.resume(t.id, 'opus')).toThrow(/cannot resume from state/)
+  })
+
+  it('throws for an unknown task id', () => {
+    expect(() => store.resume('zzzzzzzz', 'opus')).toThrow(/no task/)
+  })
+
+  for (const state of RESUMABLE_STATES) {
+    it(`updates the model when resuming from ${state}`, () => {
+      const t = store.create({ ...input, model: 'haiku' })
+      store.transition(t.id, 'provisioning')
+      store.transition(t.id, 'running')
+      store.transition(t.id, state)
+      const r = store.resume(t.id, 'opus')
+      expect(r.state).toBe('queued')
+      expect(r.model).toBe('opus')
+    })
+  }
 })

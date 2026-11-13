@@ -199,6 +199,11 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       res.sendStatus(404)
       return
     }
+    const { model } = (req.body ?? {}) as { model?: string }
+    if (model !== undefined && !MODELS.includes(model)) {
+      res.status(400).json({ error: `unknown model: ${model}` })
+      return
+    }
     // Only these states may re-run the same prompt in place. A done task must
     // go through /next so its finished turn gets archived, not silently
     // overwritten by /resume re-running the old prompt.
@@ -206,8 +211,14 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       res.status(409).json({ error: `cannot resume from state ${t.state}` })
       return
     }
+    // Omitted model keeps the task's current one, same convention as /next;
+    // resolving it when absent could override a previously-resolved value
+    // with a different (e.g. since-changed) global default.
+    const effectiveModel = model !== undefined
+      ? resolveModel(model, cfg.repos[t.repos[0]]?.defaultModel ?? null, cfg.defaults.defaultModel)
+      : undefined
     try {
-      res.json(store.transition(t.id, 'queued'))
+      res.json(store.resume(t.id, effectiveModel))
       void scheduler.tick()
     } catch {
       res.status(409).json({ error: `cannot resume from state ${t.state}` })

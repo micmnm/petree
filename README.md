@@ -29,14 +29,14 @@ The quickest way, after the one-time [Setup](#setup) above:
 The script asks whether to pull the latest changes first (default yes,
 fast-forward only; if the pull fails — no network, diverged branch, local
 conflicts — it reports the git error and stops instead of starting on an
-unknown state). It then switches to Node 22 via nvm if you have it, installs
+unknown state). It then switches to Node 26 via nvm if you have it, installs
 dependencies, and starts the dashboard on http://localhost:4100.
 Pass `--pull` or `--no-pull` to skip the question (e.g. `--no-pull` while
 working on local changes; when run non-interactively it pulls by default).
 
 Or run the steps by hand:
 
-    nvm use              # Node 22 — better-sqlite3's native module needs it
+    nvm use              # Node 26 — see .nvmrc
     npm install
     npm run dev          # dashboard on http://localhost:4100
 
@@ -72,11 +72,21 @@ repos:
 Per-repo notes live in `~/.petree/notes/<repo>/` (an `INDEX.md` plus topic
 files); they are mounted read-only into every sandbox at `/petree/notes`.
 A thread touching repos with different images (node + dotnet) runs in the
-`sandbox-full` image (the dotnet image, which also carries Node 22 and claude).
+`sandbox-full` image (the dotnet image, which also carries Node 26 and claude).
 
 All six keys are optional; a command list or `tags` may also be a bare string
 (`test: pnpm test`, `tags: work`). Repos with none of them behave exactly as before — the
 prompt is passed through untouched.
+
+`repos.yaml` is parsed as YAML 1.2, with anchors and `<<:` merge keys supported so
+repos can share settings. An empty or fully commented-out file is valid and simply
+configures no repos. Two YAML 1.1 spellings are no longer understood: binary
+integers (`0b1010`), and explicit legacy tags such as `!!set` or `!!timestamp`,
+which now fail with `unknown mapping tag` rather than being silently accepted.
+
+Write numbers as plain digits: `token_budget: 500_000` parses as the *string*
+`"500_000"`, not a number, which leaves the budget `NaN` and makes task creation
+fail. (Same for any non-numeric value, e.g. `concurrency: three`.)
 
 The composed prompt is built at launch, not at task creation, so editing
 `repos.yaml` also affects re-runs and resumes of existing tasks. The dashboard's
@@ -114,5 +124,7 @@ to **Raw** for the unprocessed log.
 
     ./scripts/test.sh    # switches to the .nvmrc Node, then runs vitest
 
-`npm test` works too when you're already on Node 22; on another Node every
-test that opens the SQLite store fails to load better-sqlite3.
+`npm test` works too, and no longer has to be run on the pinned Node:
+better-sqlite3 ships a prebuilt binary per platform rather than per Node ABI,
+so the SQLite store loads on any Node the dev dependencies support (vitest
+wants 22.12+, 24, or 26+). The dashboard itself still targets the `.nvmrc` Node.

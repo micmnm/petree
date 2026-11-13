@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run the test suite on the .nvmrc Node (better-sqlite3's native module needs it).
+# Run the test suite on the .nvmrc Node.
 # Usage: ./scripts/test.sh [vitest args...]
 set -euo pipefail
 cd "$(dirname "$0")/.."

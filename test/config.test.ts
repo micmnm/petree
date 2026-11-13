@@ -68,6 +68,100 @@ repos:
   })
 })
 
+// These guard the js-yaml behaviours petree depends on but never states.
+// They are the first things to break on a js-yaml major bump, and `npm run
+// typecheck` cannot see any of them.
+describe('repos.yaml parsing contract', () => {
+  // An empty or fully commented-out repos.yaml means "no repos configured",
+  // not an error. `---` and `~` are included because they are the only inputs
+  // that still reach the `?? {}` fallback in parseConfigText — everything else
+  // document-less comes back as undefined from loadAll's empty list.
+  it.each([
+    ['empty', ''],
+    ['whitespace only', '   \n\n'],
+    ['comments only', '# nothing configured yet\n'],
+    ['an explicit empty document', '---\n'],
+    ['an explicit null document', '~\n'],
+  ])('treats %s input as an empty config', (_label, text) => {
+    const cfg = parseConfigText(text)
+    expect(cfg.repos).toEqual({})
+    expect(cfg.allowClone).toEqual([])
+    expect(cfg.defaults.concurrency).toBe(3)
+  })
+
+  // The startup path specifically: an unconfigured repos.yaml on disk must not
+  // stop the dashboard from booting.
+  it('loads an empty repos.yaml from disk without throwing', () => {
+    expect(loadConfig(petreeHome('')).repos).toEqual({})
+    expect(loadConfig(petreeHome('# nothing here\n')).repos).toEqual({})
+  })
+
+  // Accepting a multi-document file would silently use only the first one.
+  it('rejects a file holding more than one YAML document', () => {
+    expect(() =>
+      parseConfigText('repos:\n  a: { url: x, image: sandbox-node }\n---\nrepos:\n  b: { url: y, image: sandbox-node }\n'),
+    ).toThrow(/single YAML document/)
+  })
+
+  // repos.yaml is hand-written, so anchors + `<<:` are a natural way to share
+  // settings between repos. Losing merge support is silent: merged-away
+  // `instructions` would just vanish from every prompt. Without the merge tag
+  // the merged keys land under a literal "<<" property, so `image` goes missing
+  // and this fails on the "image is required" check before reaching the
+  // assertions.
+  it('resolves anchors merged in with a merge key', () => {
+    const cfg = parseConfigText(`
+common: &common
+  image: sandbox-node
+  instructions: Run the tests.
+repos:
+  a:
+    <<: *common
+    url: url-a
+  b:
+    <<: *common
+    url: url-b
+    instructions: Override.
+`)
+    expect(cfg.repos.a).toMatchObject({
+      url: 'url-a',
+      image: 'sandbox-node',
+      instructions: 'Run the tests.',
+    })
+    expect(cfg.repos.b).toMatchObject({ url: 'url-b', image: 'sandbox-node', instructions: 'Override.' })
+  })
+
+  // The silent case: with url and image given explicitly, a lost merge raises
+  // no validation error at all — the standing instructions just quietly stop
+  // reaching the agent's prompt.
+  it('resolves a merge that contributes only instructions', () => {
+    const cfg = parseConfigText(`
+common: &common
+  instructions: Run the tests.
+repos:
+  a:
+    <<: *common
+    url: url-a
+    image: sandbox-node
+`)
+    expect(cfg.repos.a.instructions).toBe('Run the tests.')
+  })
+
+  // Merges also have to resolve in the `defaults` block, which is read by a
+  // separate code path from `repos`.
+  it('resolves a merge key in the defaults block', () => {
+    const cfg = parseConfigText(`
+shared: &shared
+  concurrency: 7
+defaults:
+  <<: *shared
+  token_budget: 1234
+`)
+    expect(cfg.defaults.concurrency).toBe(7)
+    expect(cfg.defaults.tokenBudget).toBe(1234)
+  })
+})
+
 describe('per-repo prompt settings', () => {
   it('parses instructions and setup/build/test commands', () => {
     const home = petreeHome(`

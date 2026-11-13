@@ -38,7 +38,7 @@ if [ "$PULL" = yes ]; then
   fi
 fi
 
-# better-sqlite3's native module requires Node 22 (see .nvmrc)
+# Run on the Node petree targets (.nvmrc, and engines in package.json).
 if [ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]; then
   # shellcheck disable=SC1091
   . "${NVM_DIR:-$HOME/.nvm}/nvm.sh"
@@ -46,8 +46,8 @@ if [ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]; then
   nvm use >/dev/null
 fi
 node_major="$(node -p 'process.versions.node.split(".")[0]')"
-if [ "$node_major" != "22" ]; then
-  echo "error: Node 22 required (found $(node -v)); run 'nvm use' or install Node 22" >&2
+if [ "$node_major" != "26" ]; then
+  echo "error: Node 26 required (found $(node -v)); run 'nvm use' or install Node 26" >&2
   exit 1
 fi
 

@@ -570,12 +570,12 @@
       }))
     }
     document.querySelectorAll('[data-resume]').forEach((b) => b.addEventListener('click', async () => {
-      await fetch('/api/tasks/' + b.dataset.resume + '/resume', { method: 'POST' }); refresh()
+      await fetch('/api/tasks/' + b.dataset.resume + '/resume', { method: 'POST' }); refresh(true)
     }))
     document.querySelectorAll('[data-stop]').forEach((b) => b.addEventListener('click', async () => {
       const gate = b.closest('[data-gate-card]')
       if (!confirm(gate ? 'Drop this thread? It can be continued later.' : 'Stop this thread? This will kill it.')) return
-      await fetch('/api/tasks/' + b.dataset.stop + '/stop', { method: 'POST' }); refresh()
+      await fetch('/api/tasks/' + b.dataset.stop + '/stop', { method: 'POST' }); refresh(true)
     }))
     document.querySelectorAll('[data-comment]').forEach((b) => b.addEventListener('click', async () => {
       const ta = document.getElementById('commentText')
@@ -584,7 +584,7 @@
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: ta.value }),
       })
       if (!res.ok) { alert((await res.json()).error || 'comment failed'); return }
-      refresh()
+      refresh(true)
     }))
     document.querySelectorAll('[data-gate]').forEach((b) => b.addEventListener('click', async () => {
       const body = { prompt: document.getElementById('gatePrompt').value }
@@ -594,7 +594,7 @@
       })
       if (!res.ok) { alert((await res.json()).error || 'failed'); return }
       resultShownFor = null
-      refresh()
+      refresh(true)
     }))
     document.querySelectorAll('[data-next]').forEach((b) => b.addEventListener('click', async () => {
       const ta = document.getElementById('nextPrompt')
@@ -605,7 +605,7 @@
       })
       if (!res.ok) { alert((await res.json()).error || 'follow-up failed'); return }
       resultShownFor = null
-      refresh()
+      refresh(true)
     }))
     const nextTa = document.getElementById('nextPrompt')
     if (nextTa) nextTa.addEventListener('keydown', (e) => {

@@ -67,6 +67,7 @@ repos:
     test: ["pnpm test", "pnpm typecheck"]
     run: ["pnpm dev"]               # shown in the dashboard's Local panel; never run or sent to the agent
     tags: [work]                    # badge + filter chip in the dashboard's repo picker; never sent to the agent
+    path: ~/code/admin-ui           # your local checkout; the new-thread form warns if it has unpushed commits or uncommitted changes; never mounted or sent to the agent
 ```
 
 Per-repo notes live in `~/.petree/notes/<repo>/` (an `INDEX.md` plus topic

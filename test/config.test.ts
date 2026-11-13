@@ -1,5 +1,5 @@
 import { mkdtempSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { loadConfig, parseConfigText, resolveModel } from '../src/config.js'
@@ -65,6 +65,31 @@ repos:
 
   it('throws the same validation errors as loadConfig', () => {
     expect(() => parseConfigText('repos:\n  bad: { url: x }\n')).toThrow(/image/)
+  })
+
+  it('parses path with ~ expansion; absent or bare ~ means no path', () => {
+    const cfg = parseConfigText(`
+repos:
+  a: { url: x, image: i, path: ~/code/a }
+  b: { url: x, image: i, path: /abs/b }
+  c: { url: x, image: i, path: ~ }
+  d: { url: x, image: i }
+`)
+    expect(cfg.repos.a.path).toBe(join(homedir(), 'code/a'))
+    expect(cfg.repos.b.path).toBe('/abs/b')
+    expect(cfg.repos.c.path).toBeNull()
+    expect(cfg.repos.d.path).toBeNull()
+  })
+
+  it('inherits path through <<: merge keys', () => {
+    const cfg = parseConfigText(`
+repos:
+  a: &base { url: x, image: i, path: /shared }
+  b:
+    <<: *base
+    url: y
+`)
+    expect(cfg.repos.b.path).toBe('/shared')
   })
 })
 

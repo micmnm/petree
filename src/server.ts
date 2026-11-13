@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { parseConfigText, resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
-import { repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch } from './gitops.js'
+import { localCheckout, repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch } from './gitops.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
@@ -104,20 +104,24 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
 
   app.post('/api/prune', (_req, res) => { res.json(store.prune()) })
 
-  app.get('/api/repos', (_req, res) => {
+  app.get('/api/repos', async (_req, res) => {
     res.json(
-      Object.entries(cfg.repos).map(([name, r]) => ({
-        name,
-        defaultBranch: r.defaultBranch,
-        image: r.image,
-        defaultModel: r.defaultModel,
-        instructions: r.instructions,
-        setup: r.setup,
-        build: r.build,
-        test: r.test,
-        run: r.run,
-        tags: r.tags,
-      })),
+      await Promise.all(
+        Object.entries(cfg.repos).map(async ([name, r]) => ({
+          name,
+          defaultBranch: r.defaultBranch,
+          image: r.image,
+          defaultModel: r.defaultModel,
+          instructions: r.instructions,
+          setup: r.setup,
+          build: r.build,
+          test: r.test,
+          run: r.run,
+          tags: r.tags,
+          path: r.path ?? null,
+          local: r.path ? await localCheckout(r.path) : null,
+        })),
+      ),
     )
   })
 

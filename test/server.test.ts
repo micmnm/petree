@@ -34,6 +34,7 @@ let server: Server
 let base: string
 let store: TaskStore
 let home: string
+let cfgRepos: PetreeConfig['repos']
 
 beforeEach(async () => {
   home = mkdtempSync(join(tmpdir(), 'petree-srv-'))
@@ -46,6 +47,7 @@ beforeEach(async () => {
     },
     allowClone: [],
   }
+  cfgRepos = cfg.repos
   store = new TaskStore(join(home, 'db'))
   // concurrency 0: nothing launches during API tests; stop() always reports
   // "nothing to stop" since no real process ever runs here.
@@ -222,8 +224,31 @@ describe('API', () => {
     const repos = await (await fetch(`${base}/api/repos`)).json()
     expect(repos).toContainEqual({
       name: 'demo', defaultBranch: 'main', image: 'sandbox-node', defaultModel: null,
-      instructions: '', setup: [], build: [], test: [], run: ['npm start'], tags: [],
+      instructions: '', setup: [], build: [], test: [], run: ['npm start'], tags: [], path: null, local: null,
     })
+  })
+
+  it('reports unpushed and dirty state of a configured local checkout', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'petree-local-'))
+    const bare = join(root, 'origin.git')
+    execFileSync('git', ['init', '--bare', '-b', 'main', bare])
+    const co = join(root, 'co')
+    execFileSync('git', ['clone', bare, co])
+    writeFileSync(join(co, 'a.txt'), 'a\n')
+    execFileSync('git', ['-C', co, 'add', '.'])
+    execFileSync('git', ['-C', co, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'a'])
+    execFileSync('git', ['-C', co, 'push', 'origin', 'HEAD:main'])
+    execFileSync('git', ['-C', co, 'fetch', 'origin'])
+    const get = async () => (await (await fetch(`${base}/api/repos`)).json()).find((r: { name: string }) => r.name === 'demo')
+    cfgRepos.demo.path = co
+    expect((await get()).local).toEqual({ unpushed: 0, dirty: false })
+    writeFileSync(join(co, 'b.txt'), 'b\n')
+    execFileSync('git', ['-C', co, 'add', '.'])
+    execFileSync('git', ['-C', co, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'b'])
+    writeFileSync(join(co, 'c.txt'), 'c\n')
+    expect((await get()).local).toEqual({ unpushed: 1, dirty: true })
+    cfgRepos.demo.path = join(root, 'missing')
+    expect((await get()).local).toBeNull()
   })
 
   it('accepts a valid model and stores the resolved value', async () => {

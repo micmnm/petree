@@ -17,6 +17,8 @@ export interface RepoConfig {
   /** Free-form labels (e.g. work, personal) used to filter repos in the dashboard. */
   tags: string[]
   defaultModel: string | null
+  /** Host path of the user's own checkout, used only for the unpushed/dirty warning; never mounted. */
+  path?: string | null
 }
 
 export interface Defaults {
@@ -86,6 +88,7 @@ export function parseConfigText(text: string): Omit<PetreeConfig, 'home'> {
       skills: toList(value.skills),
       tags: toList(value.tags),
       defaultModel: value.default_model != null ? String(value.default_model) : null,
+      path: value.path != null ? String(value.path).replace(/^~(?=\/|$)/, homedir()) : null,
     }
   }
   return {

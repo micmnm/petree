@@ -1,6 +1,24 @@
-import { execFileSync } from 'node:child_process'
+import { execFile, execFileSync } from 'node:child_process'
+import { promisify } from 'node:util'
 
+const execFileAsync = promisify(execFile)
 const IDENT = ['-c', 'user.name=Petree', '-c', 'user.email=petree@localhost']
+
+// Unpushed commits and uncommitted changes in the user's own checkout. No fetch,
+// so stale remote refs can only over-warn; any failure (bad path, not a repo) is null.
+export async function localCheckout(path: string): Promise<{ unpushed: number; dirty: boolean } | null> {
+  const run = async (args: string[]) =>
+    (await execFileAsync('git', ['-C', path, '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', ...args])).stdout
+  try {
+    const [count, status] = await Promise.all([
+      run(['rev-list', '--count', '--branches', '--not', '--remotes']),
+      run(['status', '--porcelain']),
+    ])
+    return { unpushed: Number(count), dirty: status.trim() !== '' }
+  } catch {
+    return null
+  }
+}
 
 function git(repoDir: string, args: string[], opts: { ident?: boolean } = {}): string {
   // The agent can write the repo's .git, so neutralise hooks and fsmonitor (both run host commands).

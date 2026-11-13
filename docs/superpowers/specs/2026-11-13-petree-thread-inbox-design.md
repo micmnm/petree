@@ -85,7 +85,7 @@ are remembered in `localStorage`.
 | **YOUR MOVE** | `card.group === 'your-move'` | expanded; empty → "Nothing needs you." and idle Sprout |
 | **QUESTING** | `'questing'` | expanded; hidden when empty |
 | **HALL OF FAME** | `'hall-of-fame'` (not archived) | trophy shelf; "Merged quests rest here for 3 days, then move to history." |
-| **GAME OVER** | `'game-over'` (not archived) | collapsed with count; "Dropped and failed quests. Cleared after 14 days." |
+| **GAME OVER** | `'game-over'` (not archived) | collapsed with count; "Dropped quests. Cleared after 14 days." |
 
 Within a section, cards sort by `updatedAt`, newest first. The **cartridge card**
 (design §4.1) shows: emblem + Q-number (§5.7), `card.topic`, `card.summary`
@@ -124,6 +124,12 @@ One scrolling page (mockup `ArcadeThread`):
    | PR open, in sync | *(none)*; action "Merge PR #42 on GitHub" with the PR link | RETRY STAGE | GAME OVER |
    | paused by you (`cancelled`, not binned) | **RESUME** "re-run the <stage> turn" → `/resume` | RETRY STAGE "send note · new turn" | GAME OVER |
    | build done, no commits, agent asked something | *(none)*; textarea focused | **RETRY STAGE** "send reply" | GAME OVER |
+   | failed (not binned) | **RETRY STAGE** "re-run the <stage> turn" → `/resume` (with a note → `/next` same stage) | *(none)* | GAME OVER |
+
+   Gates (investigate, spec) and build-done-without-commits also show a quiet
+   **QUEST COMPLETE** → `POST /done`, for quests whose findings or answer were the
+   whole point: the thread goes to HALL OF FAME as "finished · findings kept" and
+   counts as a victory.
 
 5. **QUEST STATS** (§5.9), **QUEST LOG** (§5.9), then **DETAILS**, each collapsed
    and rendered only when opened: ORIGINAL PROMPT (clamped, reader), CHANGES (the
@@ -233,7 +239,7 @@ computes it, so the dashboard only renders and vitest covers the rules. `GET
 | `card.line` | §5.2.1 |
 | `card.group` | `'your-move' \| 'questing' \| 'hall-of-fame' \| 'game-over'`, §5.2.2 |
 | `card.action` | `{ label, detail }` or `null`; detail is `status.needsYou` |
-| `card.reason` | bins only: "dropped by you", "out of tokens", "failed: <first line>", "PR closed without merge", "merged · PR #15", "finished · no code changes", "pushed · merge not tracked" |
+| `card.reason` | bins only: "dropped by you", "out of tokens", "PR closed without merge", "merged · PR #15", "finished · findings kept", "finished · no code changes", "pushed · merge not tracked" |
 | `card.progress` | `[{ step, mark, tone? }]` × 5, §5.2.3 |
 | `card.repos` | `[{ name, tags }]` from `task.repos` + `cfg.repos[r].tags` |
 | `card.prs` | `[{ repo, url, pr, number }]` from `delivery` (§5.4) |
@@ -253,6 +259,7 @@ turn has settled.
 | running | "Running <LEVEL> · <elapsed since startedAt>" |
 | paused-rate-limit | "Waiting out a rate limit" |
 | cancelled, not binned | "Paused by you" |
+| failed, not binned | "Failed: <first line of the error>" |
 | binned | `card.reason` |
 | any repo `pr: 'open'` | "PR #<n> open — waiting for merge" |
 | waiting-for-you, or done before any PR | `status.status` when fresh, else "Findings ready" / "Spec ready" / "Build finished" |
@@ -267,6 +274,7 @@ turn has settled.
 |---|---|
 | waiting-for-you, stage investigate | "Read the findings, then approve or comment" |
 | waiting-for-you, stage spec | "Read the spec, then approve or comment" |
+| failed | "Failed in <LEVEL> — retry the stage or drop it" |
 | cancelled (paused by you) | "Paused — resume or send a note" |
 | build done, a repo with `ahead > 0` has no target and no PR | "Open the PR" |
 | a repo with `pr: 'open'` whose `prHead ≠ head` | "Push the update to PR #<n>" |
@@ -442,20 +450,23 @@ fields; `store.unbin(id)` clears them.
 
 | event | bin | reason |
 |---|---|---|
-| `POST /drop` (GAME OVER button) from waiting-for-you, done or cancelled; from running it stops first | game-over | "dropped by you" |
-| transition into `failed` | game-over | "failed: <first line>" |
+| `POST /drop` (GAME OVER button) from waiting-for-you, done, failed or cancelled; from running it stops first | game-over | "dropped by you" |
+| `POST /done` (QUEST COMPLETE) from waiting-for-you, or done with no commits | hall-of-fame | "finished · findings kept" |
 | transition into `paused-limit` | game-over | "out of tokens" |
 | poll: PR closed, none open | game-over | "PR closed without merge" |
 | poll: every PR merged | hall-of-fame | "merged · PR #<n>" |
 | build turn ends with no commits in any repo and no `needsYou` | hall-of-fame | "finished · no code changes" |
 | `/push` succeeds on an untracked host | hall-of-fame | "pushed · merge not tracked" |
 
-Drop does **not** change state for a settled thread; it only bins. **PAUSE**
+A `failed` thread is **not** binned: it stays in YOUR MOVE with RETRY STAGE and
+GAME OVER, so a transient failure is one click from running again.
+
+Drop and done do **not** change state for a settled thread; they only bin. **PAUSE**
 (`/stop` while running) leaves the thread `cancelled` and unbinned, so it stays in
 YOUR MOVE as "Paused by you".
 
 **Restore** (`POST /api/tasks/:id/restore`, **CONTINUE?**): game-over and not
-archived only, else 409. It unbins, then: `failed` → `resume`; `paused-limit` →
+archived only, else 409. It unbins, then: `paused-limit` →
 `resume` with `tokensUsed` reset to 0 (one more budget; replaces open question 6);
 anything else → no state change (the thread is back in YOUR MOVE as it was).
 
@@ -474,7 +485,8 @@ petree and still aren't (known gap, out of scope).
 become `{ binDays, hallOfFameDays }`.
 
 **Upgrade**: on migration, existing done/failed/cancelled rows older than 3 days
-get `archived_at = now`; younger failed/cancelled ones are binned game-over, so the
+get `archived_at = now`; younger cancelled ones are binned game-over (younger
+failed ones stay in YOUR MOVE), so the
 first inbox isn't flooded with old "Open the PR" cards.
 
 ### 5.7 Quest identity
@@ -505,7 +517,7 @@ class tiles (open question 2 closed).
   - build done with commits → for each repo with `ahead > 0`, push and open the PR
     exactly as `POST /pr` does (target `petree/<id>`), recording delivery. Failures
     land as the usual YOUR MOVE "Open the PR" with the error in Info.
-  - Never merges. A failed or out-of-tokens turn stops AUTO-PLAY (it bins as usual).
+  - Never merges. A failed or out-of-tokens turn stops AUTO-PLAY (failed lands in YOUR MOVE, out-of-tokens bins).
   - The quest log shows these moves as "auto: on to PLAN" (an empty-prompt stage
     move on an `autoPlay` thread; nothing extra stored).
 
@@ -649,7 +661,7 @@ Changed:
   stays for compatibility, the UI uses `/drop`.
 - `POST /api/prune` → runs the sweep.
 
-New: `POST /api/tasks/:id/drop`, `POST /api/tasks/:id/restore`, `GET
+New: `POST /api/tasks/:id/drop`, `POST /api/tasks/:id/done`, `POST /api/tasks/:id/restore`, `GET
 /api/tasks/:id/stats`, `GET/PUT/DELETE /api/repos/:name`, `POST /api/repos`, `PUT
 /api/defaults`, `GET /api/hud` (cut-first).
 
@@ -688,11 +700,12 @@ current dashboard tolerates; 9–13 are the UI, one screen each; 14 is cut-first
    parsing, state mapping from canned JSON, ENOENT → untracked,
    write-only-on-change.
 4. **Bins, sweep, identity.** `bin`/`binned_at`/`archived_at`/`seq` columns,
-   backfill and upgrade rule; binning on fail/out-of-tokens/drop/poll/no-commit
-   build/untracked push; `/drop`, `/restore` (paused-limit resets tokens); sweep
-   replaces prune; settings `binDays`/`hallOfFameDays`; 409s on binned threads;
-   `cardFor` bins and reasons. *Tests:* each binning row, restore per state,
-   sweep windows, no deletes, seq backfill and uniqueness.
+   backfill and upgrade rule; binning on out-of-tokens/drop/done/poll/no-commit
+   build/untracked push (failed stays unbinned in YOUR MOVE); `/drop`, `/done`,
+   `/restore` (paused-limit resets tokens); sweep replaces prune; settings
+   `binDays`/`hallOfFameDays`; 409s on binned threads; `cardFor` bins, reasons and
+   the failed card. *Tests:* each binning row, failed not binned, restore per
+   state, sweep windows, no deletes, seq backfill and uniqueness.
 5. **Local checkout warning.** `path:` in `config.ts` (`~` expansion, README line);
    `local` on `GET /api/repos`. *Tests:* config parsing; temp repo with an
    unpushed commit and a dirty file; missing path; `path: ~`; inherited via `<<:`.
@@ -755,6 +768,9 @@ current dashboard tolerates; 9–13 are the UI, one screen each; 14 is cut-first
 10. Editing a repo's test command in Options rewrites only that block of
     `repos.yaml`; comments elsewhere survive; the next quest's prompt uses it.
 11. Every screen is usable at 390 px without horizontal scroll.
+12. A turn that fails shows under YOUR MOVE as "Failed in <LEVEL>"; RETRY STAGE
+    runs it again. QUEST COMPLETE on a SCOUT gate moves it to HALL OF FAME as a
+    victory.
 
 ## 11. Open questions
 
@@ -780,10 +796,8 @@ current dashboard tolerates; 9–13 are the UI, one screen each; 14 is cut-first
    `seq`, stable per database. Say if it must be reproducible from the id alone.
 9. **Comment-preserving YAML edits** need eemeli's `yaml` package (a new
    dependency). *Default:* text splice, anchored blocks read-only in the form.
-10. **Ending a SCOUT-only quest**: there is no "finish here" button, so a quest
-    that only wanted findings ends via GAME OVER ("dropped by you") and counts as
-    lost in usage. *Default:* accept; add an END QUEST → HALL OF FAME button if it
-    skews the stats.
-11. **Failed straight to GAME OVER** hides a transient failure from YOUR MOVE.
-    *Default:* as asked; the GAME OVER count shows in the inbox and CONTINUE?
-    retries in one click.
+10. **Ending a SCOUT-only quest.** *Resolved:* QUEST COMPLETE (`POST /done`) at a
+    gate or after a no-commit build → HALL OF FAME "finished · findings kept",
+    counted as a victory.
+11. **Where failed threads go.** *Resolved:* YOUR MOVE, with RETRY STAGE and GAME
+    OVER; only drops, closed PRs and out-of-tokens reach the bin.

@@ -112,4 +112,7 @@ to **Raw** for the unprocessed log.
 
 ## Test
 
-    npm test
+    ./scripts/test.sh    # switches to the .nvmrc Node, then runs vitest
+
+`npm test` works too when you're already on Node 22; on another Node every
+test that opens the SQLite store fails to load better-sqlite3.

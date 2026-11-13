@@ -231,7 +231,7 @@ export class TaskStore {
           .filter(Boolean).join('\n\n')
         : prompt
       const comments = t.comments.map((c) => ({ ...c, consumed: true }))
-      this.db.prepare(`UPDATE tasks SET prompt = ?, model = ?, tokens_used = 0, result = NULL,
+      this.db.prepare(`UPDATE tasks SET prompt = ?, model = ?, tokens_used = 0, result = NULL, error = NULL,
         turns = ?, stage = ?, comments = ?, state = 'queued', restarts = 0, retry_at = NULL, updated_at = ? WHERE id = ?`)
         .run(full, model !== undefined ? model : t.model, JSON.stringify(turns), to, JSON.stringify(comments),
           new Date().toISOString(), id)

@@ -126,6 +126,7 @@ describe('makeLauncher', () => {
     const launch = makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })
     await launch(task)
     expect(store.get(task.id)?.error).toContain('investigate turn changed files in demo')
+    expect(store.get(task.id)?.state).toBe('waiting-for-you')
   })
 
   it('pauses the task when a limit is hit', async () => {

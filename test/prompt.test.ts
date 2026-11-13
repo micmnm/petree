@@ -57,6 +57,13 @@ describe('composePrompt', () => {
     expect(build).toContain('test-driven-development')
   })
 
+  it('tells build turns to follow the prompt above before falling back to the spec', () => {
+    const build = composePrompt(task({ stage: 'build' }), config({ demo: repo() })).toLowerCase()
+    const ask = build.indexOf('do what the prompt above asks')
+    expect(ask).toBeGreaterThan(-1)
+    expect(ask).toBeLessThan(build.indexOf('/work/_thread/spec.md'))
+  })
+
   it('points at notes, repo CLAUDE.md and the suggestion dir for each repo', () => {
     const out = composePrompt(task({ repos: ['demo', 'api'] }), config({ demo: repo(), api: repo() }))
     for (const r of ['demo', 'api']) {

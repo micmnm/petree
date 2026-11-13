@@ -1,11 +1,10 @@
 import type { PetreeConfig, RepoConfig } from './config.js'
 import type { Stage, TaskRecord } from './store.js'
 
-// Builds the prompt actually handed to `claude -p`: the task the user typed,
-// followed by the standing conventions the registry declares for the repos it
-// touches (see config.ts / repos.yaml). Composition happens at launch time
-// rather than at task creation, so edits to repos.yaml apply to re-runs and
-// resumes without rewriting stored tasks.
+// Builds the prompt handed to `claude -p`: stored prompt, stage instructions,
+// repo notes, note-suggestion rules, then the registry's repo conventions
+// (config.ts / repos.yaml). Composed at launch so repos.yaml edits apply to
+// re-runs and resumes without rewriting stored tasks.
 
 function hasConventions(repo: RepoConfig): boolean {
   return Boolean(repo.instructions) || repo.setup.length > 0 || repo.build.length > 0 || repo.test.length > 0
@@ -40,11 +39,12 @@ export const STAGE_INSTRUCTIONS: Record<Stage, string> = {
     'end of the spec and in your final message.',
   ].join('\n'),
   build: [
-    'Implement `/work/_thread/spec.md` if it exists; otherwise implement the task above',
-    '(plus `/work/_thread/findings.md` if present). Do not ask interactive questions:',
-    'make a reasonable call and list open questions in your final message.',
+    'Do what the prompt above asks. Only when it asks for nothing specific (e.g. an',
+    'approve with no text), implement `/work/_thread/spec.md`, or `/work/_thread/findings.md`',
+    'if there is no spec. Do not ask interactive questions: make a reasonable call and',
+    'list open questions in your final message.',
     '',
-    'Maximise parallelism. First break the work down with the',
+    'For multi-part work, maximise parallelism. First break the work down with the',
     '`planning-and-task-breakdown` skill into tasks marked independent or dependent.',
     'Dispatch every independent task to its own subagent in parallel (one message with',
     'several Agent calls, typically one per repo or per independent slice), each told to',

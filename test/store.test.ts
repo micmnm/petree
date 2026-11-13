@@ -384,6 +384,14 @@ describe('restart recovery', () => {
     expect(f.restarts).toBe(0)
     expect(f.retryAt).toBeNull()
   })
+
+  it('followUp clears the previous turn error', () => {
+    const t = store.create(input)
+    toRunning(store, t.id)
+    store.transition(t.id, 'waiting-for-you', { error: 'investigate turn changed files in demo' })
+    expect(store.get(t.id)?.error).toContain('changed files')
+    expect(store.followUp(t.id, 'next').error).toBeNull()
+  })
 })
 
 describe('threads', () => {

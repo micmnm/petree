@@ -79,6 +79,40 @@ export function parseConfigText(text: string): Omit<PetreeConfig, 'home'> {
   }
 }
 
+// Inverse of parseConfigText: builds the plain snake_case object that
+// parseConfigText reads and dumps it to YAML. Empty lists/strings/null
+// fields are omitted to keep the output tidy; the three numeric `defaults`
+// fields are always emitted since there's no "absent" representation for
+// them worth special-casing.
+export function serializeConfig(cfg: Omit<PetreeConfig, 'home'>): string {
+  const repos: Record<string, Record<string, unknown>> = {}
+  for (const [name, r] of Object.entries(cfg.repos)) {
+    const repo: Record<string, unknown> = {
+      url: r.url,
+      default_branch: r.defaultBranch,
+      image: r.image,
+    }
+    if (r.instructions !== '') repo.instructions = r.instructions
+    if (r.setup.length > 0) repo.setup = r.setup
+    if (r.build.length > 0) repo.build = r.build
+    if (r.test.length > 0) repo.test = r.test
+    if (r.skills.length > 0) repo.skills = r.skills
+    if (r.defaultModel != null) repo.default_model = r.defaultModel
+    repos[name] = repo
+  }
+  const defaults: Record<string, unknown> = {
+    timeout_minutes: cfg.defaults.timeoutMinutes,
+    token_budget: cfg.defaults.tokenBudget,
+    concurrency: cfg.defaults.concurrency,
+  }
+  if (cfg.defaults.defaultModel != null) defaults.default_model = cfg.defaults.defaultModel
+  if (cfg.defaults.instructions !== '') defaults.instructions = cfg.defaults.instructions
+
+  const doc: Record<string, unknown> = { defaults, repos }
+  if (cfg.allowClone.length > 0) doc.allow_clone = cfg.allowClone
+  return yaml.dump(doc)
+}
+
 export function loadConfig(
   home: string = process.env.PETREE_HOME ?? join(homedir(), '.petree'),
 ): PetreeConfig {

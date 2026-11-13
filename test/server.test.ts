@@ -384,6 +384,88 @@ describe('API', () => {
     expect(empty.status).toBe(400)
   })
 
+  it('returns the structured config via GET /api/config', async () => {
+    const got = await (await fetch(`${base}/api/config`)).json()
+    expect(got).toEqual({
+      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
+      repos: { demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } },
+      allowClone: [],
+    })
+  })
+
+  it('writes a valid structured config via PUT /api/config, applying it to the running config and disk', async () => {
+    const body = {
+      defaults: { timeoutMinutes: 45, tokenBudget: 750000, concurrency: 2, defaultModel: 'sonnet', instructions: 'be careful' },
+      repos: {
+        demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null },
+        extra: { url: 'y', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: ['npm ci'], build: [], test: [], skills: [], defaultModel: null },
+      },
+      allowClone: ['https://example.com/extra.git'],
+    }
+    const put = await fetch(`${base}/api/config`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    expect(put.status).toBe(200)
+    expect(await put.json()).toEqual({ ok: true })
+
+    const onDisk = readFileSync(join(home, 'repos.yaml'), 'utf8')
+    expect(onDisk).toContain('extra')
+
+    const got = await (await fetch(`${base}/api/config`)).json()
+    expect(got).toEqual(body)
+
+    // a task created after the edit sees the new repo without a server restart
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', repos: ['extra'] }),
+    })
+    expect(res.status).toBe(201)
+  })
+
+  it('rejects PUT /api/config when a repo is missing url or image, without writing the file', async () => {
+    const base_body = {
+      defaults: { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
+      allowClone: [],
+    }
+    const missingUrl = await fetch(`${base}/api/config`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...base_body, repos: { bad: { url: '', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } } }),
+    })
+    expect(missingUrl.status).toBe(400)
+    expect((await missingUrl.json()).error).toMatch(/url/)
+
+    const missingImage = await fetch(`${base}/api/config`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...base_body, repos: { bad: { url: 'x', defaultBranch: 'main', image: '', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null } } }),
+    })
+    expect(missingImage.status).toBe(400)
+    expect((await missingImage.json()).error).toMatch(/image/)
+
+    // nothing was persisted; original config is intact
+    const got = await (await fetch(`${base}/api/config`)).json()
+    expect(got.repos.demo).toBeDefined()
+    expect(got.repos.bad).toBeUndefined()
+  })
+
+  it('rejects PUT /api/config with non-positive-integer defaults fields', async () => {
+    const repos = {
+      demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], skills: [], defaultModel: null },
+    }
+    for (const bad of [
+      { timeoutMinutes: 0, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' },
+      { timeoutMinutes: 30, tokenBudget: -1, concurrency: 3, defaultModel: null, instructions: '' },
+      { timeoutMinutes: 30, tokenBudget: 500000, concurrency: 1.5, defaultModel: null, instructions: '' },
+    ]) {
+      const res = await fetch(`${base}/api/config`, {
+        method: 'PUT', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ defaults: bad, repos, allowClone: [] }),
+      })
+      expect(res.status).toBe(400)
+      expect((await res.json()).error).toMatch(/must be a positive integer/)
+    }
+  })
+
   it('rejects /next with a missing prompt, unknown model, wrong state, or unknown id', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     store.transition(t.id, 'provisioning')

@@ -2,8 +2,8 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
-import { parseConfigText, resolveModel } from './config.js'
-import type { PetreeConfig } from './config.js'
+import { parseConfigText, serializeConfig, resolveModel } from './config.js'
+import type { Defaults, PetreeConfig, RepoConfig } from './config.js'
 import { repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch } from './gitops.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
@@ -12,6 +12,16 @@ import type { TaskStore, TaskRecord } from './store.js'
 import type { Response } from 'express'
 
 export const MODELS = ['default', 'haiku', 'sonnet', 'opus']
+
+// Shared by /api/settings and /api/config: both PUT routes validate one or
+// more fields as positive integers with the same error-response shape.
+function requirePositiveInt(res: Response, name: string, v: unknown): boolean {
+  if (!Number.isInteger(v) || (v as number) < 1) {
+    res.status(400).json({ error: `${name} must be a positive integer` })
+    return false
+  }
+  return true
+}
 
 // Shared by /push and /pr: a target must be a plain branch name, never the base
 // branch, HEAD, or a refspec/ref-path trick that could redirect onto it.
@@ -76,10 +86,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   app.put('/api/settings', (req, res) => {
     const { maxAgeDays, maxPerRepoGroup } = (req.body ?? {}) as { maxAgeDays?: number; maxPerRepoGroup?: number }
     for (const [name, v] of [['maxAgeDays', maxAgeDays], ['maxPerRepoGroup', maxPerRepoGroup]] as const) {
-      if (v !== undefined && (!Number.isInteger(v) || v < 1)) {
-        res.status(400).json({ error: `${name} must be a positive integer` })
-        return
-      }
+      if (v !== undefined && !requirePositiveInt(res, name, v)) return
     }
     const settings = store.updateSettings({ maxAgeDays, maxPerRepoGroup })
     res.json({ ...settings, ...store.prune() })
@@ -125,6 +132,52 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       return
     }
     writeFileSync(join(cfg.home, 'repos.yaml'), content)
+    cfg.defaults = parsed.defaults
+    cfg.repos = parsed.repos
+    cfg.allowClone = parsed.allowClone
+    res.json({ ok: true })
+  })
+
+  // Structured counterpart to /api/repos-yaml: the settings editor's
+  // General/Repos tabs exchange plain JSON with the server and never need a
+  // YAML parser/dumper in the browser.
+  app.get('/api/config', (_req, res) => {
+    res.json({ defaults: cfg.defaults, repos: cfg.repos, allowClone: cfg.allowClone })
+  })
+
+  app.put('/api/config', (req, res) => {
+    const { defaults, repos, allowClone } = (req.body ?? {}) as {
+      defaults?: Defaults
+      repos?: Record<string, RepoConfig>
+      allowClone?: string[]
+    }
+    if (!defaults) {
+      res.status(400).json({ error: 'defaults is required' })
+      return
+    }
+    for (const [name, v] of [
+      ['timeoutMinutes', defaults.timeoutMinutes],
+      ['tokenBudget', defaults.tokenBudget],
+      ['concurrency', defaults.concurrency],
+    ] as const) {
+      if (!requirePositiveInt(res, name, v)) return
+    }
+    // Validate through the same parser /api/repos-yaml uses (parseConfigText,
+    // via its serializeConfig inverse) rather than re-deriving the url/image
+    // rules here, so "valid repos.yaml" has exactly one definition whether it
+    // arrives as raw text or structured JSON. Writing serializeConfig(parsed)
+    // — not the raw request body — and assigning cfg from that same `parsed`
+    // keeps disk and memory in the same write-then-reparse relationship
+    // /api/repos-yaml already maintains (the body's strings may be untrimmed,
+    // etc. — `parsed` is the canonical, normalized form of what's on disk).
+    let parsed: Omit<PetreeConfig, 'home'>
+    try {
+      parsed = parseConfigText(serializeConfig({ defaults, repos: repos ?? {}, allowClone: allowClone ?? [] }))
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) })
+      return
+    }
+    writeFileSync(join(cfg.home, 'repos.yaml'), serializeConfig(parsed))
     cfg.defaults = parsed.defaults
     cfg.repos = parsed.repos
     cfg.allowClone = parsed.allowClone

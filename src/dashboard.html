@@ -116,13 +116,24 @@
   @media (max-width: 820px) { .layout { flex-direction: column; } .left, .right { flex: 1 1 100%; } }
   /* settings: popup modal, not an inline panel */
   .modal-overlay { position: fixed; inset: 0; background: rgba(20,20,16,.35); display: flex; align-items: center; justify-content: center; padding: calc(var(--sp)*2); z-index: 100; }
-  .modal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); width: min(640px, 100%); max-height: 88vh; overflow: auto; padding: calc(var(--sp)*2.5); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+  .modal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); width: min(760px, 100%); max-height: 88vh; overflow: auto; padding: calc(var(--sp)*2.5); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
   .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: calc(var(--sp)*1.5); }
   .modal-head h2 { margin: 0; font-size: 1rem; }
   .modal-close { border: none; background: none; font-size: 1.2rem; line-height: 1; padding: 2px 6px; color: var(--muted); }
   .modal-section { border-top: 1px dashed var(--line); padding-top: calc(var(--sp)*1.5); margin-top: calc(var(--sp)*1.5); }
+  .modal-section.first { border-top: none; padding-top: 0; margin-top: 0; }
   .modal-section h3 { margin: 0 0 8px; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   #reposYamlText { min-height: 40vh; font-family: var(--mono); font-size: .82rem; resize: vertical; overflow: auto; white-space: pre; }
+  /* Repos tab: master/detail — searchable repo list on the left, form on the right */
+  .repos-editor { display: flex; gap: calc(var(--sp)*2); align-items: flex-start; }
+  .repos-list-col { flex: 0 0 200px; min-width: 0; }
+  .repos-list-col input[type="text"] { width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
+  .repo-list { margin-top: 6px; max-height: 300px; overflow-y: auto; border: 1px solid var(--line); border-radius: 6px; }
+  .repo-list .item { padding: 6px 10px; cursor: pointer; font-size: .88rem; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+  .repo-list .item:last-child { border-bottom: none; }
+  .repo-list .item:hover, .repo-list .item.active { background: #eef6ff; }
+  .repo-list .empty { padding: 6px 10px; color: var(--muted); font-size: .85rem; }
+  .repos-detail-col { flex: 1 1 auto; min-width: 0; }
 </style>
 <header style="display:flex;align-items:center;justify-content:space-between">
   <h1>🧫 Petree</h1>
@@ -134,30 +145,11 @@
       <h2 id="settingsTitle">⚙ Settings</h2>
       <button type="button" class="modal-close" id="settingsClose" aria-label="close">×</button>
     </div>
-    <p class="muted small" style="margin:0 0 8px">Finished tasks (done/failed/cancelled) are cleared automatically. Active tasks are never cleared.</p>
-    <div class="field">
-      <label class="k" for="maxAgeDays">clear after</label>
-      <input type="number" id="maxAgeDays" min="1" step="1" style="width:5rem">
-      <span class="muted">days</span>
-    </div>
-    <div class="field">
-      <label class="k" for="maxPerRepoGroup">keep per repo group</label>
-      <input type="number" id="maxPerRepoGroup" min="1" step="1" style="width:5rem">
-      <span class="muted">tasks (oldest finished ones beyond this are cleared)</span>
-    </div>
-    <div class="field">
+    <div class="tabs" id="settingsTabs"></div>
+    <div class="tabbody" id="settingsTabBody"></div>
+    <div class="field" style="margin-top:calc(var(--sp)*1.5);border-top:1px solid var(--line);padding-top:calc(var(--sp)*1.5)">
       <button class="primary" type="button" id="saveSettings">Save</button>
-      <button type="button" id="clearNowBtn">Clear now</button>
       <span class="muted small" id="settingsMsg"></span>
-    </div>
-    <div class="modal-section">
-      <h3>repos.yaml</h3>
-      <p class="muted small" style="margin:0 0 8px">Edits apply immediately to new tasks — no restart required.</p>
-      <textarea id="reposYamlText" spellcheck="false"></textarea>
-      <div class="field" style="margin-top:8px">
-        <button class="primary" type="button" id="saveReposYaml">Save repos.yaml</button>
-        <span class="muted small" id="reposYamlMsg"></span>
-      </div>
     </div>
   </div>
 </div>
@@ -193,6 +185,8 @@
   import { renderMarkdown } from './markdown.js'
   import { renderActivity } from './activity.js'
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+  // One command/URL per line, blank lines dropped — shared by allow-clone and repo setup/build/test/skills fields.
+  const linesToList = (s) => s.split('\n').map((x) => x.trim()).filter(Boolean)
   let selected = null, tab = 'Overview', resultShownFor = null
   const TABS = ['Overview', 'Result', 'Changes', 'Log']
   // Log view preferences survive the 3s poll and page reloads
@@ -218,7 +212,13 @@
   const repoMenu = document.getElementById('repoMenu')
   const repoTags = document.getElementById('repoTags')
   const conventions = document.getElementById('conventions')
-  fetch('/api/repos').then((r) => r.json()).then((repos) => { allRepos = repos; renderRepoMenu(); renderConventions() })
+  // Refreshes the create-task form's repo list/conventions — called on initial
+  // load and after any edit that may have added/removed/renamed repos (raw-YAML
+  // apply, settings save).
+  function refreshRepoList() {
+    return fetch('/api/repos').then((r) => r.json()).then((repos) => { allRepos = repos; renderRepoMenu(); renderConventions() })
+  }
+  refreshRepoList()
 
   function renderRepoTags() {
     repoTags.innerHTML = selectedRepos.map((name) => `<span class="tag">${esc(name)}<button type="button" data-remove="${esc(name)}" aria-label="remove ${esc(name)}">×</button></span>`).join('')
@@ -271,60 +271,367 @@
     renderRepoTags(); renderRepoMenu()
   })
 
-  // settings modal: retention config for automatic task clearing, plus a raw
-  // repos.yaml editor (see /api/repos-yaml — cfg is mutated in place server-side,
-  // so a save here applies to new tasks immediately, no restart needed)
+  // settings modal: tabbed editor — General (retention + defaults + allow-clone),
+  // Repos (master/detail per-repo config) and Advanced (raw repos.yaml escape
+  // hatch). General + Repos share ONE in-memory draft fetched once on open
+  // (GET /api/settings + GET /api/config) so switching tabs is instant and never
+  // drops unsaved edits; the one footer Save button validates the whole draft and
+  // writes it back via PUT /api/settings + PUT /api/config. Advanced talks to
+  // /api/repos-yaml directly and intentionally does NOT preview the draft.
   const settingsBtn = document.getElementById('settingsBtn')
   const settingsOverlay = document.getElementById('settingsOverlay')
-  const maxAgeDaysInput = document.getElementById('maxAgeDays')
-  const maxPerRepoGroupInput = document.getElementById('maxPerRepoGroup')
+  const settingsTabsEl = document.getElementById('settingsTabs')
+  const settingsTabBody = document.getElementById('settingsTabBody')
   const settingsMsg = document.getElementById('settingsMsg')
-  const flashSettingsMsg = (text) => { settingsMsg.textContent = text; setTimeout(() => (settingsMsg.textContent = ''), 1500) }
-  const reposYamlText = document.getElementById('reposYamlText')
-  const reposYamlMsg = document.getElementById('reposYamlMsg')
-  const flashReposYamlMsg = (text) => { reposYamlMsg.textContent = text; setTimeout(() => (reposYamlMsg.textContent = ''), 2500) }
-  async function loadSettings() {
-    const s = await (await fetch('/api/settings')).json()
-    maxAgeDaysInput.value = s.maxAgeDays
-    maxPerRepoGroupInput.value = s.maxPerRepoGroup
+  const flashSettingsMsg = (text) => { settingsMsg.textContent = text; setTimeout(() => (settingsMsg.textContent = ''), 2500) }
+  // Override choices for a model select; "(use default)" (empty value, stored as null)
+  // is rendered separately so there's exactly one representation of "no override"
+  // (resolveModel in src/config.ts treats null and the literal string 'default' as
+  // equivalent, but storing null — and omitting default_model from repos.yaml — is tidier).
+  const MODEL_OPTS = ['haiku', 'sonnet', 'opus']
+  const SETTINGS_TABS = ['General', 'Repos', 'Advanced']
+
+  let draft = null // { retention: {maxAgeDays, maxPerRepoGroup}, defaults: {...}, repos: {name: {...}}, allowClone: [] }
+  let settingsTab = 'General'
+  let selectedRepoName = null
+  let addingRepo = false
+  let repoListFilter = ''
+  let rawYamlCache = null // cached /api/repos-yaml content for this modal session; cleared on open, refreshed after a successful apply
+
+  const isPosInt = (v) => Number.isInteger(v) && v > 0
+  const emptyRepo = () => ({ url: '', image: '', defaultBranch: 'main', defaultModel: null, instructions: '', setup: [], build: [], test: [], skills: [] })
+
+  async function loadDraft() {
+    const [settings, config] = await Promise.all([
+      fetch('/api/settings').then((r) => r.json()),
+      fetch('/api/config').then((r) => r.json()),
+    ])
+    draft = {
+      retention: { maxAgeDays: settings.maxAgeDays, maxPerRepoGroup: settings.maxPerRepoGroup },
+      defaults: {
+        timeoutMinutes: config.defaults?.timeoutMinutes,
+        tokenBudget: config.defaults?.tokenBudget,
+        concurrency: config.defaults?.concurrency,
+        defaultModel: config.defaults?.defaultModel && config.defaults.defaultModel !== 'default' ? config.defaults.defaultModel : null,
+        instructions: config.defaults?.instructions || '',
+      },
+      repos: config.repos || {},
+      allowClone: config.allowClone || [],
+    }
   }
-  async function loadReposYaml() {
-    const { content } = await (await fetch('/api/repos-yaml')).json()
-    reposYamlText.value = content
-  }
+
   function openSettings() {
     settingsOverlay.hidden = false
-    loadSettings()
-    loadReposYaml()
+    settingsTab = 'General'; selectedRepoName = null; addingRepo = false; repoListFilter = ''
+    rawYamlCache = null
+    settingsTabBody.innerHTML = '<p class="muted">loading…</p>'
+    loadDraft().then(renderSettingsTabs)
   }
   function closeSettings() { settingsOverlay.hidden = true }
   settingsBtn.addEventListener('click', openSettings)
   document.getElementById('settingsClose').addEventListener('click', closeSettings)
   settingsOverlay.addEventListener('click', (e) => { if (e.target === settingsOverlay) closeSettings() })
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !settingsOverlay.hidden) closeSettings() })
-  document.getElementById('saveSettings').addEventListener('click', async () => {
-    const res = await fetch('/api/settings', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ maxAgeDays: Number(maxAgeDaysInput.value), maxPerRepoGroup: Number(maxPerRepoGroupInput.value) }),
+
+  function renderSettingsTabsNav() {
+    settingsTabsEl.innerHTML = SETTINGS_TABS.map((n) => `<button class="${n === settingsTab ? 'active' : ''}" data-settings-tab="${n}">${n}</button>`).join('')
+  }
+  settingsTabsEl.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-settings-tab]'); if (!b) return
+    settingsTab = b.dataset.settingsTab
+    renderSettingsTabs()
+  })
+
+  function renderSettingsTabs() {
+    renderSettingsTabsNav()
+    if (settingsTab === 'General') renderGeneralTab()
+    else if (settingsTab === 'Repos') renderReposTab()
+    else renderAdvancedTab()
+  }
+
+  function renderGeneralTab() {
+    settingsTabBody.innerHTML = `
+      <p class="muted small" style="margin:0 0 8px">Finished tasks (done/failed/cancelled) are cleared automatically. Active tasks are never cleared.</p>
+      <div class="modal-section first">
+        <h3>Task retention</h3>
+        <div class="field">
+          <label class="k" for="maxAgeDays">clear after</label>
+          <input type="number" id="maxAgeDays" min="1" step="1" style="width:5rem" value="${esc(draft.retention.maxAgeDays)}">
+          <span class="muted">days</span>
+        </div>
+        <div class="field">
+          <label class="k" for="maxPerRepoGroup">keep per repo group</label>
+          <input type="number" id="maxPerRepoGroup" min="1" step="1" style="width:5rem" value="${esc(draft.retention.maxPerRepoGroup)}">
+          <span class="muted">tasks (oldest finished ones beyond this are cleared)</span>
+        </div>
+        <div class="field"><button type="button" id="clearNowBtn">Clear now</button></div>
+      </div>
+      <div class="modal-section">
+        <h3>Defaults</h3>
+        <div class="field">
+          <label class="k" for="defTimeout">timeout</label>
+          <input type="number" id="defTimeout" min="1" step="1" style="width:5rem" value="${esc(draft.defaults.timeoutMinutes)}">
+          <span class="muted">minutes</span>
+        </div>
+        <div class="field">
+          <label class="k" for="defTokenBudget">token budget</label>
+          <input type="number" id="defTokenBudget" min="1" step="1" style="width:7rem" value="${esc(draft.defaults.tokenBudget)}">
+        </div>
+        <div class="field">
+          <label class="k" for="defConcurrency">concurrency</label>
+          <input type="number" id="defConcurrency" min="1" step="1" style="width:5rem" value="${esc(draft.defaults.concurrency)}">
+        </div>
+        <div class="field">
+          <label class="k" for="defModel">model</label>
+          <select id="defModel">
+            <option value="" ${!draft.defaults.defaultModel ? 'selected' : ''}>(use default)</option>
+            ${MODEL_OPTS.map((m) => `<option value="${m}" ${draft.defaults.defaultModel === m ? 'selected' : ''}>${m}</option>`).join('')}
+          </select>
+        </div>
+        <div class="field" style="align-items:flex-start">
+          <label class="k" for="defInstructions">instructions</label>
+          <textarea id="defInstructions" placeholder="free text prepended to every task prompt">${esc(draft.defaults.instructions)}</textarea>
+        </div>
+      </div>
+      <div class="modal-section">
+        <h3>Allow clone</h3>
+        <p class="muted small" style="margin:0 0 8px">Extra git URLs Claude may clone mid-task, one per line.</p>
+        <textarea id="allowCloneText" placeholder="https://github.com/org/repo.git">${esc(draft.allowClone.join('\n'))}</textarea>
+      </div>
+      <p class="muted small" style="margin-top:12px">Saving rewrites repos.yaml from this structured form and does not preserve hand-written comments/formatting in the file — use the Advanced tab to edit the file directly if that matters.</p>
+      <div id="generalErr" class="err small" style="margin-top:8px"></div>`
+    document.getElementById('maxAgeDays').addEventListener('input', (e) => { draft.retention.maxAgeDays = Number(e.target.value) })
+    document.getElementById('maxPerRepoGroup').addEventListener('input', (e) => { draft.retention.maxPerRepoGroup = Number(e.target.value) })
+    document.getElementById('clearNowBtn').addEventListener('click', async () => {
+      await fetch('/api/prune', { method: 'POST' })
+      flashSettingsMsg('cleared')
+      refresh()
     })
-    if (!res.ok) { flashSettingsMsg((await res.json()).error || 'failed to save'); return }
+    document.getElementById('defTimeout').addEventListener('input', (e) => { draft.defaults.timeoutMinutes = Number(e.target.value) })
+    document.getElementById('defTokenBudget').addEventListener('input', (e) => { draft.defaults.tokenBudget = Number(e.target.value) })
+    document.getElementById('defConcurrency').addEventListener('input', (e) => { draft.defaults.concurrency = Number(e.target.value) })
+    document.getElementById('defModel').addEventListener('change', (e) => { draft.defaults.defaultModel = e.target.value || null })
+    document.getElementById('defInstructions').addEventListener('input', (e) => { draft.defaults.instructions = e.target.value })
+    document.getElementById('allowCloneText').addEventListener('input', (e) => { draft.allowClone = linesToList(e.target.value) })
+  }
+
+  function renderReposTab() {
+    settingsTabBody.innerHTML = `
+      <p class="muted small" style="margin:0 0 8px">Saving rewrites repos.yaml from this structured form and does not preserve hand-written comments/formatting in the file — use the Advanced tab to edit the file directly if that matters.</p>
+      <div class="repos-editor">
+        <div class="repos-list-col">
+          <input type="text" id="repoListSearch" placeholder="search repos…" autocomplete="off" value="${esc(repoListFilter)}">
+          <div class="repo-list" id="repoListItems"></div>
+          <div class="field" style="margin-top:8px" id="newRepoRow"></div>
+        </div>
+        <div class="repos-detail-col" id="repoDetail"></div>
+      </div>`
+    renderNewRepoRow()
+    renderRepoListItems()
+    renderRepoDetail()
+    document.getElementById('repoListSearch').addEventListener('input', (e) => { repoListFilter = e.target.value; renderRepoListItems() })
+  }
+
+  function renderNewRepoRow() {
+    const row = document.getElementById('newRepoRow')
+    if (!addingRepo) {
+      row.innerHTML = `<button type="button" id="newRepoBtn">+ New repo</button>`
+      document.getElementById('newRepoBtn').addEventListener('click', () => { addingRepo = true; renderNewRepoRow() })
+      return
+    }
+    row.innerHTML = `<input type="text" id="newRepoName" placeholder="repo name" style="flex:1 1 auto;padding:6px;border:1px solid var(--line);border-radius:6px">
+      <button type="button" id="newRepoConfirm">Add</button><button type="button" id="newRepoCancel">Cancel</button>`
+    const input = document.getElementById('newRepoName')
+    input.focus()
+    const confirmNewRepo = () => {
+      const name = input.value.trim()
+      if (!name) { input.focus(); return }
+      if (draft.repos[name]) { alert(`a repo named "${name}" already exists`); return }
+      draft.repos[name] = emptyRepo()
+      selectedRepoName = name
+      addingRepo = false
+      renderNewRepoRow(); renderRepoListItems(); renderRepoDetail()
+    }
+    document.getElementById('newRepoConfirm').addEventListener('click', confirmNewRepo)
+    document.getElementById('newRepoCancel').addEventListener('click', () => { addingRepo = false; renderNewRepoRow() })
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); confirmNewRepo() }
+      if (e.key === 'Escape') { addingRepo = false; renderNewRepoRow() }
+    })
+  }
+
+  function renderRepoListItems() {
+    const container = document.getElementById('repoListItems')
+    const q = repoListFilter.trim().toLowerCase()
+    const names = Object.keys(draft.repos).filter((n) => n.toLowerCase().includes(q)).sort((a, b) => a.localeCompare(b))
+    container.innerHTML = names.length
+      ? names.map((n) => `<div class="item ${n === selectedRepoName ? 'active' : ''}" data-repo="${esc(n)}">${esc(n)}</div>`).join('')
+      : '<div class="empty">no matching repos</div>'
+    container.querySelectorAll('[data-repo]').forEach((el) => el.addEventListener('click', () => {
+      if (el.dataset.repo === selectedRepoName) return
+      // the name list itself hasn't changed — just move the active class, no full rebuild
+      container.querySelector('.item.active')?.classList.remove('active')
+      el.classList.add('active')
+      selectedRepoName = el.dataset.repo
+      renderRepoDetail()
+    }))
+  }
+
+  function renderRepoDetail() {
+    const body = document.getElementById('repoDetail')
+    const name = selectedRepoName
+    if (!name || !draft.repos[name]) { body.innerHTML = '<p class="muted">Select a repo to edit, or create a new one.</p>'; return }
+    const r = draft.repos[name]
+    body.innerHTML = `
+      <div class="field">
+        <strong class="mono">${esc(name)}</strong>
+        <button type="button" id="deleteRepoBtn" style="margin-left:auto">Delete repo</button>
+      </div>
+      <div class="field">
+        <label class="k" for="repoUrl">url</label>
+        <input type="text" id="repoUrl" style="flex:1 1 auto" value="${esc(r.url || '')}">
+      </div>
+      <div class="field">
+        <label class="k" for="repoImage">image</label>
+        <input type="text" id="repoImage" style="flex:1 1 auto" value="${esc(r.image || '')}">
+      </div>
+      <div class="field">
+        <label class="k" for="repoBranch">default branch</label>
+        <input type="text" id="repoBranch" style="width:10rem" value="${esc(r.defaultBranch || '')}">
+      </div>
+      <div class="field">
+        <label class="k" for="repoModel">model</label>
+        <select id="repoModel">
+          <option value="">(use default)</option>
+          ${MODEL_OPTS.map((m) => `<option value="${m}" ${r.defaultModel === m ? 'selected' : ''}>${m}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field" style="align-items:flex-start">
+        <label class="k" for="repoInstructions">instructions</label>
+        <textarea id="repoInstructions">${esc(r.instructions || '')}</textarea>
+      </div>
+      <div class="field" style="align-items:flex-start">
+        <label class="k" for="repoSetup">setup</label>
+        <textarea id="repoSetup" placeholder="one command per line">${esc((r.setup || []).join('\n'))}</textarea>
+      </div>
+      <div class="field" style="align-items:flex-start">
+        <label class="k" for="repoBuild">build</label>
+        <textarea id="repoBuild" placeholder="one command per line">${esc((r.build || []).join('\n'))}</textarea>
+      </div>
+      <div class="field" style="align-items:flex-start">
+        <label class="k" for="repoTest">test</label>
+        <textarea id="repoTest" placeholder="one command per line">${esc((r.test || []).join('\n'))}</textarea>
+      </div>
+      <div class="field" style="align-items:flex-start">
+        <label class="k" for="repoSkills">skills</label>
+        <textarea id="repoSkills" placeholder="one per line">${esc((r.skills || []).join('\n'))}</textarea>
+      </div>
+      <div id="repoErr" class="err small" style="margin-top:8px"></div>`
+    document.getElementById('deleteRepoBtn').addEventListener('click', () => {
+      if (!confirm(`Delete repo "${name}"? This cannot be undone from here.`)) return
+      delete draft.repos[name]
+      selectedRepoName = null
+      renderRepoListItems()
+      renderRepoDetail()
+    })
+    // Live-bound straight into draft.repos[name], same pattern as the General tab's
+    // fields — edits are never lost on tab/repo switch, with nothing to explicitly commit.
+    document.getElementById('repoUrl').addEventListener('input', (e) => { r.url = e.target.value })
+    document.getElementById('repoImage').addEventListener('input', (e) => { r.image = e.target.value })
+    document.getElementById('repoBranch').addEventListener('input', (e) => { r.defaultBranch = e.target.value })
+    document.getElementById('repoModel').addEventListener('change', (e) => { r.defaultModel = e.target.value || null })
+    document.getElementById('repoInstructions').addEventListener('input', (e) => { r.instructions = e.target.value })
+    document.getElementById('repoSetup').addEventListener('input', (e) => { r.setup = linesToList(e.target.value) })
+    document.getElementById('repoBuild').addEventListener('input', (e) => { r.build = linesToList(e.target.value) })
+    document.getElementById('repoTest').addEventListener('input', (e) => { r.test = linesToList(e.target.value) })
+    document.getElementById('repoSkills').addEventListener('input', (e) => { r.skills = linesToList(e.target.value) })
+  }
+
+  function renderAdvancedTab() {
+    settingsTabBody.innerHTML = `
+      <p class="muted small" style="margin:0 0 8px">Edits apply immediately to new tasks — no restart required. This is a raw-text escape hatch: it bypasses the structured validation on the other tabs and can preserve comments/formatting the structured editor cannot.</p>
+      <textarea id="reposYamlText" spellcheck="false"></textarea>
+      <div class="field" style="margin-top:8px">
+        <button class="primary" type="button" id="applyRawYamlBtn">Apply raw YAML</button>
+        <span class="muted small" id="reposYamlMsg"></span>
+      </div>`
+    const reposYamlText = document.getElementById('reposYamlText')
+    const reposYamlMsg = document.getElementById('reposYamlMsg')
+    const flashReposYamlMsg = (text) => { reposYamlMsg.textContent = text; setTimeout(() => (reposYamlMsg.textContent = ''), 2500) }
+    if (rawYamlCache === null) {
+      reposYamlText.value = 'loading…'
+      fetch('/api/repos-yaml').then((r) => r.json()).then(({ content }) => { rawYamlCache = content; reposYamlText.value = content })
+    } else {
+      reposYamlText.value = rawYamlCache
+    }
+    document.getElementById('applyRawYamlBtn').addEventListener('click', async () => {
+      const res = await fetch('/api/repos-yaml', {
+        method: 'PUT', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ content: reposYamlText.value }),
+      })
+      if (!res.ok) { flashReposYamlMsg((await res.json()).error || 'failed to apply'); return }
+      flashReposYamlMsg('applied')
+      // the file now holds exactly reposYamlText.value — cache it rather than refetching
+      rawYamlCache = reposYamlText.value
+      // the raw apply may have changed defaults/repos/allowClone — reset the in-memory draft
+      // from the server (so switching back to General/Repos doesn't show stale data) and
+      // refresh the create-form's repo list, concurrently — neither depends on the other
+      await Promise.all([loadDraft(), refreshRepoList()])
+    })
+  }
+
+  // Validates the whole draft client-side; returns null when valid, or
+  // { tab, message, repo? } identifying the first tab/field to surface.
+  function validateDraft() {
+    const genErrors = []
+    if (!isPosInt(draft.retention.maxAgeDays)) genErrors.push('clear after: must be a positive integer')
+    if (!isPosInt(draft.retention.maxPerRepoGroup)) genErrors.push('keep per repo group: must be a positive integer')
+    if (!isPosInt(draft.defaults.timeoutMinutes)) genErrors.push('timeout: must be a positive integer')
+    if (!isPosInt(draft.defaults.tokenBudget)) genErrors.push('token budget: must be a positive integer')
+    if (!isPosInt(draft.defaults.concurrency)) genErrors.push('concurrency: must be a positive integer')
+    if (genErrors.length) return { tab: 'General', message: genErrors.join('; ') }
+
+    const repoErrors = []
+    let firstBadRepo = null
+    for (const [name, r] of Object.entries(draft.repos)) {
+      if (!r.url?.trim() || !r.image?.trim()) {
+        repoErrors.push(`"${name}": url and image are required`)
+        if (!firstBadRepo) firstBadRepo = name
+      }
+    }
+    if (repoErrors.length) return { tab: 'Repos', message: repoErrors.join('; '), repo: firstBadRepo }
+    return null
+  }
+
+  document.getElementById('saveSettings').addEventListener('click', async () => {
+    const invalid = validateDraft()
+    if (invalid) {
+      settingsTab = invalid.tab
+      if (invalid.repo) selectedRepoName = invalid.repo
+      renderSettingsTabs()
+      const errEl = document.getElementById(invalid.tab === 'General' ? 'generalErr' : 'repoErr')
+      if (errEl) errEl.textContent = invalid.message
+      flashSettingsMsg('fix the highlighted fields')
+      return
+    }
+    const [settingsRes, configRes] = await Promise.all([
+      fetch('/api/settings', {
+        method: 'PUT', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ maxAgeDays: draft.retention.maxAgeDays, maxPerRepoGroup: draft.retention.maxPerRepoGroup }),
+      }),
+      fetch('/api/config', {
+        method: 'PUT', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ defaults: draft.defaults, repos: draft.repos, allowClone: draft.allowClone }),
+      }),
+    ])
+    if (!settingsRes.ok || !configRes.ok) {
+      const errs = await Promise.all([settingsRes, configRes].map(async (r) => (r.ok ? null : (await r.json().catch(() => ({}))).error)))
+      flashSettingsMsg(errs.filter(Boolean).join('; ') || 'failed to save')
+      return
+    }
     flashSettingsMsg('saved')
     refresh()
-  })
-  document.getElementById('clearNowBtn').addEventListener('click', async () => {
-    await fetch('/api/prune', { method: 'POST' })
-    flashSettingsMsg('cleared')
-    refresh()
-  })
-  document.getElementById('saveReposYaml').addEventListener('click', async () => {
-    const res = await fetch('/api/repos-yaml', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ content: reposYamlText.value }),
-    })
-    if (!res.ok) { flashReposYamlMsg((await res.json()).error || 'failed to save'); return }
-    flashReposYamlMsg('saved')
-    // repos may have been added/removed/renamed — refresh the create-form's repo list
-    fetch('/api/repos').then((r) => r.json()).then((repos) => { allRepos = repos; renderRepoMenu(); renderConventions() })
+    refreshRepoList() // repos may have been added/removed/renamed
   })
 
   const prompt = document.getElementById('prompt')

@@ -2,7 +2,8 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { loadConfig, parseConfigText, resolveModel } from '../src/config.js'
+import { loadConfig, parseConfigText, serializeConfig, resolveModel } from '../src/config.js'
+import type { PetreeConfig } from '../src/config.js'
 
 function petreeHome(yamlText: string): string {
   const home = mkdtempSync(join(tmpdir(), 'petree-'))
@@ -140,5 +141,46 @@ describe('resolveModel', () => {
     expect(resolveModel(undefined, null, 'sonnet')).toBe('sonnet')
     expect(resolveModel(undefined, 'haiku', 'sonnet')).toBe('haiku')
     expect(resolveModel(null, null, null)).toBeNull()
+  })
+})
+
+describe('serializeConfig', () => {
+  it('round-trips a representative config through parseConfigText', () => {
+    const cfg: Omit<PetreeConfig, 'home'> = {
+      defaults: {
+        timeoutMinutes: 45,
+        tokenBudget: 750_000,
+        concurrency: 2,
+        defaultModel: 'sonnet',
+        instructions: 'Write a failing test first.\nKeep PRs small.',
+      },
+      repos: {
+        demo: {
+          url: 'file:///tmp/demo',
+          defaultBranch: 'develop',
+          image: 'sandbox-node',
+          instructions: 'Never edit src/generated/.',
+          setup: ['npm ci'],
+          build: ['npm run build'],
+          test: ['npm test', 'npm run typecheck'],
+          skills: ['testing', 'refactoring'],
+          defaultModel: 'haiku',
+        },
+        minimal: {
+          url: 'file:///tmp/minimal',
+          defaultBranch: 'main',
+          image: 'sandbox-python',
+          instructions: '',
+          setup: [],
+          build: [],
+          test: [],
+          skills: [],
+          defaultModel: null,
+        },
+      },
+      allowClone: ['https://example.com/extra.git', 'git@example.com:other/repo.git'],
+    }
+    const roundTripped = parseConfigText(serializeConfig(cfg))
+    expect(roundTripped).toEqual(cfg)
   })
 })

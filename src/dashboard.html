@@ -189,7 +189,7 @@
     </div>
   </form>
   <div class="layout">
-    <div class="left card"><table><thead><tr><th>id</th><th>stage</th><th>state</th><th>repos</th><th>tokens</th></tr></thead><tbody id="tasks"></tbody></table></div>
+    <div class="left card"><table><thead><tr><th>id</th><th>thread</th><th>stage</th><th>state</th><th>repos</th><th>tokens</th></tr></thead><tbody id="tasks"></tbody></table></div>
     <div class="right card">
       <div class="tabs" id="tabs"></div>
       <div class="tabbody" id="tabbody"><p class="muted">Select a thread to see details.</p></div>
@@ -356,14 +356,17 @@
     refresh()
   })
 
+  // Mirrors threadTitle() in src/store.ts.
+  const threadTitle = (t) => ((t.turns || [])[0]?.prompt ?? t.prompt).split('\n')[0].slice(0, 72)
+
   function taskRow(t) {
     return `<tr class="${t.id === selected ? 'sel' : ''}" data-id="${esc(t.id)}">
-      <td class="mono">${esc(t.id)}</td><td><span class="badge stage">${esc(t.stage)}</span></td><td><span class="badge ${esc(t.state)}">${esc(t.state)}</span></td>
+      <td class="mono">${esc(t.id)}</td><td>${esc(threadTitle(t))}</td><td><span class="badge stage">${esc(t.stage)}</span></td><td><span class="badge ${esc(t.state)}">${esc(t.state)}</span></td>
       <td>${esc(t.repos.join(', '))}</td><td>${esc(t.tokensUsed)}</td></tr>`
   }
   document.getElementById('tasks').addEventListener('click', (e) => {
     const tr = e.target.closest('tr[data-id]'); if (!tr) return
-    selected = tr.dataset.id; tab = 'Overview'; threadInfo = { spec: '', findings: '', suggestions: [] }; refresh()
+    selected = tr.dataset.id; tab = 'Overview'; threadInfo = { spec: '', findings: '', suggestions: [] }; refresh(true)
   })
 
   function renderTabs() {
@@ -426,13 +429,14 @@
       body.innerHTML = `<dl>
         <dt>stage / state</dt><dd><span class="badge stage">${esc(t.stage)}</span> <span class="badge ${esc(t.state)}">${esc(t.state)}</span> ${resume} ${stop}</dd>
         <dt>id</dt><dd class="mono">${esc(t.id)} ${copyBtn(t.id)}</dd>
-        <dt>prompt</dt><dd>${esc(t.prompt)}</dd>
+        <dt>thread</dt><dd>${esc(threadTitle(t))}</dd>
+        <dt>current turn</dt><dd>${esc(t.prompt)}</dd>
         <dt>repos</dt><dd>${esc(t.repos.join(', '))}</dd>
         <dt>model</dt><dd>${esc(t.model || 'default')}</dd>
         <dt>tokens</dt><dd>${esc(t.tokensUsed)} / ${esc(t.tokenBudget)}</dd>
         <dt>session</dt><dd class="mono">${esc(t.sessionId || '—')} ${t.sessionId ? copyBtn(t.sessionId) : ''}</dd>
         <dt>created / updated</dt><dd class="mono">${esc(t.createdAt)} · ${esc(t.updatedAt)}</dd>
-        ${t.state === 'failed' && t.error ? `<dt>error</dt><dd class="err">${esc(t.error)}</dd>` : ''}
+        ${t.error ? `<dt>${t.state === 'failed' ? 'failed:' : 'note:'}</dt><dd class="err">${esc(t.error)}</dd>` : ''}
         ${(t.turns || []).length ? `<dt>turns</dt><dd>${t.turns.map((turn, i) => `<div>${i + 1}. <span class="badge stage">${esc(turn.stage)}</span> ${esc(turn.prompt.split('\n')[0].slice(0, 80))}</div>`).join('')}</dd>` : ''}
         <dt>comments</dt><dd>${(t.comments || []).map((c) => `<div class="comment${c.consumed ? '' : ' pending'}">
           <span class="muted small mono">${esc(c.at)}${c.consumed ? '' : ' · will be included in the next turn'}</span>
@@ -441,7 +445,7 @@
           <button data-comment="${esc(t.id)}">Add comment</button></div></dd>
       </dl>
         ${t.state === 'waiting-for-you' ? `
-        <div class="card" style="margin-top:16px;padding:12px">
+        <div class="card" data-gate-card style="margin-top:16px;padding:12px">
           <dt>review the ${esc(t.stage)} stage, then decide</dt>
           <textarea id="gatePrompt" placeholder="optional note for the next turn"></textarea>
           <div class="field" style="margin-top:8px">
@@ -569,7 +573,8 @@
       await fetch('/api/tasks/' + b.dataset.resume + '/resume', { method: 'POST' }); refresh()
     }))
     document.querySelectorAll('[data-stop]').forEach((b) => b.addEventListener('click', async () => {
-      if (!confirm('Stop this thread? This will kill it.')) return
+      const gate = b.closest('[data-gate-card]')
+      if (!confirm(gate ? 'Drop this thread? It can be continued later.' : 'Stop this thread? This will kill it.')) return
       await fetch('/api/tasks/' + b.dataset.stop + '/stop', { method: 'POST' }); refresh()
     }))
     document.querySelectorAll('[data-comment]').forEach((b) => b.addEventListener('click', async () => {
@@ -608,7 +613,7 @@
     })
   }
 
-  async function refresh() {
+  async function refresh(switched = false) {
     const tasks = await (await fetch('/api/tasks')).json()
     // waiting-for-you first; Array.sort is stable so the server order holds within each group
     const waiting = (t) => (t.state === 'waiting-for-you' ? 0 : 1)
@@ -631,7 +636,9 @@
     const active = document.activeElement
     const typing = active && document.getElementById('tabbody').contains(active) &&
       ['TEXTAREA', 'INPUT', 'SELECT'].includes(active.tagName)
-    if (selected && !typing && (['Overview', 'Spec', 'Findings', 'Log'].includes(tab) || resultLive)) await renderBody()
+    // Unsent drafts in the Overview forms must survive the poll even after focus moves away.
+    const drafting = !switched && ['commentText', 'gatePrompt', 'nextPrompt'].some((id) => document.getElementById(id)?.value)
+    if (selected && !typing && !drafting && (['Overview', 'Spec', 'Findings', 'Log'].includes(tab) || resultLive)) await renderBody()
   }
   setInterval(refresh, 3000); refresh()
 </script>

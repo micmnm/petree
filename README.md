@@ -65,13 +65,13 @@ repos:
     setup: ["pnpm install"]         # run before making changes
     build: ["pnpm build"]           # must pass before reporting success
     test: ["pnpm test", "pnpm typecheck"]
-    run: ["pnpm dev"]               # how to start the app, for the agent to verify changes
+    run: ["pnpm dev"]               # shown in the dashboard's Local panel; never run or sent to the agent
 ```
 
 Per-repo notes live in `~/.petree/notes/<repo>/` (an `INDEX.md` plus topic
 files); they are mounted read-only into every sandbox at `/petree/notes`.
 A thread touching repos with different images (node + dotnet) runs in the
-combined `sandbox-full` image.
+`sandbox-full` image (the dotnet image, which also carries Node 22 and claude).
 
 All five keys are optional; a command list may also be a bare string
 (`test: pnpm test`). Repos with none of them behave exactly as before — the

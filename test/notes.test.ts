@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, beforeEach } from 'vitest'
@@ -27,6 +27,40 @@ describe('readThreadFile', () => {
     mkdirSync(join(workDir, '_thread'))
     writeFileSync(join(workDir, '_thread', 'spec.md'), 'hello')
     expect(readThreadFile(workDir, 'spec.md')).toBe('hello')
+  })
+})
+
+describe('symlink containment', () => {
+  it('reads a symlinked thread file pointing outside workDir as null', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'petree-out-'))
+    writeFileSync(join(outside, 'secret.md'), 'secret')
+    mkdirSync(join(workDir, '_thread'))
+    symlinkSync(join(outside, 'secret.md'), join(workDir, '_thread', 'spec.md'))
+    expect(readThreadFile(workDir, 'spec.md')).toBeNull()
+  })
+
+  it('skips a symlinked suggestion dir pointing outside workDir', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'petree-out-'))
+    writeFileSync(join(outside, 'x.md'), 'leak')
+    mkdirSync(join(workDir, '_thread', 'notes'), { recursive: true })
+    symlinkSync(outside, join(workDir, '_thread', 'notes', 'demo'))
+    expect(listSuggestions(notesHome, workDir, repos)).toEqual([])
+  })
+
+  it('refuses to accept a note when the notes dir escapes notesHome', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'petree-out-'))
+    symlinkSync(outside, join(notesHome, 'demo'))
+    expect(() => acceptNote(notesHome, workDir, { repo: 'demo', topic: 'a', text: 't', summary: 's' }, repos)).toThrow(NoteInputError)
+    expect(existsSync(join(outside, 'a.md'))).toBe(false)
+  })
+
+  it('refuses to drop a suggestion through a symlinked dir', () => {
+    const outside = mkdtempSync(join(tmpdir(), 'petree-out-'))
+    writeFileSync(join(outside, 'a.md'), 'keep')
+    mkdirSync(join(workDir, '_thread', 'notes'), { recursive: true })
+    symlinkSync(outside, join(workDir, '_thread', 'notes', 'demo'))
+    expect(() => dropSuggestion(workDir, 'demo', 'a', repos)).toThrow(NoteInputError)
+    expect(existsSync(join(outside, 'a.md'))).toBe(true)
   })
 })
 

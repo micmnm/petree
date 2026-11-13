@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
@@ -38,6 +38,18 @@ describe('gitops', () => {
     expect(commitChanges(repoDir, 'abc123', 'petree abc123: add file')).toBe(true)
     const msg = execFileSync('git', ['-C', repoDir, 'log', '-1', '--pretty=%s'], { encoding: 'utf8' }).trim()
     expect(msg).toBe('petree abc123: add file')
+  })
+
+  it('does not run repo-controlled git hooks on commit', () => {
+    const { repoDir } = fixture()
+    createTaskBranch(repoDir, 'abc123')
+    const marker = join(repoDir, '..', 'hook-ran')
+    const hook = join(repoDir, '.git', 'hooks', 'pre-commit')
+    writeFileSync(hook, `#!/bin/sh\ntouch "${marker}"\n`)
+    chmodSync(hook, 0o755)
+    writeFileSync(join(repoDir, 'new.txt'), 'hi\n')
+    expect(commitChanges(repoDir, 'abc123', 'petree abc123: hook')).toBe(true)
+    expect(existsSync(marker)).toBe(false)
   })
 
   it('reports status and diff of the branch vs base', () => {

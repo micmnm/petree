@@ -296,7 +296,12 @@
   let selectedRepoName = null
   let addingRepo = false
   let repoListFilter = ''
-  let rawYamlCache = null // cached /api/repos-yaml content for this modal session; cleared on open, refreshed after a successful apply
+  let rawYamlCache = null // cached /api/repos-yaml content for this modal session; cleared on open, refreshed after a successful save
+  // True once the user edits the Advanced tab's raw textarea. While true, the one Save
+  // button applies rawYamlCache verbatim (bypassing General/Repos validation) instead of
+  // the structured draft — raw edits are a whole-file override, so they win over any
+  // unsaved structured edits made in the same modal session.
+  let rawYamlDirty = false
 
   const isPosInt = (v) => Number.isInteger(v) && v > 0
   const emptyRepo = () => ({ url: '', image: '', defaultBranch: 'main', defaultModel: null, instructions: '', setup: [], build: [], test: [], skills: [] })
@@ -323,7 +328,7 @@
   function openSettings() {
     settingsOverlay.hidden = false
     settingsTab = 'General'; selectedRepoName = null; addingRepo = false; repoListFilter = ''
-    rawYamlCache = null
+    rawYamlCache = null; rawYamlDirty = false
     settingsTabBody.innerHTML = '<p class="muted">loading…</p>'
     loadDraft().then(renderSettingsTabs)
   }
@@ -549,43 +554,31 @@
 
   function renderAdvancedTab() {
     settingsTabBody.innerHTML = `
-      <p class="muted small" style="margin:0 0 8px">Edits apply immediately to new tasks — no restart required. This is a raw-text escape hatch: it bypasses the structured validation on the other tabs and can preserve comments/formatting the structured editor cannot.</p>
-      <textarea id="reposYamlText" spellcheck="false"></textarea>
-      <div class="field" style="margin-top:8px">
-        <button class="primary" type="button" id="applyRawYamlBtn">Apply raw YAML</button>
-        <span class="muted small" id="reposYamlMsg"></span>
-      </div>`
+      <p class="muted small" style="margin:0 0 8px">Raw-text escape hatch: bypasses the General/Repos validation and can preserve comments/formatting the structured editor cannot. Editing here and clicking Save below applies this text as the whole repos.yaml file, overriding any unsaved General/Repos edits from this session (both end up writing the same file).</p>
+      <textarea id="reposYamlText" spellcheck="false"></textarea>`
     const reposYamlText = document.getElementById('reposYamlText')
-    const reposYamlMsg = document.getElementById('reposYamlMsg')
-    const flashReposYamlMsg = (text) => { reposYamlMsg.textContent = text; setTimeout(() => (reposYamlMsg.textContent = ''), 2500) }
     if (rawYamlCache === null) {
       reposYamlText.value = 'loading…'
       fetch('/api/repos-yaml').then((r) => r.json()).then(({ content }) => { rawYamlCache = content; reposYamlText.value = content })
     } else {
       reposYamlText.value = rawYamlCache
     }
-    document.getElementById('applyRawYamlBtn').addEventListener('click', async () => {
-      const res = await fetch('/api/repos-yaml', {
-        method: 'PUT', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ content: reposYamlText.value }),
-      })
-      if (!res.ok) { flashReposYamlMsg((await res.json()).error || 'failed to apply'); return }
-      flashReposYamlMsg('applied')
-      // the file now holds exactly reposYamlText.value — cache it rather than refetching
-      rawYamlCache = reposYamlText.value
-      // the raw apply may have changed defaults/repos/allowClone — reset the in-memory draft
-      // from the server (so switching back to General/Repos doesn't show stale data) and
-      // refresh the create-form's repo list, concurrently — neither depends on the other
-      await Promise.all([loadDraft(), refreshRepoList()])
-    })
+    reposYamlText.addEventListener('input', (e) => { rawYamlCache = e.target.value; rawYamlDirty = true })
   }
 
-  // Validates the whole draft client-side; returns null when valid, or
-  // { tab, message, repo? } identifying the first tab/field to surface.
-  function validateDraft() {
+  // Retention (General tab) is always part of the save regardless of raw-YAML
+  // mode — it's DB-backed, unrelated to repos.yaml. Returns an error string or null.
+  function validateRetention() {
+    const errors = []
+    if (!isPosInt(draft.retention.maxAgeDays)) errors.push('clear after: must be a positive integer')
+    if (!isPosInt(draft.retention.maxPerRepoGroup)) errors.push('keep per repo group: must be a positive integer')
+    return errors.length ? errors.join('; ') : null
+  }
+
+  // Validates the structured General/Repos draft; only relevant when NOT in raw-YAML
+  // mode. Returns null when valid, or { tab, message, repo? } identifying what to surface.
+  function validateConfigDraft() {
     const genErrors = []
-    if (!isPosInt(draft.retention.maxAgeDays)) genErrors.push('clear after: must be a positive integer')
-    if (!isPosInt(draft.retention.maxPerRepoGroup)) genErrors.push('keep per repo group: must be a positive integer')
     if (!isPosInt(draft.defaults.timeoutMinutes)) genErrors.push('timeout: must be a positive integer')
     if (!isPosInt(draft.defaults.tokenBudget)) genErrors.push('token budget: must be a positive integer')
     if (!isPosInt(draft.defaults.concurrency)) genErrors.push('concurrency: must be a positive integer')
@@ -603,31 +596,59 @@
     return null
   }
 
+  // The modal's one Save button. Retention always saves via /api/settings. The
+  // repos.yaml side saves via /api/repos-yaml (verbatim) when the Advanced tab was
+  // edited this session, or via /api/config (structured, validated) otherwise.
   document.getElementById('saveSettings').addEventListener('click', async () => {
-    const invalid = validateDraft()
-    if (invalid) {
-      settingsTab = invalid.tab
-      if (invalid.repo) selectedRepoName = invalid.repo
+    const retentionErr = validateRetention()
+    if (retentionErr) {
+      settingsTab = 'General'
       renderSettingsTabs()
-      const errEl = document.getElementById(invalid.tab === 'General' ? 'generalErr' : 'repoErr')
-      if (errEl) errEl.textContent = invalid.message
+      document.getElementById('generalErr').textContent = retentionErr
       flashSettingsMsg('fix the highlighted fields')
       return
     }
-    const [settingsRes, configRes] = await Promise.all([
-      fetch('/api/settings', {
-        method: 'PUT', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ maxAgeDays: draft.retention.maxAgeDays, maxPerRepoGroup: draft.retention.maxPerRepoGroup }),
-      }),
-      fetch('/api/config', {
-        method: 'PUT', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ defaults: draft.defaults, repos: draft.repos, allowClone: draft.allowClone }),
-      }),
-    ])
+    if (!rawYamlDirty) {
+      const invalid = validateConfigDraft()
+      if (invalid) {
+        settingsTab = invalid.tab
+        if (invalid.repo) selectedRepoName = invalid.repo
+        renderSettingsTabs()
+        const errEl = document.getElementById(invalid.tab === 'General' ? 'generalErr' : 'repoErr')
+        if (errEl) errEl.textContent = invalid.message
+        flashSettingsMsg('fix the highlighted fields')
+        return
+      }
+    }
+    const settingsPut = fetch('/api/settings', {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ maxAgeDays: draft.retention.maxAgeDays, maxPerRepoGroup: draft.retention.maxPerRepoGroup }),
+    })
+    const configPut = rawYamlDirty
+      ? fetch('/api/repos-yaml', {
+          method: 'PUT', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ content: rawYamlCache }),
+        })
+      : fetch('/api/config', {
+          method: 'PUT', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ defaults: draft.defaults, repos: draft.repos, allowClone: draft.allowClone }),
+        })
+    const [settingsRes, configRes] = await Promise.all([settingsPut, configPut])
     if (!settingsRes.ok || !configRes.ok) {
       const errs = await Promise.all([settingsRes, configRes].map(async (r) => (r.ok ? null : (await r.json().catch(() => ({}))).error)))
+      if (!configRes.ok && rawYamlDirty) { settingsTab = 'Advanced'; renderSettingsTabs() }
       flashSettingsMsg(errs.filter(Boolean).join('; ') || 'failed to save')
       return
+    }
+    if (rawYamlDirty) {
+      // the file now holds exactly rawYamlCache (already current) — just resync the
+      // structured draft from it so General/Repos don't show stale pre-save data
+      rawYamlDirty = false
+      await loadDraft()
+    } else {
+      // repos.yaml was just rewritten from the structured draft — the Advanced tab's
+      // cached raw text is now stale; clear it so it refetches next time it's opened
+      rawYamlCache = null
     }
     flashSettingsMsg('saved')
     refresh()

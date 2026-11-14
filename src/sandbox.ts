@@ -77,8 +77,9 @@ export function buildSandboxCommands(
   const authEnv = useLmStudio
     ? ['-e', `ANTHROPIC_BASE_URL=${hostDockerInternalUrl(lmStudioBaseUrl as string)}`, '-e', 'ANTHROPIC_AUTH_TOKEN=lm-studio',
         '-e', `CLAUDE_CODE_MAX_CONTEXT_TOKENS=${LM_CONTEXT}`,
-        // Send no effort level, so the model's reasoning setting in LM Studio applies instead of Claude Code's `high`.
-        '-e', 'CLAUDE_CODE_EFFORT_LEVEL=unset']
+        // Send no effort level or thinking mode (LM Studio maps `high` and adaptive thinking to full reasoning),
+        // so the model's own reasoning setting in LM Studio applies.
+        '-e', 'CLAUDE_CODE_EFFORT_LEVEL=unset', '-e', 'MAX_THINKING_TOKENS=0']
     : ['-e', `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`]
   const modelArg = useLmStudio ? lmStudioModelId(task.model as string) : task.model
   const create = [

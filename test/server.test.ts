@@ -318,6 +318,7 @@ describe('API', () => {
 
   it('bins hall-of-fame when a push lands on an untracked host', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1, stage: 'build' })
+    for (const s of ['provisioning', 'running', 'done'] as const) store.transition(t.id, s)
     seedWorkRepo(home, t.id, 'demo')
     store.setDelivery(t.id, 'demo', { ahead: 1, head: 'h' })
     const res = await post(`/api/tasks/${t.id}/push`, { repo: 'demo', target: `petree/${t.id}` })
@@ -406,6 +407,7 @@ describe('API', () => {
 
   it('archives past-window bins via POST /api/prune and hides them unless ?archived=1', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    for (const s of ['provisioning', 'running', 'done'] as const) store.transition(t.id, s)
     store.bin(t.id, 'hall-of-fame', 'r')
     await fetch(`${base}/api/settings`, {
       method: 'PUT', headers: { 'content-type': 'application/json' },
@@ -591,6 +593,13 @@ describe('API', () => {
       const del = await send('DELETE', `/api/repos/demo?hash=${await hashOf()}`)
       expect(del.status).toBe(409)
       expect(disk()).toBe(FILE)
+    })
+
+    it('refuses to delete a repo a finished but unbinned thread uses', async () => {
+      const t = store.create({ prompt: 'x', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+      for (const s of ['provisioning', 'running', 'done'] as const) store.transition(t.id, s)
+      const del = await send('DELETE', `/api/repos/demo?hash=${await hashOf()}`)
+      expect(del.status).toBe(409)
     })
 
     it('ignores binned threads when checking whether a repo is in use', async () => {

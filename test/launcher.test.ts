@@ -326,6 +326,34 @@ describe('makeLauncher', () => {
     expect((await run(undefined, 'topic: t\nstatus: s\nneeds-you: which db?\n')).bin).toBeNull()
   })
 
+  it('does not bin "no code changes" when the commit failed', async () => {
+    const { home, cfg, store, task } = setup()
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    process.env.WD = join(home, 'work', task.id)
+    process.env.FAKE_CONTAINER_EXEC = JSON.stringify([process.execPath, '-e',
+      `const fs=require('fs');fs.writeFileSync(process.env.WD+'/demo/a.txt','x');fs.writeFileSync(process.env.WD+'/demo/.git/index.lock','');` +
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'r'}))`])
+    try {
+      await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })(task)
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    expect(store.get(task.id)).toMatchObject({ state: 'done', bin: null })
+    expect(store.get(task.id)!.error).toMatch(/commit failed for demo/)
+  })
+
+  it('records no ahead=0 when the base ref cannot be read', async () => {
+    const { home, cfg, store, task } = setup()
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const workDir = join(home, 'work', task.id)
+    await prepareWorkspace(cfg, ['demo'], workDir, task.id)
+    execFileSync('git', ['-C', join(workDir, 'demo'), 'update-ref', '-d', 'refs/remotes/origin/main'])
+    await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })(task)
+    expect(store.get(task.id)).toMatchObject({ state: 'done', bin: null, delivery: {} })
+    expect(store.get(task.id)!.error).toMatch(/could not read demo/)
+  })
+
   it('does not bin a failed turn', async () => {
     const { cfg, store, task } = setup()
     await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('crash', `petree-${t.id}`) })(task)
@@ -587,6 +615,48 @@ describe('AUTO-PLAY', () => {
     }
     expect(pr).toHaveLength(1)
     expect(store.get(task.id)).toMatchObject({ state: 'done', error: 'auto PR failed: demo: push rejected' })
+  })
+
+  it('cancels instead of running when stopped while the workspace was being prepared', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'investigate', autoPlay: true })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const launch = makeLauncher(cfg, store, {
+      buildCommands: (t) => { void launch.stop(t.id); return shimCommands('ok', `petree-${t.id}`) },
+    })
+    await launch(task)
+    expect(store.get(task.id)).toMatchObject({ state: 'cancelled', stage: 'investigate' })
+  })
+
+  it('does not open PRs for a thread binned during its turn', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'build', autoPlay: true })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const pr: string[] = []
+    writer(home, task.id, "fs.writeFileSync(process.env.WD+'/demo/a.txt','x');")
+    try {
+      const running = launcherFor(cfg, store, 'ok', pr)(task)
+      store.bin(task.id, 'game-over', 'dropped by you')
+      await running
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    expect(pr).toEqual([])
+  })
+
+  it('records a PR step that throws instead of swallowing it', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'build', autoPlay: true })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    writer(home, task.id, "fs.writeFileSync(process.env.WD+'/demo/a.txt','x');")
+    try {
+      await makeLauncher(cfg, store, {
+        buildCommands: (t) => shimCommands('ok', `petree-${t.id}`),
+        openPr: async () => { throw new Error('boom') },
+      })(task)
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    expect(store.get(task.id)!.error).toBe('auto PR failed: demo: Error: boom')
   })
 
   it('leaves a thread without AUTO-PLAY at the gate', async () => {

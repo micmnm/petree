@@ -1,4 +1,7 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  closeSync, constants, existsSync, fstatSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, readSync,
+  realpathSync, rmSync, writeFileSync,
+} from 'node:fs'
 import { basename, dirname, join, sep } from 'node:path'
 
 export interface Suggestion { repo: string; topic: string; text: string; exists: boolean }
@@ -44,14 +47,35 @@ function assertContained(p: string, root: string): void {
   if (!contained(p, root)) throw new NoteInputError(`path escapes its root: ${p}`)
 }
 
-export function readThreadFile(workDir: string, name: 'spec.md' | 'findings.md'): string | null {
-  const p = join(workDir, '_thread', name)
-  if (!contained(p, workDir)) return null
+// A bounded read of a regular file. The agent can plant a FIFO (a plain read blocks the server forever),
+// a device, a last-second symlink or a huge file, so: no follow, no blocking, fstat the fd, cap the size.
+function readCapped(p: string, max: number): { text: string; mtimeMs: number } | null {
+  let fd: number
   try {
-    return readFileSync(p, 'utf8')
+    fd = openSync(p, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)
   } catch {
     return null
   }
+  try {
+    const st = fstatSync(fd)
+    if (!st.isFile()) return null
+    const buf = Buffer.alloc(Math.min(st.size, max))
+    const n = readSync(fd, buf, 0, buf.length, 0)
+    return { text: buf.toString('utf8', 0, n), mtimeMs: st.mtimeMs }
+  } catch {
+    return null
+  } finally {
+    closeSync(fd)
+  }
+}
+
+const THREAD_FILE_MAX = 1024 * 1024
+const STATUS_MAX = 4096
+
+export function readThreadFile(workDir: string, name: 'spec.md' | 'findings.md'): string | null {
+  const p = join(workDir, '_thread', name)
+  if (!contained(p, workDir)) return null
+  return readCapped(p, THREAD_FILE_MAX)?.text ?? null
 }
 
 export interface ThreadStatus { topic: string; status: string; needsYou: string | null }
@@ -63,13 +87,9 @@ const STATUS_KEYS = { topic: 60, status: 140, 'needs-you': 160 } as const
 export function readThreadStatus(workDir: string, since: string | null): ThreadStatus | null {
   const p = join(workDir, '_thread', 'status.txt')
   if (!since || !contained(p, workDir)) return null
-  let text: string
-  try {
-    if (statSync(p).mtimeMs < Date.parse(since)) return null
-    text = readFileSync(p, 'utf8')
-  } catch {
-    return null
-  }
+  const file = readCapped(p, STATUS_MAX)
+  if (!file || file.mtimeMs < Date.parse(since)) return null
+  const text = file.text
   const found: Partial<Record<keyof typeof STATUS_KEYS, string>> = {}
   for (const line of text.split('\n')) {
     const m = /^([\w-]+):(.*)$/.exec(line)

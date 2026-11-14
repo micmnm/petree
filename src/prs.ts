@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { PetreeConfig } from './config.js'
 import { headSha, pushBranch, scrubUrls, taskBranch } from './gitops.js'
-import { threadTitle, type Delivery, type TaskRecord, type TaskStore } from './store.js'
+import { NO_PR, threadTitle, type Delivery, type TaskRecord, type TaskStore } from './store.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -78,7 +78,11 @@ export async function pollPrs(store: TaskStore, cfg: PetreeConfig, onlyId?: stri
       const host = prHost(cfg.repos[repo]?.url ?? '')
       if (host.kind === 'untracked') { set(t.id, repo, { untracked: host.reason }); continue }
       try {
-        set(t.id, repo, { ...await findPr(host, d.target ?? taskBranch(t.id), run), untracked: undefined })
+        const found = await findPr(host, d.target ?? taskBranch(t.id), run)
+        // A finished PR behind newer local commits, or the closed one the user restored past, is not this delivery's PR.
+        const moot = found && found.pr !== 'open'
+          && (found.prHead !== d.head || (found.pr === 'closed' && !d.pr && found.number === d.number))
+        set(t.id, repo, { ...(moot ? NO_PR : found), untracked: undefined })
       } catch (err) {
         set(t.id, repo, { untracked: reason(host.kind === 'github' ? 'gh' : 'az', err) })
       }
@@ -87,15 +91,26 @@ export async function pollPrs(store: TaskStore, cfg: PetreeConfig, onlyId?: stri
   }
 }
 
-// Every repo with commits merged → hall of fame; none open and one closed → game over (spec §5.4).
+// Missing CLI or host, not a transient CLI error: merge can never be read, so a push is the end of the road.
+const untrackable = (u?: string) => u === 'unsupported host' || /^(gh|az) not installed$/.test(u ?? '')
+
+// Every repo with commits merged → hall of fame; none open and one closed → game over; every repo pushed
+// where merge can't be tracked → hall of fame (spec §5.4, §5.6). Re-read: a turn may have started meanwhile.
 function binByPrs(store: TaskStore, id: string): void {
   const t = store.get(id)
-  if (!t || t.bin) return
-  const shipped = Object.values(t.delivery).filter((d) => d.ahead > 0)
-  if (shipped.length && shipped.every((d) => d.pr === 'merged')) {
+  if (!t || t.bin || !['done', 'failed', 'cancelled'].includes(t.state)) return
+  // New local commits since the PR finished are unshipped work, not a verdict.
+  for (const [repo, d] of Object.entries(t.delivery)) {
+    if (d.ahead > 0 && (d.pr === 'merged' || d.pr === 'closed') && d.prHead !== d.head) store.setDelivery(id, repo, NO_PR)
+  }
+  const shipped = Object.values(store.get(id)!.delivery).filter((d) => d.ahead > 0)
+  if (!shipped.length) return
+  if (shipped.every((d) => d.pr === 'merged')) {
     store.bin(id, 'hall-of-fame', `merged · PR ${shipped.map((d) => `#${d.number}`).join(', ')}`)
   } else if (shipped.some((d) => d.pr === 'closed') && !shipped.some((d) => d.pr === 'open')) {
     store.bin(id, 'game-over', 'PR closed without merge')
+  } else if (shipped.every((d) => d.target && untrackable(d.untracked))) {
+    store.bin(id, 'hall-of-fame', 'pushed · merge not tracked')
   }
 }
 
@@ -115,14 +130,14 @@ export async function openPr(
   store.setDelivery(t.id, repo, { target, prHead: headSha(repoDir) })
   const base = cfg.repos[repo]?.defaultBranch ?? 'main'
   const title = `petree ${t.id}: ${threadTitle(t)}`
-  const made = await create(cfg.repos[repo].url, repoDir, target, base, title, t.turns[0]?.prompt ?? t.prompt)
+  const made = await create(cfg.repos[repo].url, cfg.home, target, base, title, t.turns[0]?.prompt ?? t.prompt)
   if (made.ok && made.url) store.setDelivery(t.id, repo, { url: made.url, number: made.number, pr: 'open' })
   return { ok: made.ok, output: made.output, url: made.url }
 }
 
 export async function createPullRequest(
   repoUrl: string,
-  repoDir: string,
+  cwd: string,
   target: string,
   baseBranch: string,
   title: string,
@@ -132,16 +147,20 @@ export async function createPullRequest(
   const host = prHost(repoUrl)
   if (host.kind === 'untracked') return { ok: false, output: host.reason }
   const cli = host.kind === 'github' ? 'gh' : 'az'
+  // Never run gh/az inside the agent's repo: they shell out to git, which obeys its agent-written .git/config.
+  // `--body=` keeps a body starting with '-' from parsing as a flag.
   try {
     if (host.kind === 'github') {
-      const output = (await run('gh', ['pr', 'create', '--head', target, '--base', baseBranch, '--title', title, '--body', body], repoDir)).trim()
+      const output = (await run('gh', ['pr', 'create', '--repo', host.slug, '--head', target, '--base', baseBranch,
+        '--title', title, `--body=${body}`], cwd)).trim()
       // gh pr create prints the new PR's URL as the last line of stdout.
       const url = output.split('\n').pop()
       return { ok: true, output, url, number: url ? prNumber(url) : undefined }
     }
     const output = await run('az', ['repos', 'pr', 'create', '--org', azureOrg(host), '--project', host.project,
       '--repository', host.repo, '--source-branch', target, '--target-branch', baseBranch,
-      '--title', title, '--description', body, '-o', 'json'], repoDir)
+      // Azure rejects descriptions over 4000 characters.
+      '--title', title, `--description=${body.slice(0, 4000)}`, '-o', 'json'])
     const id = JSON.parse(output).pullRequestId as number
     return { ok: true, output: output.trim(), url: azureUrl(host, id), number: id }
   } catch (err) {

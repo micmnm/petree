@@ -53,7 +53,9 @@ function progressFor(task: TaskRecord): ProgressStep[] {
 
 function prLabel(task: TaskRecord, cfg: PetreeConfig): string | null {
   const entries = Object.entries(task.delivery)
-  if (entries.some(([, d]) => d.ahead > 0 && !d.target && !d.pr)) return 'Open the PR'
+  // A target without a PR on a tracked host means the push landed but PR creation failed.
+  const tracked = (repo: string) => prHost(cfg.repos[repo]?.url ?? '').kind !== 'untracked'
+  if (entries.some(([repo, d]) => d.ahead > 0 && !d.pr && (!d.target || tracked(repo)))) return 'Open the PR'
   const open = entries.filter(([, d]) => d.pr === 'open')
   const stale = open.find(([, d]) => d.prHead !== d.head)
   if (stale) return `Push the update to PR #${stale[1].number}`

@@ -46,9 +46,10 @@ export function repoUsage(tasks: TaskRecord[], cfg: PetreeConfig, now: Date = ne
       const u = out[name]
       if (!u) continue
       u.quests++
-      if (group === 'hall-of-fame') u.won++
+      // A win is a merge; findings kept or pushed-untracked are hall-of-fame but not wins.
+      if (group === 'hall-of-fame') { if (t.binReason?.startsWith('merged')) u.won++ }
       else if (group === 'game-over') u.lost++
-      else u.inPlay++
+      else if (!t.archivedAt) u.inPlay++
       if (!u.lastQuestAt || t.createdAt > u.lastQuestAt) u.lastQuestAt = t.createdAt
       if (week >= 0 && week < 8) u.weekly[7 - week]++
       u.ended[STAGES[level]]++

@@ -245,7 +245,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (!Object.hasOwn(cfg.repos, name)) { res.sendStatus(404); return }
     const text = readReposText()
     if (!hashOk(res, text, req.query.hash, true)) return
-    if (store.list().some((t) => t.repos.includes(name) && !t.bin && !t.archivedAt && !['done', 'failed', 'cancelled'].includes(t.state))) {
+    if (store.list().some((t) => t.repos.includes(name) && !t.bin && !t.archivedAt)) {
       res.status(409).json({ error: `repo ${name} is used by an active thread` })
       return
     }
@@ -325,12 +325,6 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (pushed.ok) {
       store.setDelivery(t.id, repo as string, { target: norm, prHead: headSha(repoDir) })
       await pollPrs(store, cfg, t.id)
-      // Merge can't be tracked once every pushed repo sits on an untracked host (§5.6).
-      const after = store.get(t.id)!
-      const shipped = Object.values(after.delivery).filter((d) => d.ahead > 0)
-      if (!after.bin && shipped.length && shipped.every((d) => d.untracked && d.target)) {
-        store.bin(t.id, 'hall-of-fame', 'pushed · merge not tracked')
-      }
     }
     res.json(pushed)
   })

@@ -6,6 +6,7 @@ import type { PetreeConfig } from '../src/config.js'
 import { createPullRequest, findPr, pollPrs, prHost, prNumber } from '../src/prs.js'
 import type { Run } from '../src/prs.js'
 import { TaskStore } from '../src/store.js'
+import type { Delivery } from '../src/store.js'
 
 describe('prHost', () => {
   it.each([
@@ -68,6 +69,24 @@ describe('createPullRequest', () => {
       .toMatchObject({ ok: true, number: 8, url: 'https://github.com/o/r/pull/8' })
   })
 
+  it('never runs the CLI in the repo dir, names the repo, and keeps a dash-led body a value', async () => {
+    const calls: { cmd: string; args: string[]; cwd?: string }[] = []
+    const run: Run = async (cmd, args, cwd) => {
+      calls.push({ cmd, args, cwd })
+      return cmd === 'gh' ? 'https://github.com/o/r/pull/1' : JSON.stringify({ pullRequestId: 1 })
+    }
+    await createPullRequest('https://github.com/o/r', '/petree-home', 'f', 'main', 't', '--web', run)
+    await createPullRequest('https://dev.azure.com/org/proj/_git/repo', '/petree-home', 'f', 'main', 't', `-x${'y'.repeat(5000)}`, run)
+    const [gh, az] = calls
+    expect(gh.cwd).toBe('/petree-home')
+    expect(gh.args.join(' ')).toContain('--repo o/r')
+    expect(gh.args).toContain('--body=--web')
+    expect(az.cwd).toBeUndefined()
+    const desc = az.args.find((a) => a.startsWith('--description='))!
+    expect(desc.startsWith('--description=-x')).toBe(true)
+    expect(desc.length).toBe('--description='.length + 4000)
+  })
+
   it('reports a missing CLI and unsupported hosts without running anything', async () => {
     expect(await createPullRequest('https://github.com/o/r', '/d', 'f', 'main', 't', 'b', enoent)).toEqual({ ok: false, output: 'gh not installed' })
     expect(await createPullRequest('file:///x', '/d', 'f', 'main', 't', 'b', enoent)).toEqual({ ok: false, output: 'unsupported host' })
@@ -77,9 +96,11 @@ describe('createPullRequest', () => {
 describe('pollPrs', () => {
   const cfg = { repos: { demo: { url: 'https://github.com/o/r' }, local: { url: 'file:///x' } } } as unknown as PetreeConfig
 
-  function seed(delivery: Record<string, { ahead: number; head: string; pr?: 'open' | 'merged' }>) {
+  // A finished build, as the poll normally sees it.
+  function seed(delivery: Record<string, Partial<Delivery>>) {
     const store = new TaskStore(join(mkdtempSync(join(tmpdir(), 'petree-prs-')), 'db'))
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1, stage: 'build' })
+    for (const s of ['provisioning', 'running', 'done'] as const) store.transition(t.id, s)
     for (const [repo, d] of Object.entries(delivery)) store.setDelivery(t.id, repo, d)
     return { store, id: t.id }
   }
@@ -151,10 +172,56 @@ describe('pollPrs', () => {
     let calls = 0
     const run: Run = async () => { calls++; return '[]' }
     await pollPrs(store, cfg, undefined, run)
-    store.transition(id, 'provisioning')
-    store.transition(id, 'running')
+    for (const s of ['queued', 'provisioning', 'running'] as const) store.transition(id, s)
     store.setDelivery(id, 'demo', { pr: undefined })
     await pollPrs(store, cfg, undefined, run)
     expect(calls).toBe(0)
+  })
+
+  it('records but never bins a thread that is back in play', async () => {
+    const { store, id } = seed({ demo: { ahead: 1, head: 'h' } })
+    store.followUp(id, 'more')
+    await pollPrs(store, cfg, undefined, merged)
+    expect(store.get(id)).toMatchObject({ bin: null, delivery: { demo: { pr: 'merged' } } })
+  })
+
+  it('does not bin a merge or close of an older head; the new commits are offered as a PR again', async () => {
+    for (const state of ['MERGED', 'CLOSED']) {
+      const { store, id } = seed({ demo: { ahead: 2, head: 'new', target: 't', url: 'u', number: 1, pr: 'open', prHead: 'old' } })
+      await pollPrs(store, cfg, undefined, answer([{ url: 'u', number: 1, state, headRefOid: 'old' }]))
+      const t = store.get(id)!
+      expect(t.bin).toBeNull()
+      expect(t.delivery.demo).toEqual({ ahead: 2, head: 'new', number: 1 })
+    }
+  })
+
+  it('clears a stored merge of an older head instead of keeping it forever', async () => {
+    const { store, id } = seed({ demo: { ahead: 2, head: 'new', url: 'u', number: 1, pr: 'merged', prHead: 'old' } })
+    await pollPrs(store, cfg, undefined, merged)
+    expect(store.get(id)).toMatchObject({ bin: null, delivery: { demo: { ahead: 2, head: 'new', number: 1 } } })
+    expect(store.get(id)!.delivery.demo.pr).toBeUndefined()
+  })
+
+  it('a restored game-over is not re-binned by the same closed PR', async () => {
+    const { store, id } = seed({ demo: { ahead: 1, head: 'h' } })
+    const closed = answer([{ url: 'u', number: 3, state: 'CLOSED', headRefOid: 'h' }])
+    await pollPrs(store, cfg, undefined, closed)
+    expect(store.get(id)!.bin).toBe('game-over')
+    store.restore(id)
+    await pollPrs(store, cfg, undefined, closed)
+    expect(store.get(id)!.bin).toBeNull()
+    expect(store.get(id)!.delivery.demo.pr).toBeUndefined()
+  })
+
+  it('bins "pushed · merge not tracked" only for an unsupported host or a missing CLI', async () => {
+    const pushed = (url: string, run: Run) => {
+      const c = { repos: { demo: { url } } } as unknown as PetreeConfig
+      const { store, id } = seed({ demo: { ahead: 1, head: 'h', target: 'feat' } })
+      return pollPrs(store, c, undefined, run).then(() => store.get(id)!)
+    }
+    expect(await pushed('file:///x', enoent)).toMatchObject({ bin: 'hall-of-fame', binReason: 'pushed · merge not tracked' })
+    expect(await pushed('https://github.com/o/r', enoent)).toMatchObject({ bin: 'hall-of-fame', binReason: 'pushed · merge not tracked' })
+    const flaky: Run = async () => { throw Object.assign(new Error('x'), { stderr: 'not logged in' }) }
+    expect((await pushed('https://github.com/o/r', flaky)).bin).toBeNull()
   })
 })

@@ -60,10 +60,15 @@ export interface RepoStatus {
   baseBranch: string
 }
 
+// Commits on HEAD beyond origin/<base>; throws when that can't be read, so callers never record a bogus 0.
+export function aheadCount(repoDir: string, baseBranch: string): number {
+  return Number(git(repoDir, ['rev-list', '--count', `origin/${baseBranch}..HEAD`]).trim()) || 0
+}
+
 export function repoStatus(repoDir: string, baseBranch: string): RepoStatus {
   let ahead = 0
   try {
-    ahead = Number(git(repoDir, ['rev-list', '--count', `origin/${baseBranch}..HEAD`]).trim()) || 0
+    ahead = aheadCount(repoDir, baseBranch)
   } catch {
     ahead = 0
   }

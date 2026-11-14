@@ -74,6 +74,14 @@ export interface Delivery {
   untracked?: string
 }
 
+// Forgets a repo's PR; `number` stays so the poll can skip the closed PR the user restored past.
+export const NO_PR: Partial<Delivery> = {
+  pr: undefined, url: undefined, prHead: undefined, target: undefined, mergedAt: undefined, mergedBy: undefined,
+}
+
+// Engine states no turn will leave on its own; only these may be binned by the poll or archived.
+export const SETTLED_STATES: TaskState[] = ['done', 'failed', 'cancelled', 'paused-limit', 'waiting-for-you']
+
 const DAY_MS = 24 * 60 * 60 * 1000
 
 export interface RetentionSettings {
@@ -151,26 +159,29 @@ export class TaskStore {
       session_id TEXT, tokens_used INTEGER NOT NULL DEFAULT 0,
       token_budget INTEGER NOT NULL, timeout_minutes INTEGER NOT NULL,
       error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result TEXT, model TEXT)`)
-    const cols = (this.db.prepare('PRAGMA table_info(tasks)').all() as { name: string }[]).map((c) => c.name)
-    if (!cols.includes('result')) this.db.exec('ALTER TABLE tasks ADD COLUMN result TEXT')
-    if (!cols.includes('model')) this.db.exec('ALTER TABLE tasks ADD COLUMN model TEXT')
-    if (!cols.includes('turns')) this.db.exec('ALTER TABLE tasks ADD COLUMN turns TEXT')
-    if (!cols.includes('restarts')) this.db.exec('ALTER TABLE tasks ADD COLUMN restarts INTEGER NOT NULL DEFAULT 0')
-    if (!cols.includes('retry_at')) this.db.exec('ALTER TABLE tasks ADD COLUMN retry_at TEXT')
-    if (!cols.includes('started_at')) this.db.exec('ALTER TABLE tasks ADD COLUMN started_at TEXT')
-    if (!cols.includes('log_offset')) this.db.exec('ALTER TABLE tasks ADD COLUMN log_offset INTEGER NOT NULL DEFAULT 0')
-    // Default 'build' so pre-threads rows read as already-building tasks.
-    if (!cols.includes('stage')) this.db.exec("ALTER TABLE tasks ADD COLUMN stage TEXT NOT NULL DEFAULT 'build'")
-    if (!cols.includes('comments')) this.db.exec('ALTER TABLE tasks ADD COLUMN comments TEXT')
-    if (!cols.includes('delivery')) this.db.exec('ALTER TABLE tasks ADD COLUMN delivery TEXT')
-    if (!cols.includes('party')) this.db.exec('ALTER TABLE tasks ADD COLUMN party INTEGER NOT NULL DEFAULT 1')
-    if (!cols.includes('auto_play')) this.db.exec('ALTER TABLE tasks ADD COLUMN auto_play INTEGER NOT NULL DEFAULT 0')
-    if (!cols.includes('turn_stats')) this.db.exec('ALTER TABLE tasks ADD COLUMN turn_stats TEXT')
-    for (const c of ['bin TEXT', 'binned_at TEXT', 'bin_reason TEXT', 'archived_at TEXT', 'seq INTEGER']) {
-      if (!cols.includes(c.split(' ')[0])) this.db.exec(`ALTER TABLE tasks ADD COLUMN ${c}`)
-    }
-    if (!cols.includes('seq')) this.backfillSeq()
-    if (!cols.includes('bin')) this.upgradeRetention()
+    // One transaction, so a failed upgrade can't commit new columns while their backfill is skipped on the next open.
+    this.db.transaction(() => {
+      const cols = (this.db.prepare('PRAGMA table_info(tasks)').all() as { name: string }[]).map((c) => c.name)
+      if (!cols.includes('result')) this.db.exec('ALTER TABLE tasks ADD COLUMN result TEXT')
+      if (!cols.includes('model')) this.db.exec('ALTER TABLE tasks ADD COLUMN model TEXT')
+      if (!cols.includes('turns')) this.db.exec('ALTER TABLE tasks ADD COLUMN turns TEXT')
+      if (!cols.includes('restarts')) this.db.exec('ALTER TABLE tasks ADD COLUMN restarts INTEGER NOT NULL DEFAULT 0')
+      if (!cols.includes('retry_at')) this.db.exec('ALTER TABLE tasks ADD COLUMN retry_at TEXT')
+      if (!cols.includes('started_at')) this.db.exec('ALTER TABLE tasks ADD COLUMN started_at TEXT')
+      if (!cols.includes('log_offset')) this.db.exec('ALTER TABLE tasks ADD COLUMN log_offset INTEGER NOT NULL DEFAULT 0')
+      // Default 'build' so pre-threads rows read as already-building tasks.
+      if (!cols.includes('stage')) this.db.exec("ALTER TABLE tasks ADD COLUMN stage TEXT NOT NULL DEFAULT 'build'")
+      if (!cols.includes('comments')) this.db.exec('ALTER TABLE tasks ADD COLUMN comments TEXT')
+      if (!cols.includes('delivery')) this.db.exec('ALTER TABLE tasks ADD COLUMN delivery TEXT')
+      if (!cols.includes('party')) this.db.exec('ALTER TABLE tasks ADD COLUMN party INTEGER NOT NULL DEFAULT 1')
+      if (!cols.includes('auto_play')) this.db.exec('ALTER TABLE tasks ADD COLUMN auto_play INTEGER NOT NULL DEFAULT 0')
+      if (!cols.includes('turn_stats')) this.db.exec('ALTER TABLE tasks ADD COLUMN turn_stats TEXT')
+      for (const c of ['bin TEXT', 'binned_at TEXT', 'bin_reason TEXT', 'archived_at TEXT', 'seq INTEGER']) {
+        if (!cols.includes(c.split(' ')[0])) this.db.exec(`ALTER TABLE tasks ADD COLUMN ${c}`)
+      }
+      if (!cols.includes('seq')) this.backfillSeq()
+      if (!cols.includes('bin')) this.upgradeRetention()
+    })()
 
     this.db.exec(`CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -264,6 +275,8 @@ export class TaskStore {
       if (!t) throw new Error(`no task ${id}`)
       if (t.bin !== 'game-over' || t.archivedAt) throw new Error('cannot restore')
       this.unbin(id)
+      // Else the next poll re-bins it, and the card never offers "Open the PR" again.
+      for (const [repo, d] of Object.entries(t.delivery)) if (d.pr === 'closed') this.setDelivery(id, repo, NO_PR)
       if (t.state !== 'paused-limit') return this.get(id)!
       this.db.prepare('UPDATE tasks SET tokens_used = 0 WHERE id = ?').run(id)
       return this.resume(id)
@@ -276,6 +289,7 @@ export class TaskStore {
   resume(id: string, model?: string | null): TaskRecord {
     const t = this.get(id)
     if (!t) throw new Error(`no task ${id}`)
+    if (t.bin) throw new Error('restore first')
     if (!RESUMABLE_STATES.includes(t.state)) {
       throw new Error(`cannot resume from state ${t.state}`)
     }
@@ -335,6 +349,7 @@ export class TaskStore {
     return this.db.transaction(() => {
       const t = this.get(id)
       if (!t) throw new Error(`no task ${id}`)
+      if (t.bin) throw new Error('restore first')
       if (!FOLLOWUP_STATES.includes(t.state)) {
         throw new Error(`cannot follow up from state ${t.state}`)
       }
@@ -420,7 +435,8 @@ export class TaskStore {
     const { binDays, hallOfFameDays } = this.getSettings()
     const before = (days: number) => new Date(now.getTime() - days * DAY_MS).toISOString()
     return this.db.prepare(`UPDATE tasks SET archived_at = ? WHERE archived_at IS NULL
+      AND state IN (${SETTLED_STATES.map(() => '?').join(', ')})
       AND ((bin = 'game-over' AND binned_at < ?) OR (bin = 'hall-of-fame' AND binned_at < ?))`)
-      .run(now.toISOString(), before(binDays), before(hallOfFameDays)).changes
+      .run(now.toISOString(), ...SETTLED_STATES, before(binDays), before(hallOfFameDays)).changes
   }
 }

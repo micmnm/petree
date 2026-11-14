@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, existsSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -27,6 +28,12 @@ describe('readThreadFile', () => {
     mkdirSync(join(workDir, '_thread'))
     writeFileSync(join(workDir, '_thread', 'spec.md'), 'hello')
     expect(readThreadFile(workDir, 'spec.md')).toBe('hello')
+  })
+
+  it('caps an oversized file at 1 MiB', () => {
+    mkdirSync(join(workDir, '_thread'))
+    writeFileSync(join(workDir, '_thread', 'findings.md'), 'x'.repeat(3 * 1024 * 1024))
+    expect(readThreadFile(workDir, 'findings.md')).toHaveLength(1024 * 1024)
   })
 })
 
@@ -66,6 +73,19 @@ describe('readThreadStatus', () => {
   it('returns null when written before the turn started', () => {
     write('topic: t\nstatus: s\nneeds-you: nothing')
     expect(readThreadStatus(workDir, new Date(Date.now() + 60_000).toISOString())).toBeNull()
+  })
+
+  it('reads only the first 4 KiB', () => {
+    write(`topic: t\n${'x'.repeat(5000)}\nneeds-you: hidden\n`)
+    expect(readThreadStatus(workDir, since)).toMatchObject({ topic: 't', needsYou: null })
+  })
+
+  it.skipIf(process.platform === 'win32')('returns null for a FIFO instead of blocking', () => {
+    mkdirSync(join(workDir, '_thread'))
+    execFileSync('mkfifo', [join(workDir, '_thread', 'status.txt')])
+    execFileSync('mkfifo', [join(workDir, '_thread', 'spec.md')])
+    expect(readThreadStatus(workDir, since)).toBeNull()
+    expect(readThreadFile(workDir, 'spec.md')).toBeNull()
   })
 
   it('returns null for a symlink pointing outside workDir', () => {

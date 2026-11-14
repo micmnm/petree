@@ -115,4 +115,13 @@ describe('repoUsage', () => {
     expect(u.demo.weekly).toEqual([1, 0, 0, 0, 0, 0, 0, 1])
     expect(u.idle).toMatchObject({ quests: 1, avgTurns: 0, topModel: null })
   })
+
+  it('wins are merges only; archived rows are not in play', () => {
+    const rows = [
+      task({ id: 'm', state: 'done', bin: 'hall-of-fame', binReason: 'merged · PR #1' }),
+      task({ id: 'f', state: 'waiting-for-you', bin: 'hall-of-fame', binReason: 'finished · findings kept' }),
+      task({ id: 'o', state: 'done', archivedAt: '2026-11-01T00:00:00Z' }),
+    ]
+    expect(repoUsage(rows, cfg, now).demo).toMatchObject({ quests: 3, won: 1, lost: 0, inPlay: 0 })
+  })
 })

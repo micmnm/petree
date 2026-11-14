@@ -133,6 +133,12 @@ describe('cardFor progress', () => {
     expect(c).toMatchObject({ group: 'your-move', action: { label }, line })
   })
 
+  it('offers the PR again when the push landed but PR creation failed, unless the host is untracked', () => {
+    expect(cardFor(built({ demo: { ahead: 1, head: 'a', target: 'feat' } }), null, cfg).action?.label).toBe('Open the PR')
+    const local = { ...cfg, repos: { ...cfg.repos, local: { tags: [], url: 'file:///x' } } } as unknown as PetreeConfig
+    expect(cardFor(built({ local: { ahead: 1, head: 'a', target: 'feat', untracked: 'unsupported host' } }), null, local).action).toBeNull()
+  })
+
   it('lists PRs on the card, and a pushed-only repo has none', () => {
     const c = cardFor(built({ demo: open, b: { ahead: 1, head: 'b', target: 'x' } }), null, cfg)
     expect(c.prs).toEqual([{ repo: 'demo', url: gh, pr: 'open', number: 7 }])

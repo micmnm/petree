@@ -3,7 +3,7 @@ import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readSync
 import { join } from 'node:path'
 import type { PetreeConfig } from './config.js'
 import { prepareWorkspace } from './git.js'
-import { commitChanges, commitStat, headSha, repoStatus, taskBranch } from './gitops.js'
+import { aheadCount, commitChanges, commitStat, headSha, taskBranch } from './gitops.js'
 import { readThreadStatus } from './notes.js'
 import { openPr } from './prs.js'
 import { CliRunner } from './runner.js'
@@ -59,6 +59,8 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
 
   const runners = new Map<string, CliRunner>()
   const cancelled = new Set<string>()
+  // Stops asked for during a turn; the turn's end consumes it so AUTO-PLAY never moves on past one.
+  const stopRequested = new Set<string>()
 
   // Shared turn body: stream events into the store and the log file, reconcile
   // a run that ended without a terminal event, capture commits, and remove the
@@ -139,16 +141,19 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
       } catch (err) {
         commitErrors.push(`commit failed for ${repo}: ${String(err)}`)
       }
-      // headSha throws on a wrecked repo, so a bogus ahead=0 is never recorded.
+      // Both throw on a wrecked repo or a missing base ref, so a bogus ahead=0 is never recorded.
       try {
         const dir = join(workDir, repo)
         const head = headSha(dir)
-        safely(() => store.setDelivery(task.id, repo, { ahead: repoStatus(dir, cfg.repos[repo]?.defaultBranch ?? 'main').ahead, head }))
-      } catch { /* nothing to record */ }
+        const ahead = aheadCount(dir, cfg.repos[repo]?.defaultBranch ?? 'main')
+        safely(() => store.setDelivery(task.id, repo, { ahead, head }))
+      } catch (err) {
+        commitErrors.push(`could not read ${repo}: ${String(err)}`)
+      }
     }
     // A finished build that changed nothing and asks nothing is complete (spec §5.6).
     const after = store.get(task.id)
-    if (after && !after.bin && after.stage === 'build' && after.state === 'done'
+    if (after && !after.bin && !commitErrors.length && after.stage === 'build' && after.state === 'done'
       && task.repos.every((r) => after.delivery[r] && after.delivery[r].ahead <= 0)
       && !readThreadStatus(workDir, after.startedAt)?.needsYou) {
       safely(() => store.bin(task.id, 'hall-of-fame', 'finished · no code changes'))
@@ -171,14 +176,14 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
 
     // The turn is finalized — the detached container is no longer needed.
     await runCommand(commands.remove)
-    await autoPlay(task.id)
+    if (!stopRequested.delete(task.id)) await autoPlay(task.id)
   }
 
   // AUTO-PLAY (spec §5.8): move on to the next stage, or open the PRs after build. Stops on
-  // anything but a clean finish, or when the agent asked for the user.
+  // anything but a clean finish, when the agent asked for the user, or once the thread is binned.
   const autoPlay = async (id: string): Promise<void> => {
     const t = store.get(id)
-    if (!t?.autoPlay || readThreadStatus(join(cfg.home, 'work', id), t.startedAt)?.needsYou) return
+    if (!t?.autoPlay || t.bin || readThreadStatus(join(cfg.home, 'work', id), t.startedAt)?.needsYou) return
     try {
       if (t.state === 'waiting-for-you' && t.stage !== 'build') {
         store.followUp(id, '', undefined, t.stage === 'investigate' ? 'spec' : 'build')
@@ -186,12 +191,26 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
         const errors: string[] = []
         for (const [repo, d] of Object.entries(t.delivery)) {
           if (d.ahead <= 0 || d.pr) continue
-          const made = await (opts.openPr ?? openPr)(store, cfg, t, repo, taskBranch(id))
-          if (!made.ok) errors.push(`${repo}: ${made.output}`)
+          try {
+            const made = await (opts.openPr ?? openPr)(store, cfg, t, repo, taskBranch(id))
+            if (!made.ok) errors.push(`${repo}: ${made.output}`)
+          } catch (err) {
+            errors.push(`${repo}: ${String(err)}`)
+          }
         }
         if (errors.length) store.patch(id, { error: `auto PR failed: ${errors.join('; ')}` })
       }
-    } catch { /* thread moved or was pruned meanwhile */ }
+    } catch (err) {
+      try { store.patch(id, { error: `auto-play failed: ${String(err)}` }) } catch { /* thread gone */ }
+    }
+  }
+
+  // A stop that arrived while the workspace was being prepared: cancel instead of starting the container.
+  const cancelledEarly = (id: string): boolean => {
+    if (!cancelled.delete(id)) return false
+    stopRequested.delete(id)
+    store.transition(id, 'cancelled')
+    return true
   }
 
   const launch = async function launch(task: TaskRecord): Promise<void> {
@@ -200,17 +219,9 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     mkdirSync(join(cfg.home, 'logs'), { recursive: true })
     mkdirSync(join(cfg.home, 'sessions', task.id), { recursive: true })
 
-    if (cancelled.delete(task.id)) {
-      store.transition(task.id, 'cancelled')
-      return
-    }
-
+    if (cancelledEarly(task.id)) return
     await prepareWorkspace(cfg, task.repos, workDir, task.id)
-
-    if (cancelled.delete(task.id)) {
-      store.transition(task.id, 'cancelled')
-      return
-    }
+    if (cancelledEarly(task.id)) return
 
     const commands = buildCommands(task, workDir)
     // A stale container from an interrupted previous turn may still hold the name.
@@ -225,6 +236,8 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
       tokenBudget: task.tokenBudget,
       alreadyUsed: task.tokensUsed,
     })
+    // stop() may have landed during the awaits above, with no runner yet to kill.
+    if (cancelledEarly(task.id)) return
     store.transition(task.id, 'running')
     await runTurn(task, runner, logFile, workDir, commands)
   } as Launcher
@@ -252,6 +265,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     const runner = runners.get(id)
     if (runner) {
       cancelled.add(id)
+      stopRequested.add(id)
       await runner.stop()
       return true
     }
@@ -260,6 +274,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     // creating one.
     if (store.get(id)?.state === 'provisioning') {
       cancelled.add(id)
+      stopRequested.add(id)
       return true
     }
     return false

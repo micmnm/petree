@@ -288,6 +288,53 @@ describe('TaskStore bins and identity', () => {
     expect(store.restore(g.id)).toMatchObject({ state: 'waiting-for-you', bin: null })
   })
 
+  it('binned threads refuse followUp and resume until restored', () => {
+    const t = store.create(input)
+    toRunning(t.id)
+    store.transition(t.id, 'failed', { error: 'x' })
+    store.bin(t.id, 'game-over', 'dropped by you')
+    expect(() => store.followUp(t.id, 'more')).toThrow(/restore first/)
+    expect(() => store.resume(t.id)).toThrow(/restore first/)
+    store.restore(t.id)
+    expect(store.resume(t.id).state).toBe('queued')
+  })
+
+  it('restore forgets a closed PR so the card offers it again', () => {
+    const t = store.create(input)
+    toRunning(t.id)
+    store.transition(t.id, 'done')
+    store.setDelivery(t.id, 'demo', { ahead: 1, head: 'h', target: 'f', url: 'u', number: 3, pr: 'closed', prHead: 'h' })
+    store.bin(t.id, 'game-over', 'PR closed without merge')
+    expect(store.restore(t.id).delivery.demo).toEqual({ ahead: 1, head: 'h', number: 3 })
+  })
+
+  it('sweep leaves a binned thread that is not settled', () => {
+    const t = store.create(input)
+    store.bin(t.id, 'game-over', 'dropped by you')
+    store.updateSettings({ binDays: 1 })
+    expect(store.sweep(new Date(Date.now() + 2 * DAY))).toBe(0)
+  })
+
+  it('a failed upgrade commits nothing, so the next open still backfills', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'petree-mig-')), 'db')
+    const raw = new Database(file)
+    raw.exec(`CREATE TABLE tasks (
+      id TEXT PRIMARY KEY, prompt TEXT NOT NULL, repos TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'unattended', state TEXT NOT NULL,
+      session_id TEXT, tokens_used INTEGER NOT NULL DEFAULT 0,
+      token_budget INTEGER NOT NULL, timeout_minutes INTEGER NOT NULL,
+      error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result TEXT, model TEXT)`)
+    raw.prepare(`INSERT INTO tasks (id,prompt,repos,state,token_budget,timeout_minutes,created_at,updated_at)
+      VALUES ('a', 'p', '["demo"]', 'done', 1, 1, 't', 't')`).run()
+    raw.exec("CREATE TRIGGER boom BEFORE UPDATE ON tasks BEGIN SELECT RAISE(ABORT, 'boom'); END")
+    raw.close()
+    expect(() => new TaskStore(file)).toThrow(/boom/)
+    const fix = new Database(file)
+    fix.exec('DROP TRIGGER boom')
+    fix.close()
+    expect(new TaskStore(file).get('a')!.seq).toBe(1)
+  })
+
   it('restore refuses unbinned and hall-of-fame threads', () => {
     const t = store.create(input)
     expect(() => store.restore(t.id)).toThrow()
@@ -589,6 +636,7 @@ describe('TaskStore.resume', () => {
     store.addUsage(t.id, 42)
     store.patch(t.id, { sessionId: 'sess-1' })
     store.transition(t.id, 'paused-limit')
+    store.unbin(t.id)
     const r = store.resume(t.id, 'opus')
     expect(r.state).toBe('queued')
     expect(r.model).toBe('opus')
@@ -635,6 +683,7 @@ describe('TaskStore.resume', () => {
       store.transition(t.id, 'provisioning')
       store.transition(t.id, 'running')
       store.transition(t.id, state)
+      store.unbin(t.id) // paused-limit bins; only restore() lifts that
       const r = store.resume(t.id, 'opus')
       expect(r.state).toBe('queued')
       expect(r.model).toBe('opus')

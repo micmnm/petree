@@ -4,9 +4,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
-  answerRecord, interviewPhase, parseQuestions, readThreadQuestions, renderAnswers,
+  answerRecord, interviewPhase, parseQuestions, readThreadQuestions, recap, renderAnswers,
   type InterviewRecord, type Questionnaire,
 } from '../src/interview.js'
+
+describe('recap', () => {
+  it('tolerates a stored record without questions or answers', () => {
+    const partial = { stage: 'spec', round: 1, final: false } as unknown as InterviewRecord
+    expect(recap(partial)).toMatchObject({ questions: [], answers: {}, recap: [] })
+  })
+})
 import type { Stage, TaskRecord, Turn } from '../src/store.js'
 
 const FILE = {

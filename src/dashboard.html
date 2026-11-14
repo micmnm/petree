@@ -1781,8 +1781,8 @@
       notes(r.endedAt, r.stage)
       const iv = r.interview
       if (iv) {
-        const got = Object.values(iv.answers).filter((a) => a !== null).length
-        add('agent', thLv[r.stage], `Questions asked · round ${iv.round}`, 'agent', `${iv.questions.length} question${iv.questions.length === 1 ? '' : 's'}.`)
+        const got = Object.values(iv.answers ?? {}).filter((a) => a !== null).length, nq = iv.questions?.length ?? 0
+        add('agent', thLv[r.stage], `Questions asked · round ${iv.round}`, 'agent', `${nq} question${nq === 1 ? '' : 's'}.`)
         add('you', thLv[r.stage], iv.final ? 'Wrote it now' : iv.how === 'guesses' ? 'Accepted the guesses' : `Answered · ${got} answer${got === 1 ? '' : 's'}, ${iv.changed} changed`,
           'by you', note.split('## Note from the user\n\n')[1] ?? '', r.endedAt)
         return

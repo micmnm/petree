@@ -216,10 +216,12 @@ export function answerText(q: Question, a: Answer): string {
 
 // The record plus its answers as the thread page's recap shows them; a null answer is "left to the agent".
 export function recap(r: InterviewRecord) {
+  // Turns are stored JSON; a partial record must not take the whole thread page down.
+  const questions = r.questions ?? [], answers = r.answers ?? {}
   return {
-    ...r,
-    recap: r.questions.map((q) => {
-      const a = r.answers[q.id]
+    ...r, questions, answers,
+    recap: questions.map((q) => {
+      const a = answers[q.id] ?? null
       return {
         answer: a === null ? null : answerText(q, a),
         kept: a !== null && sameAnswer(a, q.guess),

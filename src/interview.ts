@@ -230,7 +230,7 @@ export function recap(r: InterviewRecord) {
   // Turns are stored JSON; a partial record must not take the whole thread page down.
   const questions = r.questions ?? [], answers = r.answers ?? {}
   return {
-    ...r, questions, answers,
+    ...r, questions, answers, changed: r.changed ?? 0,
     recap: questions.map((q) => {
       const a = answers[q.id] ?? null
       return {

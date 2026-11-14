@@ -11,7 +11,7 @@ import {
 describe('recap', () => {
   it('tolerates a stored record without questions or answers', () => {
     const partial = { stage: 'spec', round: 1, final: false } as unknown as InterviewRecord
-    expect(recap(partial)).toMatchObject({ questions: [], answers: {}, recap: [] })
+    expect(recap(partial)).toMatchObject({ questions: [], answers: {}, changed: 0, recap: [] })
   })
 })
 import type { Stage, TaskRecord, Turn } from '../src/store.js'

@@ -1,7 +1,7 @@
 # Petree Interview Questionnaire — Ask First, Then Write
 
-**Date:** 2026-11-14 (rev 2: the 17 open questions decided, §11)
-**Status:** Draft; decisions settled, a few new open questions in §11.2
+**Date:** 2026-11-14 (rev 3: the follow-up questions N1–N6 decided, MCP servers allowlist, §5.8.4)
+**Status:** Draft; decisions settled, one open question (§11.3)
 **Builds on:** `docs/superpowers/specs/2026-11-13-petree-thread-inbox-design.md` (the "inbox spec"),
 branch `inbox-engine`. Visuals follow `docs/design/handheld-arcade.md`.
 **Mockups:** `docs/design/interview-mockups.html`, screens (a)–(g) of §5.1, light and dark.
@@ -35,9 +35,11 @@ skills and chosen plugins, so they ask and write the way the user's own sessions
 7. **The user's `~/.claude` in the sandbox**, all read-only:
    - `CLAUDE.md` and `rules/`;
    - an allowlist of personal skills;
-   - an allowlist of whole plugins (skills, hooks, MCP servers).
+   - an allowlist of whole plugins (skills, hooks, MCP servers);
+   - an allowlist of MCP servers from the host's Claude Code config, copied into petree's own
+     MCP file.
 
-   Both allowlists are edited in Options › GAME RULES. Anything that can't start in the
+   All three allowlists are edited in Options › GAME RULES. Anything that can't start in the
    sandbox is reported in INFO.
 
 ## 3. Non-goals
@@ -47,7 +49,10 @@ skills and chosen plugins, so they ask and write the way the user's own sessions
 - Editing the agent's questions or adding your own (the note box covers "you forgot X").
 - Changing INTERVIEW after the quest is created (same as PARTY MODE / AUTO-PLAY).
 - Mounting anything else from the host: `~/.claude.json` (OAuth tokens, project history),
-  `settings.json`, user-level MCP servers, and agents or commands outside allowlisted plugins.
+  `settings.json`, and agents or commands outside allowlisted plugins. MCP servers from
+  `~/.claude.json` reach the sandbox only as copied definitions in petree's own file (§5.8.4).
+- MCP servers that log in with OAuth tokens kept outside the config (claude.ai connectors, the
+  keychain). They show "needs login".
 - New task states or tables. The only new route is the read-only `GET /api/claude-home`
   (§5.8).
 
@@ -64,7 +69,8 @@ skills and chosen plugins, so they ask and write the way the user's own sessions
 - Everything the agent writes is untrusted: the questions file is size-capped, read with no
   follow and no blocking, validated field by field, clipped, and always escaped when rendered.
 - Everything mounted from the host is `:ro`. The sandbox still never sees git, `gh` or `az`
-  credentials, nor `~/.claude.json`.
+  credentials, nor `~/.claude.json`. The only secrets it gets are the env/header values of MCP
+  servers the user allowlisted (§5.8.4).
 - Phone: every new screen works at 390 px.
 
 ## 5. Design
@@ -124,8 +130,9 @@ Same page as inbox spec §5.1(b), with these differences while a questionnaire w
    | quiet | **GAME OVER** | `POST /drop` |
 
    - The primary is disabled while a NEEDS AN ANSWER question is empty ("answer Q4 first").
-   - WRITE IT NOW is never disabled: an empty no-guess question goes as "no answer — decide
-     yourself" (§11.2 N1).
+   - WRITE IT NOW is never disabled. It sends the form as it stands: edits kept, untouched
+     answers as "guess kept", an empty no-guess question as "no answer — decide yourself"
+     (decision N1).
 
 #### (c) The same at phone width (390 px)
 
@@ -178,7 +185,8 @@ A section in the existing GAME RULES panel, in the Options page style, fed by
 `GET /api/claude-home` (§5.8) and saved with the rest of GAME RULES through `PUT /api/defaults`:
 
 - **INSTRUCTIONS** switch — "CLAUDE.md + 3 rules files, read-only. Contains machine and
-  infrastructure details." Default ON.
+  infrastructure details." Default ON. When `CLAUDE.md` has `@imports` that point outside
+  `~/.claude`, a hint lists them: "won't resolve in the sandbox" (decision N6).
 - **PERSONAL SKILLS** — one checkbox tile per `~/.claude/skills/<name>/SKILL.md` (synced
   skills excluded): the name, the first line of its description, and a "picked N of M" count.
   Default: none.
@@ -189,11 +197,23 @@ A section in the existing GAME RULES panel, in the Options page style, fed by
   - "MCP: figma".
 
   Two warning chips:
-  - "Stop hook: can keep a turn running" (§11.2 N3);
+  - "Stop hook: can keep a turn running" (allowed, decision N3);
   - "MCP may need network or login".
 
   A **USED BY INTERVIEW** tag marks plugins that ship `interview-me`, `brainstorming` or
-  `spec-driven-development`. Default: none.
+  `spec-driven-development`. Default: those plugins, when installed (in practice `agent-skills`
+  and `superpowers`), ticked until the user saves a different list (decision N2, §5.8).
+- **MCP SERVERS** — one checkbox tile per server found in the host's Claude Code config
+  (§5.8.4):
+  - The tile shows the name, the scope ("user" or the project path), the transport
+    (`stdio · npx` / `http · api.example.com`), and "has secrets" when it has env values or
+    headers.
+  - Servers whose login lives outside the config are tagged **NEEDS LOGIN**. They can be ticked
+    but won't connect.
+  - Plugin MCP servers are listed separately, read-only: "comes with plugin <name>", ticked
+    when the plugin is.
+  - Default: none.
+  - Footer: "SAVE rewrites petree's MCP file; running turns keep the old one."
 - Footer hint: "Changes apply from each quest's next turn."
 
 ### 5.2 Card data contract changes (`src/inbox.ts`)
@@ -482,8 +502,15 @@ defaults:
   claude_home:
     instructions: true                 # CLAUDE.md + rules/ (default true)
     skills: [sip-expert]               # personal skill allowlist (default [])
-    plugins: [agent-skills@addy-agent-skills, superpowers@claude-plugins-official]   # (default [])
+    plugins: [agent-skills@addy-agent-skills, superpowers@claude-plugins-official]
+    mcp: [linear, docs@/Users/me/code/api]   # MCP server allowlist (default []), §5.8.4
 ```
+
+**Default plugins** (decision N2): while `plugins` is absent, the default is every installed
+plugin that ships `interview-me`, `brainstorming` or `spec-driven-development` (in practice
+`agent-skills` and `superpowers`). GAME RULES shows them ticked. Once SAVE writes an explicit
+list, even `[]`, that list rules. The engine and the form use the same rule, so the first quest
+after the upgrade already has the interview skills.
 
 **1. Instructions** (when `instructions` is true and the source exists):
 
@@ -495,7 +522,8 @@ defaults:
 - These are nested inside the rw session mount, which Docker allows: it creates the mount
   points (an empty file and an empty dir) in `~/.petree/sessions/<id>/` on the host. Claude
   Code reads them as user memory, exactly as on the host.
-- `@imports` inside `CLAUDE.md` that point outside `~/.claude` do not resolve (§11.2 N6).
+- `@imports` inside `CLAUDE.md` that point outside `~/.claude` do not resolve. GAME RULES lists
+  them as a hint (decision N6).
 - Precedence is stated in the prompt (§5.4): petree's stage instructions and `_thread/`
   contracts win.
 - **Risk**: these files hold machine and infrastructure details (cluster names, IPs, local
@@ -546,6 +574,59 @@ claude … --plugin-dir /petree/plugins/<slug>    (one flag per plugin)
   RULES allowlist alone decides.
 - Check in PR 4: `--plugin-dir` and `${CLAUDE_PLUGIN_ROOT}` on the CLI version in the sandbox
   images.
+- Plugins with a `Stop` hook are allowed, with the warning chip (decision N3); the turn timeout
+  bounds them.
+
+**4. MCP servers** (allowlist, decision N4): petree never mounts `~/.claude.json`. It keeps its
+own file, `<petree home>/claude.mcp.json`, holding only the allowlisted servers' definitions:
+
+```
+-v <petree home>/claude.mcp.json:/petree/mcp.json:ro
+claude … --mcp-config /petree/mcp.json            (only when the allowlist is non-empty)
+```
+
+- **Where the picker's list comes from** (`GET /api/claude-home`, host-side):
+  - **User scope**: top-level `mcpServers` in `<claudeHome>/../.claude.json` (i.e.
+    `~/.claude.json`; with `$CLAUDE_CONFIG_DIR`, the `.claude.json` inside it). Id: `<name>`.
+  - **Local/project scope**: `projects[<path>].mcpServers` in the same file. Id:
+    `<name>@<path>`. In the generated file a name clash with another chosen server gets
+    `-<project dir basename>` appended.
+  - **Plugin servers**: each installed plugin's `.mcp.json`. These are listed read-only, as
+    "comes with plugin <name>". They are **not** copied: they load with their plugin through
+    `--plugin-dir` (§5.8.3), so the plugin allowlist controls them.
+  - Project `.mcp.json` files in repos are not offered. Repos bring their own, and `/work` is
+    not a repo root.
+- **What is copied**: for each allowlisted id, the definition as written:
+  - `stdio`: `command`, `args`, `env`;
+  - `http`/`sse`: `type`, `url`, `headers`.
+
+  Nothing else from `~/.claude.json` is read into the file. `${VAR}` references are copied as
+  written. They resolve only if the sandbox has that variable, which it usually doesn't, so the
+  picker tags such servers "uses host env vars".
+- **Secrets**: env and header values are copied only for allowlisted servers. The file is
+  written by temp file + rename with mode `0600`. `repos.yaml` stores only ids, and
+  `GET /api/claude-home` returns names, scope, transport, the command name or URL host, and a
+  `hasSecrets` flag, never values.
+  - On Linux the container user must be able to read a 0600 file. That holds when the host
+    uid equals the image's `dev` uid, the same condition the rw session mount already needs.
+- **Needs login**: a remote server with no `Authorization` header (or a stdio server that
+  shells out to an OAuth helper) relies on a token kept outside the config: the keychain,
+  Claude Code's credentials store, or a claude.ai connector. Those servers are tagged
+  **NEEDS LOGIN** in the picker. In the sandbox they fail to authenticate, and INFO shows
+  "needs login". claude.ai connectors are not in `~/.claude.json` at all, so they are never
+  listed.
+- **SAVE regenerates the file**: `PUT /api/defaults` with `claude_home.mcp` re-reads the host
+  config and rewrites `claude.mcp.json`. It also does this at server start, so host-side edits
+  to a server's command or token arrive after a restart or the next SAVE. Running containers
+  keep the old file, because the rename leaves their bound inode in place.
+  - An allowlisted id that has vanished from the host config is dropped from the file and shown
+    in INFO as skipped.
+- **No `--strict-mcp-config`**: that flag also drops plugin MCP servers (SDK `strictMcpConfig`:
+  "ignore project `.mcp.json`, user settings, plugin-provided MCP servers, and claude.ai
+  connectors"), and decision 9 keeps those. Without it, the only other sources in the sandbox
+  are the per-thread session `~/.claude.json` (starts empty) and a `/work/.mcp.json` the agent
+  could write itself. That gives no new power: the agent can already start any process.
+  §11.3 asks whether to add strict anyway.
 
 **Failing quietly, reported in INFO**:
 - Docker binds only paths that exist. A missing source (deleted skill, uninstalled plugin) is
@@ -565,22 +646,30 @@ claude … --plugin-dir /petree/plugins/<slug>    (one flag per plugin)
   }
   ```
 
-  `loaded: false` means allowlisted but absent from the init event. `skipped` is filled at
-  launch: missing source, outside `~/.claude/plugins`, duplicate name. `ponytail:` it compares
+  `loaded: false` means allowlisted but absent from the init event. `mcp` covers both copied
+  and plugin servers, with the init status (`connected`, `failed`, `needs-auth`); an
+  allowlisted server missing from init shows as "failed". `skipped` is filled at launch:
+  missing source, outside `~/.claude/plugins`, duplicate name, MCP id gone from the host
+  config. `ponytail:` it compares
   against the current allowlist, not a launch snapshot; store one if allowlists change
   mid-quest often.
-- Details › Info shows "PLUGINS 2 of 3 loaded · figma: MCP failed", "SKILLS 41" and the
-  skipped list.
+- Details › Info shows "PLUGINS 2 of 3 loaded", "MCP linear: connected · notion: needs login",
+  "SKILLS 41" and the skipped list.
 
 **Listing for GAME RULES**: `GET /api/claude-home` (read-only, host-side) returns:
 
 ```ts
 {
-  instructions: { claudeMd: boolean; rules: number }
+  instructions: { claudeMd: boolean; rules: number; unresolvedImports: string[] }
   skills: { name: string; description: string }[]   // description: first line, ≤ 140
   plugins: {
     key: string; name: string; marketplace: string; version: string
-    skills: string[]; hooks: string[]; mcp: string[]; outside: boolean
+    skills: string[]; hooks: string[]; mcp: string[]; outside: boolean; interview: boolean
+  }[]
+  mcp: {
+    id: string; name: string; scope: 'user' | string   // string = project path
+    transport: 'stdio' | 'http' | 'sse'; target: string // command name or URL host
+    hasSecrets: boolean; hostEnv: boolean; needsLogin: boolean
   }[]
 }
 ```
@@ -588,7 +677,9 @@ claude … --plugin-dir /petree/plugins/<slug>    (one flag per plugin)
 - Skills come from `SKILL.md` front matter.
 - Plugins come from `installed_plugins.json` + each plugin's `.claude-plugin/plugin.json`,
   `hooks/hooks.json` event names, `.mcp.json` server names and `skills/*`.
-- It never returns file bodies. Unreadable entries are left out.
+- MCP servers come from `~/.claude.json` (user and project scope, §5.8.4). Plugin servers are
+  under their plugin.
+- It never returns file bodies or secret values. Unreadable entries are left out.
 
 ## 6. What is reused, changed, or added
 
@@ -600,10 +691,10 @@ claude … --plugin-dir /petree/plugins/<slug>    (one flag per plugin)
 | `cardFor` | **Changed**: one parameter, one field, two rows. |
 | `composePrompt` | **Changed**: `interviewPhase` picks the stage variant; a "user's own setup" section. |
 | Launcher `autoPlay` | **Changed**: one early return at a waiting questionnaire. |
-| `buildSandboxCommands` | **Changed**: instruction, skill and plugin mounts; `--add-dir`, `--plugin-dir`. |
+| `buildSandboxCommands` | **Changed**: instruction, skill, plugin and MCP-file mounts; `--add-dir`, `--plugin-dir`, `--mcp-config`. |
 | `GET /thread`, `GET /stats`, `PUT /api/defaults` | **Changed**: `questions`/`interview`; `sandbox`; `claude_home`. |
 | Dashboard `tile()`, `sw()`, `thMoves`, `#thMove`, card, GAME RULES | **Reused** and extended; the card's `<a>` becomes a stretched link. |
-| New | `interview` column, `Turn.interview`, `readThreadQuestions` + validator, `renderAnswers`, `interviewPhase`, `claudeMounts`, `claude_home` config, `GET /api/claude-home`. |
+| New | `interview` column, `Turn.interview`, `readThreadQuestions` + validator, `renderAnswers`, `interviewPhase`, `claudeMounts`, `claude_home` config, `writeMcpFile` (`<petree home>/claude.mcp.json`), `GET /api/claude-home`. |
 
 ## 7. API changes (`src/server.ts`)
 
@@ -616,8 +707,9 @@ Changed:
   - 400 on a stage move together with `answers`;
   - 400 on an invalid answer.
 - `GET /api/tasks/:id/stats`: adds `sandbox` (§5.8).
-- `PUT /api/defaults`: accepts `claude_home: { instructions, skills, plugins }`. Each name is
-  validated against `GET /api/claude-home`, 400 on unknown.
+- `PUT /api/defaults`: accepts `claude_home: { instructions, skills, plugins, mcp }`. Each
+  name is validated against `GET /api/claude-home`, 400 on unknown. A successful save
+  regenerates `claude.mcp.json` (§5.8.4).
 
 New: `GET /api/claude-home`. Unchanged: everything else.
 
@@ -643,6 +735,12 @@ New: `GET /api/claude-home`. Unchanged: everything else.
   skipped, the turn launches, and INFO lists it. A Docker bind failure (e.g. a path not shared
   with Docker Desktop) fails the turn with Docker's message, as any mount failure does today.
 - **A plugin MCP server or hook fails inside the sandbox**: not an error; INFO shows the status.
+- **MCP file**:
+  - `~/.claude.json` is missing or unparseable at SAVE → the picker is empty, the existing
+    `claude.mcp.json` is kept as is, and SAVE reports the error.
+  - Writing the file fails → SAVE fails with the error, and `repos.yaml` is not written either
+    (the file is written first, then the YAML).
+  - An allowlisted server needs a login it lacks → "needs login" in INFO; the turn runs.
 
 ## 9. Delivery as small PRs
 
@@ -663,14 +761,18 @@ New: `GET /api/claude-home`. Unchanged: everything else.
      no-guess → recorded null; 409; rendered note snapshot; card cases; AUTO-PLAY with the fake
      runner stops at a questionnaire and continues after the answers.
 4. **`~/.claude` mounts.**
-   - The `claude_home` config, `claudeMounts` (instructions, skills, plugins, containment,
-     slugs, duplicates).
-   - `--add-dir`/`--plugin-dir`; the prompt section; `GET /api/claude-home`;
+   - The `claude_home` config with the interview-plugin default, `claudeMounts` (instructions,
+     skills, plugins, containment, slugs, duplicates).
+   - `writeMcpFile` (user/project scope, name clashes, 0600, temp + rename, run at start and on
+     SAVE).
+   - `--add-dir`/`--plugin-dir`/`--mcp-config`; the prompt section; `GET /api/claude-home`;
      `PUT /api/defaults`; `sandbox` from the init event; README step 5 optional.
-   - *Tests:* a temp `claudeHome` fixture → the exact `-v`/flag list; all host mounts `:ro`;
-     a plugin outside `plugins/` refused; init event → `sandbox`.
-   - *Manual:* one real thread with `agent-skills` allowlisted uses `interview-me`; a plugin
-     with a failing MCP server shows in INFO.
+   - *Tests:* a temp `claudeHome` + `.claude.json` fixture → the exact `-v`/flag list; all host
+     mounts `:ro`; a plugin outside `plugins/` refused; the MCP file holds only allowlisted
+     servers, with secrets, at mode 0600; `/api/claude-home` returns no secret values;
+     needs-login detection; init event → `sandbox`.
+   - *Manual:* one real thread with the default plugins uses `interview-me`; one allowlisted
+     stdio MCP server connects; an OAuth-only one shows "needs login" in INFO.
 5. **New quest switch + GAME RULES section** (screens a, g).
 6. **Questionnaire UI** (screens b–f): form, round header, smart button, WRITE IT NOW, two-tap
    card with stretched link, QUESTING line, recap, quest log; phone. *Check:* against the
@@ -694,7 +796,10 @@ New: `GET /api/claude-home`. Unchanged: everything else.
 9. In the sandbox, `CLAUDE.md`, `rules/`, allowlisted skills and plugins are present and
    read-only. A non-allowlisted one is absent. A plugin whose MCP server can't start is listed
    in INFO, and the turn still runs.
-10. Every new screen works at 390 px without horizontal scroll.
+10. Ticking one MCP server in GAME RULES and pressing SAVE writes `claude.mcp.json` with only
+    that server (mode 0600). The next turn lists it in INFO as connected, or as "needs login"
+    when its token lives in the keychain.
+11. Every new screen works at 390 px without horizontal scroll.
 
 ## 11. Decisions and open questions
 
@@ -720,57 +825,29 @@ New: `GET /api/claude-home`. Unchanged: everything else.
 | 16 | Synced skills | Skipped. |
 | 17 | QUESTING wording | "Preparing questions · PLAN · 3m". |
 
-### 11.2 New open questions (raised by the decisions)
+### 11.2 Decided (2026-11-14, follow-up round)
 
-- **N1. What does WRITE IT NOW send?**
-  - (a) **The form as it stands: edits kept, untouched answers as "guess kept", an empty
-    no-guess question as "no answer — decide yourself".**
-  - (b) Nothing: discard the form, "use your guesses".
-  - (c) The form, but only enabled once every no-guess question is answered.
+| # | question | decision |
+|---|---|---|
+| N1 | What WRITE IT NOW sends | **The form as it stands**: edits kept, untouched answers as "guess kept", an empty no-guess question as "no answer — decide yourself". |
+| N2 | Default allowlists | **Interview plugins on by default**: installed plugins that ship `interview-me` / `brainstorming` / `spec-driven-development` (`agent-skills`, `superpowers`) are allowlisted until GAME RULES saves another list. The USED BY INTERVIEW tag stays. |
+| N3 | Plugins with a Stop hook | **Allowed**, with the warning chip. |
+| N4 | MCP servers and the host's login | **Petree's own MCP file** (§5.8.4): an MCP SERVERS allowlist in GAME RULES; only those definitions are copied (0600) and passed with `--mcp-config`. `~/.claude.json` is never mounted. Servers whose token lives outside the config show "needs login". |
+| N5 | Cost of many rounds | **No cap** beyond the round header for now. |
+| N6 | Unresolved `@imports` | **Accept, with a hint** in GAME RULES. |
 
-  *Recommendation: (a).* It never throws away what the user typed, and stays always available,
-  as decided.
+### 11.3 Open
 
-- **N2. Default allowlists?** INTERVIEW is on by default, and the prompt asks for
-  `interview-me`, but it ships in a plugin (`agent-skills`), and both allowlists start empty.
-  - (a) **Empty, with a USED BY INTERVIEW tag on the plugins that ship interview skills.**
-  - (b) Preselect installed plugins that ship `interview-me` / `brainstorming` /
-    `spec-driven-development` on first run.
-  - (c) Empty, and the INTERVIEW switch line warns "interview-me isn't enabled — GAME RULES".
+- **S1. Pass `--strict-mcp-config` too?** It would make `claude.mcp.json` the only MCP source.
+  It would also drop the MCP servers of allowlisted plugins (and claude.ai connectors), which
+  decision 9 keeps.
+  - (a) **No strict.** The only other sources in the sandbox are the empty per-thread session
+    config and a `/work/.mcp.json` the agent would have to write itself.
+  - (b) Strict, and petree also copies allowlisted plugins' MCP definitions into the file,
+    rewriting `${CLAUDE_PLUGIN_ROOT}` to `/petree/plugins/<slug>`.
 
-  *Recommendation: (a)* plus (c)'s one-line hint. (b) silently turns on whole plugins with
-  hooks.
-
-- **N3. Plugins with a `Stop` hook** (e.g. a loop plugin) can keep an unattended turn running
-  until its timeout.
-  - (a) **Allow, with a warning chip in GAME RULES.**
-  - (b) Refuse to allowlist plugins with Stop/SubagentStop hooks.
-  - (c) Allow, but cap such turns to a shorter timeout.
-
-  *Recommendation: (a).* The user chose whole plugins, and the timeout already bounds the cost.
-
-- **N4. MCP servers that need the host's OAuth login** (tokens live in `~/.claude.json` / the
-  keychain) won't connect.
-  - (a) **Accept; INFO shows "needs login".**
-  - (b) Mount `~/.claude.json` read-only. It also holds every project's history and other
-    tokens.
-
-  *Recommendation: (a).*
-
-- **N5. Many rounds.** With no cap, and `tokensUsed` reset on every follow-up, nothing bounds
-  the total.
-  - (a) **Nothing beyond the round header; WRITE IT NOW is always there.**
-  - (b) From round 4, WRITE IT NOW becomes the second big button.
-  - (c) A soft cap in GAME RULES.
-
-  *Recommendation: (a)* for now, and (b) if rounds over 3 show up in practice.
-
-- **N6. `@imports` in `CLAUDE.md` that point outside `~/.claude`** don't resolve in the
-  sandbox.
-  - (a) **Accept, with a hint in GAME RULES.**
-  - (b) Petree inlines imports on the host into a generated file and mounts that instead.
-
-  *Recommendation: (a).*
+  *Recommendation: (a).* (b) closes a door the agent can walk around anyway (it can start any
+  process), at the cost of re-implementing plugin MCP loading.
 
 ## Risks in the decisions (for the reviewer)
 
@@ -778,12 +855,16 @@ New: `GET /api/claude-home`. Unchanged: everything else.
   core rule, so the prompt borrows only its question selection. Model-decided rounds make up
   for part of that.
 - **No hard cap on rounds**: an over-eager agent can keep asking. Each round costs a resumed
-  turn, and only the user's WRITE IT NOW stops it (N5).
+  turn, and only the user's WRITE IT NOW stops it (decision N5).
 - **INTERVIEW on by default + AUTO-PLAY stops at questionnaires**: every AUTO-PLAY quest now
   stops at least twice (SCOUT and PLAN) before CRAFT, unless INTERVIEW is switched off. That
   breaks "no stops until the PR" for anyone who forgets to switch it off.
 - **Whole plugins**: their hooks run in every turn of the thread. A persona hook changes the
-  agent's style; a Stop hook can loop until the timeout (N3). MCP servers may try the network.
+  agent's style; a Stop hook can loop until the timeout (decision N3). MCP servers may try the
+  network. With N2, `superpowers` is on by default, and its SessionStart hook comes with it.
+- **MCP secrets in the sandbox**: allowlisted servers' tokens and env values are readable by
+  the agent (it needs them to start the server). A careless agent could print one into a log,
+  a spec or a PR. Allowlist only servers whose tokens you'd trust to an unattended agent.
 - **CLAUDE.md and rules**: machine and infrastructure details reach every thread, and rules
   written for interactive sessions ("ask before…", "use MCP X") can still tug at the agent,
   despite the stated precedence.

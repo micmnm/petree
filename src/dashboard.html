@@ -914,6 +914,24 @@
   /* GAME RULES, footer, raw editor */
   .o-rules { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 22px 24px; }
   .o-num { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 15px; color: var(--muted); }
+  /* GAME RULES › FROM YOUR ~/.claude (spec §5.1g) */
+  .cl { display: flex; flex-direction: column; gap: 18px; padding-top: 18px; border-top: 2px dotted var(--line); }
+  .cl-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .cl-h code { font: 400 30px/1 var(--px); }
+  .cl-h .btn2 { margin-left: auto; align-self: center; }
+  .cl-k { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .cl-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+  .cl-skills .o-pick, .cl-plugs .o-pick { display: flex; }
+  .cl-skills .o-pick > span, .cl-plugs .o-pick > span { flex: 1 1 auto; align-items: flex-start; }
+  .cl-skills .o-box, .cl-plugs .o-box { margin-top: 2px; }
+  .cl-plugs { display: flex; flex-direction: column; gap: 10px; }
+  .cl-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .cl-warn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; background: var(--gold-tint); color: var(--gold); font-size: 13px; font-weight: 700; }
+  .cl-warn svg { width: 14px; height: 12px; }
+  .cl-use { padding: 3px 8px 2px; background: var(--go-fill); color: var(--on-fill); font: 20px/1 var(--px); }
+  .cl-sw { border-bottom: 2px dotted var(--line); }
+  .cl-sync { margin: 0; padding: 10px 12px; background: var(--inset); font-size: 14px; color: var(--muted); }
+  .cl-sync b { font: 400 20px/1 var(--px); color: var(--ink); margin-right: 6px; }
   .o-form .o-num input { flex: none; width: 150px; }
   .o-foot { display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: space-between; gap: 16px 24px; }
   .o-foot > div { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
@@ -1123,6 +1141,7 @@
       <button type="button" class="btn2" id="clearNowBtn"><span><b>SWEEP NOW</b><small>clear bins past these days</small></span></button>
       <span class="o-msg" id="rulesMsg" role="status"></span>
     </div>
+    <div class="cl" id="chBox"></div>
     <div class="strip" aria-hidden="true"></div>
   </div></section>
 
@@ -2390,7 +2409,107 @@
     // defaults: has no GET route; read the numbers from the file (defaultValue marks "unchanged")
     const block = /^defaults:.*\n((?:[ \t]+.*\n?|[ \t]*\n)*)/m.exec(content)?.[1] ?? ''
     for (const k of DEFAULT_KEYS) rules[k].value = rules[k].defaultValue = new RegExp(`^[ \\t]+${k}:[ \\t]*([\\d.]+)`, 'm').exec(block)?.[1] ?? ''
+    chLoad()
   }
+
+  // ---- GAME RULES › FROM YOUR ~/.claude (spec §5.1g): GET /api/claude-home, saved by SAVE via PUT /api/defaults ----
+  const CH_INTERVIEW = ['interview-me', 'brainstorming', 'spec-driven-development']
+  let chData = null, chOrig = '', chReport = null
+  const chNorm = (s) => JSON.stringify({ instructions: s.instructions, ...Object.fromEntries(['skills', 'plugins', 'mcp'].map((k) => [k, [...s[k]].sort()])) })
+  // What the form shows now; null before the first load.
+  function chState() {
+    const box = $('chBox'), on = (n) => [...box.querySelectorAll(`input[name=${n}]:checked`)].map((i) => i.value)
+    return chData && { instructions: $('chInstr')?.getAttribute('aria-checked') === 'true', skills: on('chSkill'), plugins: on('chPlugin'), mcp: on('chMcp') }
+  }
+  async function chLoad() {
+    try { const r = await fetch('/api/claude-home'); if (!r.ok) return; chData = await r.json() } catch { return }
+    chOrig = chNorm(chData.chosen); chReport = null
+    chRender(chData.chosen)
+  }
+  const chWarn = (t) => `<span class="cl-warn">${WARN}${t}</span>`
+  const chBadge = (t) => `<span class="o-badge">${t}</span>`
+  // sub, badges and tail are HTML (callers escape)
+  const chPick = (name, value, on, word, sub, badges, sm, tail = '') => `<label class="o-pick${sm ? ' sm' : ''}"><input type="checkbox" name="${name}" value="${esc(value)}"${on ? ' checked' : ''}><span>${OBOX}<span class="o-pw"><b>${esc(word)}</b>${sub}${badges ? `<span class="cl-badges">${badges}</span>` : ''}${tail}</span></span></label>`
+  const chCounts = () => {
+    const st = chState()
+    for (const [k, all] of [['skills', chData.skills], ['plugins', chData.plugins], ['mcp', chData.mcp]]) {
+      const el = $('chBox').querySelector(`[data-ch-n="${k}"]`); if (el) el.textContent = `picked ${st[k].length} of ${all.length}`
+    }
+    const fp = $('chFromPlugins')
+    if (fp) fp.innerHTML = chData.plugins.flatMap((p) => p.mcp.map((m) => chBadge(`${esc(m)} · with plugin ${esc(p.name)} · ${st.plugins.includes(p.key) ? 'on' : 'off'}`))).join('')
+  }
+
+  function chRender(st) {
+    const d = chData, r = chReport
+    if (!d) return
+    const tags = (kind, id) => (r?.new[kind].includes(id) ? '<span class="o-badge gold">NEW</span>' : '') + (r?.changed[kind].includes(id) ? '<span class="o-badge gold">CHANGED</span>' : '')
+    const ins = d.instructions, imp = ins.unresolvedImports
+    const insLine = ins.claudeMd || ins.rules
+      ? `${ins.claudeMd ? 'CLAUDE.md' : 'No CLAUDE.md'} + ${ins.rules} rules file${ins.rules === 1 ? '' : 's'}, read-only. Petree’s stage instructions win on conflict. They contain machine and infrastructure details, which every quest will see.`
+      : 'No CLAUDE.md or rules/ found.'
+    const plugBadges = (p) => [
+      p.interview ? '<span class="cl-use">USED BY INTERVIEW</span>' : '', tags('plugins', p.key),
+      chBadge(`${p.skills.length} skill${p.skills.length === 1 ? '' : 's'}`),
+      chBadge(p.hooks.length ? `hooks: ${esc(p.hooks.join(', '))}` : 'no hooks'),
+      chBadge(p.mcp.length ? `MCP: ${esc(p.mcp.join(', '))}` : 'no MCP'),
+      p.enabled === false ? chBadge('disabled on this machine') : '',
+      p.hooks.includes('Stop') ? chWarn('Stop hook: can keep a turn running') : '',
+      p.mcp.length ? chWarn('MCP may need network or login') : '',
+      p.outside ? chWarn('outside ~/.claude/plugins · never mounted') : '',
+    ].join('')
+    const sync = r ? `<p class="cl-sync" role="status"><b>${esc(r.summary)}</b>${
+      ['skills', 'plugins', 'mcp'].flatMap((k) => r.gone[k].map((id) => esc(id))).map((id, i) => `${i ? ', ' : 'gone: '}${id}`).join('')}${
+      r.mcpFile?.error ? ` · claude.mcp.json: ${esc(r.mcpFile.error)}` : ''}</p>` : ''
+    $('chBox').innerHTML = `<div class="cl-h"><h3 class="o-h3">FROM YOUR</h3><code>~/.claude</code><span class="hint">Mounted read-only into every sandbox, so quests work like your own sessions. Changes apply from each quest’s next turn.</span>
+        <button type="button" class="btn2" id="chSyncBtn"><span><b>SYNC</b><small>find new, gone and changed</small></span></button></div>
+      ${sync}
+      <div class="nq-sws cl-sw"><button type="button" class="nq-sw" role="switch" aria-checked="${st.instructions}" id="chInstr"><span><b>INSTRUCTIONS</b><small>${insLine}${
+        imp.length ? `<span class="cl-badges">${chWarn(`${imp.length} import${imp.length === 1 ? '' : 's'} won’t resolve in the sandbox: ${esc(imp.join(', '))}`)}</span>` : ''}</small></span>
+        <span class="sw" aria-hidden="true"><span class="sw-w">${st.instructions ? 'ON' : 'OFF'}</span><span class="sw-t"><span></span><span></span></span></span></button></div>
+      <div class="o-sub">
+        <div class="cl-k"><span class="o-k">PERSONAL SKILLS</span><span class="o-help">~/.claude/skills · <span data-ch-n="skills"></span> · synced skills aren’t offered</span></div>
+        ${d.skills.length ? `<div class="cl-skills">${d.skills.map((s) => chPick('chSkill', s.name, st.skills.includes(s.name), s.name,
+          s.description ? `<small>${esc(s.description)}</small>` : '', tags('skills', s.name), true)).join('')}</div>` : '<p class="o-help">No skills in ~/.claude/skills.</p>'}
+      </div>
+      <div class="o-sub">
+        <div class="cl-k"><span class="o-k">PLUGINS</span><span class="o-help">whole plugins: skills, hooks and MCP servers · <span data-ch-n="plugins"></span>${
+          d.chosen.pluginsSaved ? '' : ' · interview plugins start ticked until you save your own list'} · anything that can’t start shows in the quest’s INFO</span></div>
+        ${d.plugins.length ? `<div class="cl-plugs">${d.plugins.map((p) => chPick('chPlugin', p.key, st.plugins.includes(p.key), p.name,
+          `<i>${esc(p.marketplace)} · ${esc(p.version)}</i>`, plugBadges(p), false,
+          p.interview ? `<small>ships ${esc(p.skills.filter((s) => CH_INTERVIEW.includes(s)).join(' and '))}</small>` : '')).join('')}</div>`
+          : '<p class="o-help">No installed plugins.</p>'}
+      </div>
+      <div class="o-sub">
+        <div class="cl-k"><span class="o-k">MCP SERVERS</span><span class="o-help">from ~/.claude.json, user and project scope · <span data-ch-n="mcp"></span> · only the ticked ones are copied, secrets included, into petree’s own <code>claude.mcp.json</code> (0600, read-only in the sandbox)</span></div>
+        ${d.mcpError ? `<p class="o-help">${chWarn(esc(d.mcpError))}</p>` : ''}
+        ${d.mcp.length ? `<div class="cl-skills">${d.mcp.map((m) => chPick('chMcp', m.id, st.mcp.includes(m.id), m.name,
+          `<small>${esc(m.scope)} · ${esc(m.transport)} · ${esc(m.target)}</small>`,
+          tags('mcp', m.id) + (m.hasSecrets ? chBadge('has secrets') : '') + (m.needsLogin ? chWarn('NEEDS LOGIN · token lives outside the config') : '')
+          + (m.hostEnv ? chWarn('uses host env vars') : ''), true)).join('')}</div>` : d.mcpError ? '' : '<p class="o-help">No MCP servers in ~/.claude.json.</p>'}
+        <div class="cl-k"><span class="o-k">FROM PLUGINS</span><span class="o-help">come and go with their plugin above, not copied</span></div>
+        <div class="cl-badges" id="chFromPlugins"></div>
+        <p class="o-help">SAVE rewrites <code>claude.mcp.json</code> from your current ~/.claude.json. Running turns keep the old file; the next turn gets the new one.</p>
+      </div>`
+    chCounts()
+  }
+
+  async function chSync() {
+    const b = $('chSyncBtn'); b.disabled = true
+    const keep = chState()
+    try {
+      const res = await fetch('/api/claude-home/sync', send('POST', {}))
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) { $('rulesMsg').textContent = `SYNC failed: ${body.error || res.status}`; b.disabled = false; return }
+      chReport = body
+      // Keep unsaved ticks; gone items drop out because their tiles do.
+      const r = await fetch('/api/claude-home'); if (r.ok) chData = await r.json()
+      chOrig = chNorm(chData.chosen)
+      chRender(keep)
+      // SYNC may have dropped gone items from repos.yaml; a stale raw editor would put them back.
+      reposYamlText.value = (await (await fetch('/api/repos-yaml')).json()).content
+    } catch { $('rulesMsg').textContent = 'SYNC failed: petree not reachable'; b.disabled = false }
+  }
+  $('chBox').addEventListener('change', () => chCounts())
 
   // Form fields as repos.yaml wants them: lists split and trimmed, empties dropped, tags sorted.
   const LISTS = ['setup', 'build', 'test', 'run', 'tags']
@@ -2570,6 +2689,8 @@
     const changed = (el) => el.value !== el.defaultValue
     // an emptied box means "leave as is": PUT /api/defaults can't unset a key
     const patch = Object.fromEntries(DEFAULT_KEYS.filter((k) => changed(rules[k]) && rules[k].value !== '').map((k) => [k, Number(rules[k].value)]))
+    const ch = chState()
+    if (ch && chNorm(ch) !== chOrig) patch.claude_home = ch
     if (stop === null && Object.keys(patch).length) {
       const res = await fetch('/api/defaults', send('PUT', patch))
       if (res.ok) wrote++; else rulesErr = (await res.json().catch(() => ({}))).error || 'defaults not saved'
@@ -2606,6 +2727,11 @@
     else if ('reload' in b.dataset) { delete drafts[key]; openEdit(key) }
     else if ('raw' in b.dataset) openRaw(b.dataset.raw === 'toggle')
     else if (b.id === 'saveAll') saveAll()
+    else if (b.id === 'chSyncBtn') chSync()
+    else if (b.id === 'chInstr') {
+      const on = b.getAttribute('aria-checked') !== 'true'
+      b.setAttribute('aria-checked', String(on)); b.querySelector('.sw-w').textContent = on ? 'ON' : 'OFF'
+    }
     else if (b.id === 'clearNowBtn') {
       const { archived } = await (await fetch('/api/prune', { method: 'POST' })).json().catch(() => ({}))
       $('rulesMsg').textContent = archived == null ? 'Sweep failed.' : `Swept ${archived} quest${archived === 1 ? '' : 's'}.`

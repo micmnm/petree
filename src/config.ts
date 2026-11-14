@@ -159,3 +159,14 @@ export function resolveModel(
   const norm = (m?: string | null): string | null => (m && m !== 'default' ? m : null)
   return norm(requested) ?? norm(repoDefault) ?? norm(globalDefault) ?? null
 }
+
+const GITHUB_REGEX = /^(?:\w+:\/\/)?(?:[^@/]+@)?github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/
+const AZURE_REGEX = /^https?:\/\/(?:[^@/]+@)?dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+?)\/?$/
+const AZURE_VS_REGEX = /^https?:\/\/([^./@]+)\.visualstudio\.com\/([^/]+)\/_git\/([^/]+?)\/?$/
+
+/** Detect the Git host type from a repository URL. */
+export function repoHostKind(repoUrl: string): 'github' | 'azure' | 'unknown' {
+  if (GITHUB_REGEX.test(repoUrl)) return 'github'
+  if (AZURE_REGEX.test(repoUrl) || AZURE_VS_REGEX.test(repoUrl)) return 'azure'
+  return 'unknown'
+}

@@ -2,7 +2,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { loadConfig, parseConfigText, resolveModel } from '../src/config.js'
+import { loadConfig, parseConfigText, resolveModel, repoHostKind } from '../src/config.js'
 
 function petreeHome(yamlText: string): string {
   const home = mkdtempSync(join(tmpdir(), 'petree-'))
@@ -295,5 +295,65 @@ describe('resolveModel', () => {
     expect(resolveModel(undefined, null, 'sonnet')).toBe('sonnet')
     expect(resolveModel(undefined, 'haiku', 'sonnet')).toBe('haiku')
     expect(resolveModel(null, null, null)).toBeNull()
+  })
+})
+
+describe('repoHostKind', () => {
+  it('detects GitHub URLs', () => {
+    expect(repoHostKind('https://github.com/org/repo.git')).toBe('github')
+    expect(repoHostKind('https://github.com/org/repo')).toBe('github')
+    expect(repoHostKind('git@github.com:org/repo.git')).toBe('github')
+    expect(repoHostKind('git@github.com:org/repo')).toBe('github')
+    expect(repoHostKind('github.com:org/repo.git')).toBe('github')
+  })
+
+  it('detects Azure DevOps URLs', () => {
+    expect(repoHostKind('https://dev.azure.com/org/project/_git/repo')).toBe('azure')
+    expect(repoHostKind('https://dev.azure.com/org/project/_git/repo/')).toBe('azure')
+    expect(repoHostKind('https://org.visualstudio.com/project/_git/repo')).toBe('azure')
+    expect(repoHostKind('https://org.visualstudio.com/project/_git/repo/')).toBe('azure')
+    expect(repoHostKind('http://dev.azure.com/org/project/_git/repo')).toBe('azure')
+  })
+
+  it('returns unknown for unsupported URLs', () => {
+    expect(repoHostKind('https://gitlab.com/org/repo.git')).toBe('unknown')
+    expect(repoHostKind('https://gitea.example.com/org/repo.git')).toBe('unknown')
+    expect(repoHostKind('file:///local/repo')).toBe('unknown')
+    expect(repoHostKind('invalid-url')).toBe('unknown')
+    expect(repoHostKind('')).toBe('unknown')
+  })
+})
+
+describe('repoHostKind', () => {
+  it('detects GitHub HTTPS URLs', () => {
+    expect(repoHostKind('https://github.com/org/repo')).toBe('github')
+    expect(repoHostKind('https://github.com/org/repo.git')).toBe('github')
+  })
+
+  it('detects GitHub SSH URLs', () => {
+    expect(repoHostKind('git@github.com:org/repo')).toBe('github')
+    expect(repoHostKind('git@github.com:org/repo.git')).toBe('github')
+  })
+
+  it('detects GitHub URLs with trailing slash', () => {
+    expect(repoHostKind('https://github.com/org/repo/')).toBe('github')
+    expect(repoHostKind('https://github.com/org/repo.git/')).toBe('github')
+  })
+
+  it('detects Azure dev.azure.com URLs', () => {
+    expect(repoHostKind('https://dev.azure.com/org/project/_git/repo')).toBe('azure')
+    expect(repoHostKind('https://dev.azure.com/org/project/_git/repo.git')).toBe('azure')
+  })
+
+  it('detects Azure visualstudio.com URLs', () => {
+    expect(repoHostKind('https://org.visualstudio.com/project/_git/repo')).toBe('azure')
+    expect(repoHostKind('https://org.visualstudio.com/project/_git/repo.git')).toBe('azure')
+  })
+
+  it('returns unknown for unrecognized URLs', () => {
+    expect(repoHostKind('file:///tmp/repo')).toBe('unknown')
+    expect(repoHostKind('https://gitlab.com/org/repo')).toBe('unknown')
+    expect(repoHostKind('/local/path')).toBe('unknown')
+    expect(repoHostKind('')).toBe('unknown')
   })
 })

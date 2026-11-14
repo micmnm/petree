@@ -998,7 +998,7 @@
 <!-- ===================== (g) GAME RULES allowlist ===================== -->
 <section class="scr" id="g" aria-labelledby="g-h">
   <div class="scr-h"><span class="scr-k">(g)</span><h2 id="g-h">OPTIONS · GAME RULES · FROM YOUR ~/.claude</h2>
-    <p>A new section of the existing GAME RULES panel, filled from <code>GET /api/claude-home</code> and saved by the page’s SAVE. Skill and plugin names are samples.</p></div>
+    <p>A new section of the existing GAME RULES panel, filled from <code>GET /api/claude-home</code> and saved by the page’s SAVE, which also rewrites petree’s MCP file. Skill, plugin and MCP server names are samples.</p></div>
   <div class="vp"><div class="dev-mid"><main class="page sub-page">
     <section class="cart-frame" aria-labelledby="g-rules"><div class="cart-in o-panel">
       <div class="sec-head"><h2 id="g-rules">GAME RULES</h2><span class="hint">Defaults for every quest and how long old ones stay around.</span></div>
@@ -1012,7 +1012,7 @@
         <div class="cl-h"><h3 class="o-h3">FROM YOUR</h3><code>~/.claude</code><span class="hint">Mounted read-only into every sandbox, so quests work like your own sessions. Changes apply from each quest’s next turn.</span></div>
 
         <div class="nq-sws cl-sw">
-          <button type="button" class="nq-sw" role="switch" aria-checked="true" data-sw><span><b>INSTRUCTIONS</b><small>CLAUDE.md + 3 rules files. Petree’s stage instructions win on conflict. They contain machine and infrastructure details, which every quest will see. <code>@imports</code> outside ~/.claude won’t resolve.</small></span><span class="sw" aria-hidden="true"><span class="sw-w">ON</span><span class="sw-t"><span></span><span></span></span></span></button>
+          <button type="button" class="nq-sw" role="switch" aria-checked="true" data-sw><span><b>INSTRUCTIONS</b><small>CLAUDE.md + 3 rules files. Petree’s stage instructions win on conflict. They contain machine and infrastructure details, which every quest will see.<span class="cl-badges"><span class="cl-warn"><svg width="14" height="12" aria-hidden="true"><use href="#warn"/></svg>1 import won’t resolve in the sandbox: @~/notes/team-rules.md</span></span></small></span><span class="sw" aria-hidden="true"><span class="sw-w">ON</span><span class="sw-t"><span></span><span></span></span></span></button>
         </div>
 
         <div class="o-sub">
@@ -1028,7 +1028,7 @@
         </div>
 
         <div class="o-sub">
-          <div class="cl-k"><span class="o-k">PLUGINS</span><span class="o-help">whole plugins: skills, hooks and MCP servers · picked 2 of 5 · anything that can’t start shows in the quest’s INFO</span></div>
+          <div class="cl-k"><span class="o-k">PLUGINS</span><span class="o-help">whole plugins: skills, hooks and MCP servers · picked 2 of 5 · interview plugins start ticked until you save your own list · anything that can’t start shows in the quest’s INFO</span></div>
           <div class="cl-plugs">
             <label class="o-pick"><input type="checkbox" checked><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>agent-skills</b><i>addy-agent-skills · 0.6.15</i><span class="cl-badges"><span class="cl-use">USED BY INTERVIEW</span><span class="o-badge">21 skills</span><span class="o-badge">no hooks</span><span class="o-badge">no MCP</span></span><small>ships interview-me and spec-driven-development</small></span></span></label>
             <label class="o-pick"><input type="checkbox" checked><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>superpowers</b><i>claude-plugins-official · 7.0.2</i><span class="cl-badges"><span class="cl-use">USED BY INTERVIEW</span><span class="o-badge">14 skills</span><span class="o-badge">hooks: SessionStart</span><span class="o-badge">no MCP</span></span><small>ships brainstorming</small></span></span></label>
@@ -1036,6 +1036,20 @@
             <label class="o-pick"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>figma</b><i>claude-plugins-official · 2.2.157</i><span class="cl-badges"><span class="o-badge">17 skills</span><span class="o-badge">MCP: figma</span><span class="cl-warn"><svg width="14" height="12" aria-hidden="true"><use href="#warn"/></svg>MCP may need network or login</span></span></span></span></label>
             <label class="o-pick"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>playwright</b><i>claude-plugins-official · 099387b</i><span class="cl-badges"><span class="o-badge">0 skills</span><span class="o-badge">MCP: playwright</span><span class="cl-warn"><svg width="14" height="12" aria-hidden="true"><use href="#warn"/></svg>MCP may need network or login</span></span></span></span></label>
           </div>
+        </div>
+
+        <div class="o-sub">
+          <div class="cl-k"><span class="o-k">MCP SERVERS</span><span class="o-help">from ~/.claude.json, user and project scope · picked 2 of 5 · only the ticked ones are copied, secrets included, into petree’s own <code>claude.mcp.json</code> (0600, read-only in the sandbox)</span></div>
+          <div class="cl-skills">
+            <label class="o-pick sm"><input type="checkbox" checked><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>linear</b><small>user · http · mcp.linear.app</small><span class="cl-badges"><span class="o-badge">has secrets</span></span></span></span></label>
+            <label class="o-pick sm"><input type="checkbox" checked><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>postgres-ro</b><small>~/code/api · stdio · npx</small><span class="cl-badges"><span class="o-badge">has secrets</span></span></span></span></label>
+            <label class="o-pick sm"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>notion</b><small>user · http · mcp.notion.com</small><span class="cl-badges"><span class="cl-warn"><svg width="14" height="12" aria-hidden="true"><use href="#warn"/></svg>NEEDS LOGIN · token lives in the keychain</span></span></span></span></label>
+            <label class="o-pick sm"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>docs-search</b><small>user · stdio · uvx</small><span class="cl-badges"><span class="cl-warn"><svg width="14" height="12" aria-hidden="true"><use href="#warn"/></svg>uses host env vars</span></span></span></span></label>
+            <label class="o-pick sm"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>staging-db</b><small>~/code/billing · stdio · node</small><span class="cl-badges"><span class="o-badge">has secrets</span></span></span></span></label>
+          </div>
+          <div class="cl-k"><span class="o-k">FROM PLUGINS</span><span class="o-help">come and go with their plugin above, not copied</span></div>
+          <div class="cl-badges"><span class="o-badge">figma · with plugin figma · off</span><span class="o-badge">playwright · with plugin playwright · off</span></div>
+          <p class="o-help">SAVE rewrites <code>claude.mcp.json</code> from your current ~/.claude.json. Running turns keep the old file; the next turn gets the new one.</p>
         </div>
       </div>
       <div class="strip" aria-hidden="true"></div>
@@ -1051,7 +1065,8 @@
         <div><dt>INSTRUCTIONS</dt><dd>CLAUDE.md + 3 rules</dd></div>
         <div><dt>SKILLS</dt><dd>41 loaded · skipped: release-notes (name taken by shared)</dd></div>
         <div><dt>PLUGINS</dt><dd>2 of 2 loaded</dd></div>
-        <div><dt>MCP</dt><dd>none allowlisted</dd></div>
+        <div><dt>MCP</dt><dd>linear: connected · postgres-ro: failed (npx: no network)</dd></div>
+        <div><dt>MCP FILE</dt><dd>claude.mcp.json · 2 servers · saved 10:42</dd></div>
       </dl></div></details>
     </section>
   </main></div></div>

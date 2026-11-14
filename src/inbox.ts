@@ -1,5 +1,6 @@
 import type { PetreeConfig } from './config.js'
 import type { ThreadStatus } from './notes.js'
+import { prHost } from './prs.js'
 import { STAGES, threadTitle } from './store.js'
 import type { Delivery, Stage, TaskRecord } from './store.js'
 
@@ -49,14 +50,15 @@ function progressFor(task: TaskRecord): ProgressStep[] {
   return [...steps, last('pr', ship), last('merged', merged)]
 }
 
-const hostOf = (url: string) => /\/\/github\.com\//.test(url) ? 'GitHub' : 'Azure DevOps'
-
-function prLabel(ds: Delivery[]): string | null {
-  if (ds.some((d) => d.ahead > 0 && !d.target && !d.pr)) return 'Open the PR'
-  const open = ds.filter((d) => d.pr === 'open')
-  const stale = open.find((d) => d.prHead !== d.head)
-  if (stale) return `Push the update to PR #${stale.number}`
-  return open[0] ? `Merge PR #${open[0].number} on ${hostOf(open[0].url ?? '')}` : null
+function prLabel(task: TaskRecord, cfg: PetreeConfig): string | null {
+  const entries = Object.entries(task.delivery)
+  if (entries.some(([, d]) => d.ahead > 0 && !d.target && !d.pr)) return 'Open the PR'
+  const open = entries.filter(([, d]) => d.pr === 'open')
+  const stale = open.find(([, d]) => d.prHead !== d.head)
+  if (stale) return `Push the update to PR #${stale[1].number}`
+  if (!open[0]) return null
+  const host = prHost(cfg.repos[open[0][0]]?.url ?? '').kind === 'azure' ? 'Azure DevOps' : 'GitHub'
+  return `Merge PR #${open[0][1].number} on ${host}`
 }
 
 export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: PetreeConfig, now: Date = new Date()): Card {
@@ -96,8 +98,8 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
       group = 'your-move'
       if (task.state === 'waiting-for-you') {
         action = { label: `Read the ${task.stage === 'spec' ? 'spec' : 'findings'}, then approve or comment`, detail }
-      } else if (prLabel(deliveries)) {
-        action = { label: prLabel(deliveries)!, detail }
+      } else if (prLabel(task, cfg)) {
+        action = { label: prLabel(task, cfg)!, detail }
         if (openPr) line = `PR #${openPr.number} open — waiting for merge`
       } else if (detail) {
         action = { label: 'Reply', detail }

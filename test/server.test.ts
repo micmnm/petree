@@ -337,7 +337,7 @@ describe('API', () => {
     expect(unknownRepo.status).toBe(400)
   })
 
-  it('pushes then attempts gh pr create, surfacing failure without crashing (no real GitHub remote in tests)', async () => {
+  it('records target after the push even when PR creation fails (unsupported host, no CLI run)', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     seedWorkRepo(home, t.id, 'demo')
     const res = await fetch(`${base}/api/tasks/${t.id}/pr`, {
@@ -348,6 +348,7 @@ describe('API', () => {
     const body = await res.json()
     expect(body.ok).toBe(false)
     expect(body.output.length).toBeGreaterThan(0)
+    expect(store.get(t.id)!.delivery.demo.target).toBe(`petree/${t.id}`)
   })
 
   it('queues a follow-up turn on a done task via /next', async () => {

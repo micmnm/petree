@@ -80,7 +80,7 @@ export function diffBranch(repoDir: string, baseBranch: string): { stat: string;
 
 // git's push output echoes the remote URL (e.g. "To https://x-access-token:TOKEN@host/repo.git"),
 // which can carry embedded credentials — strip URLs before this reaches the API response.
-function scrubUrls(text: string): string {
+export function scrubUrls(text: string): string {
   return text.replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, '[url redacted]').replace(/\bgit@\S+/gi, '[url redacted]')
 }
 
@@ -91,31 +91,6 @@ export function pushBranch(repoDir: string, taskId: string, target: string): { o
   } catch (err) {
     const e = err as { stderr?: Buffer | string; stdout?: Buffer | string; message?: string }
     const output = String(e.stderr?.toString() || e.stdout?.toString() || e.message || 'push failed')
-    return { ok: false, output: scrubUrls(output) }
-  }
-}
-
-// Shells out to the GitHub CLI (`gh`), which reads its own auth from the host —
-// same "host owns credentials, sandbox never sees them" model as git push above.
-export function createPullRequest(
-  repoDir: string,
-  target: string,
-  baseBranch: string,
-  title: string,
-  body: string,
-): { ok: boolean; output: string; url?: string } {
-  try {
-    const output = execFileSync(
-      'gh',
-      ['pr', 'create', '--head', target, '--base', baseBranch, '--title', title, '--body', body],
-      { cwd: repoDir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-    ).trim()
-    // gh pr create prints the new PR's URL as the last line of stdout.
-    const url = output.split('\n').pop()
-    return { ok: true, output, url }
-  } catch (err) {
-    const e = err as { stderr?: Buffer | string; stdout?: Buffer | string; message?: string }
-    const output = String(e.stderr?.toString() || e.stdout?.toString() || e.message || 'gh pr create failed')
     return { ok: false, output: scrubUrls(output) }
   }
 }

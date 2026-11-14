@@ -7,7 +7,7 @@ import type { TaskRecord } from '../src/store.js'
 const cfg = {
   home: '/h',
   defaults: { timeoutMinutes: 30, tokenBudget: 1, concurrency: 1, defaultModel: null, instructions: '' },
-  repos: { demo: { tags: ['work'] } },
+  repos: { demo: { tags: ['work'], url: 'https://github.com/o/r.git' }, az: { tags: [], url: 'https://dev.azure.com/o/p/_git/r' } },
   allowClone: [],
 } as unknown as PetreeConfig
 
@@ -120,7 +120,7 @@ describe('cardFor progress', () => {
     ['unshipped commits', { demo: { ahead: 1, head: 'a' } }, 'Open the PR', 'Build finished'],
     ['PR head behind local head', { demo: { ...open, head: 'b' } }, 'Push the update to PR #7', 'PR #7 open — waiting for merge'],
     ['open PR on GitHub', { demo: open }, 'Merge PR #7 on GitHub', 'PR #7 open — waiting for merge'],
-    ['open PR on Azure', { demo: { ...open, url: 'https://dev.azure.com/o/p/_git/r/pullrequest/7' } }, 'Merge PR #7 on Azure DevOps', 'PR #7 open — waiting for merge'],
+    ['open PR on Azure', { az: { ...open, url: 'https://dev.azure.com/o/p/_git/r/pullrequest/7' } }, 'Merge PR #7 on Azure DevOps', 'PR #7 open — waiting for merge'],
   ])('PR action and line: %s', (_n, d, label, line) => {
     const c = cardFor(built(d), null, cfg)
     expect(c).toMatchObject({ group: 'your-move', action: { label }, line })

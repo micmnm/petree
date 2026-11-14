@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { parseConfigText, resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
-import { localCheckout, repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch, headSha } from './gitops.js'
+import { localCheckout, repoStatus, diffBranch, pushBranch, taskBranch, headSha } from './gitops.js'
+import { createPullRequest, pollPrs } from './prs.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
@@ -299,11 +300,14 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     const repoDir = join(cfg.home, 'work', t.id, repo as string)
     if (!existsSync(repoDir)) { res.status(400).json({ error: 'no work dir for task' }); return }
     const pushed = pushBranch(repoDir, t.id, norm)
-    if (pushed.ok) store.setDelivery(t.id, repo as string, { target: norm, prHead: headSha(repoDir) })
+    if (pushed.ok) {
+      store.setDelivery(t.id, repo as string, { target: norm, prHead: headSha(repoDir) })
+      void pollPrs(store, cfg, t.id)
+    }
     res.json(pushed)
   })
 
-  app.post('/api/tasks/:id/pr', (req, res) => {
+  app.post('/api/tasks/:id/pr', async (req, res) => {
     if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) { res.sendStatus(400); return }
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
@@ -314,14 +318,16 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (!existsSync(repoDir)) { res.status(400).json({ error: 'no work dir for task' }); return }
     const pushed = pushBranch(repoDir, t.id, norm)
     if (!pushed.ok) { res.json(pushed); return }
+    // The branch is on the remote now, whether or not the PR gets created.
+    store.setDelivery(t.id, repo as string, { target: norm, prHead: headSha(repoDir) })
     const base = cfg.repos[repo as string]?.defaultBranch ?? 'main'
     const title = `petree ${t.id}: ${threadTitle(t)}`
-    const made = createPullRequest(repoDir, norm, base, title, t.turns[0]?.prompt ?? t.prompt)
+    const made = await createPullRequest(cfg.repos[repo as string].url, repoDir, norm, base, title, t.turns[0]?.prompt ?? t.prompt)
     if (made.ok && made.url) {
-      const number = Number(/\/pull\/(\d+)/.exec(made.url)?.[1]) || undefined
-      store.setDelivery(t.id, repo as string, { target: norm, url: made.url, number, pr: 'open', prHead: headSha(repoDir) })
+      store.setDelivery(t.id, repo as string, { url: made.url, number: made.number, pr: 'open' })
     }
-    res.json(made)
+    void pollPrs(store, cfg, t.id)
+    res.json({ ok: made.ok, output: made.output, url: made.url })
   })
 
   app.post('/api/tasks/:id/resume', (req, res) => {

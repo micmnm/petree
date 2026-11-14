@@ -2,6 +2,7 @@ import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadConfig } from './config.js'
 import { makeLauncher } from './launcher.js'
+import { pollPrs } from './prs.js'
 import { recover } from './recover.js'
 import { containerName, inspectContainerState } from './sandbox.js'
 import { Scheduler } from './scheduler.js'
@@ -26,6 +27,9 @@ void recover(store, launcher, {
 
 store.prune()
 setInterval(() => store.prune(), 60_000)
+
+void pollPrs(store, cfg)
+setInterval(() => void pollPrs(store, cfg), 5 * 60_000)
 
 const app = makeApp(cfg, store, scheduler, launcher)
 const port = Number(process.env.PORT ?? 4100)

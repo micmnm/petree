@@ -16,7 +16,10 @@ export class Scheduler {
       while (
         this.store.countByState('running') + this.store.countByState('provisioning') < this.concurrency
       ) {
-        const next = this.store.nextQueued()
+        // LM Studio holds one model in memory at a time: never start a second
+        // local-model task while one is already running/provisioning, however
+        // much concurrency headroom is left. Cloud tasks keep flowing through.
+        const next = this.store.nextQueued(new Date(), { skipLocalModel: this.store.hasActiveLocalModel() })
         if (!next) break
         const t = this.store.transition(next.id, 'provisioning')
         this.launch(t).catch((err) => {

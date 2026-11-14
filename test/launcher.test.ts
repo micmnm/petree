@@ -8,7 +8,7 @@ import type { PetreeConfig } from '../src/config.js'
 import { prepareWorkspace } from '../src/git.js'
 import { TaskStore } from '../src/store.js'
 import type { Stage, TaskRecord } from '../src/store.js'
-import { makeLauncher } from '../src/launcher.js'
+import { defaultBuildCommands, makeLauncher } from '../src/launcher.js'
 import type { SandboxCommands } from '../src/sandbox.js'
 import { inspectContainerState } from '../src/sandbox.js'
 
@@ -36,7 +36,7 @@ function makeFixtureRepo(): string {
   return dir
 }
 
-function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: Stage } = {}): {
+function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: Stage; model?: string } = {}): {
   home: string
   cfg: PetreeConfig
   store: TaskStore
@@ -56,6 +56,7 @@ function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: S
     tokenBudget: input.tokenBudget ?? 500000,
     timeoutMinutes: input.timeoutMinutes ?? 30,
     stage: input.stage ?? 'build',
+    model: input.model ?? null,
   })
   const task = store.transition(created.id, 'provisioning')
   return { home, cfg, store, task }
@@ -443,6 +444,102 @@ describe('makeLauncher', () => {
     await launch.reattach(store.get(task.id)!)
     expect(store.get(task.id)?.state).toBe('paused-limit')
     expect(store.get(task.id)?.error).toBe('timeout')
+  })
+})
+
+describe('makeLauncher — LM Studio', () => {
+  it('runs an lmstudio task end to end when the model loads successfully', async () => {
+    const { home, cfg, store, task } = setup({ model: 'lmstudio:qwen2.5-coder-7b' })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    store.updateSettings({ lmStudioBaseUrl: 'http://fake:1234' })
+
+    const launch = makeLauncher(cfg, store, {
+      buildCommands: (t) => shimCommands('ok', `petree-${t.id}`),
+      loadLmStudioModel: async () => {},
+    })
+    await launch(task)
+
+    expect(store.get(task.id)?.state).toBe('done')
+  })
+
+  it('fails without starting a container when no LM Studio base URL is configured', async () => {
+    const { home, cfg, store, task } = setup({ model: 'lmstudio:qwen2.5-coder-7b' })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+
+    let buildCommandsCalled = false
+    const launch = makeLauncher(cfg, store, {
+      buildCommands: (t) => {
+        buildCommandsCalled = true
+        return shimCommands('ok', `petree-${t.id}`)
+      },
+      loadLmStudioModel: async () => {},
+    })
+    await launch(task)
+
+    const finished = store.get(task.id)!
+    expect(finished.state).toBe('failed')
+    expect(finished.error).toMatch(/Settings|LM Studio/)
+    expect(buildCommandsCalled).toBe(false)
+  })
+
+  it('fails without starting a container when the model fails to load', async () => {
+    const { home, cfg, store, task } = setup({ model: 'lmstudio:qwen2.5-coder-7b' })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    store.updateSettings({ lmStudioBaseUrl: 'http://fake:1234' })
+
+    let buildCommandsCalled = false
+    const launch = makeLauncher(cfg, store, {
+      buildCommands: (t) => {
+        buildCommandsCalled = true
+        return shimCommands('ok', `petree-${t.id}`)
+      },
+      loadLmStudioModel: async () => { throw new Error('LM Studio unreachable at http://fake:1234') },
+    })
+    await launch(task)
+
+    const finished = store.get(task.id)!
+    expect(finished.state).toBe('failed')
+    expect(finished.error).toBe('LM Studio unreachable at http://fake:1234')
+    expect(buildCommandsCalled).toBe(false)
+  })
+
+  it('bypasses the token budget for local-model tasks', async () => {
+    const { home, cfg, store, task } = setup({ model: 'lmstudio:qwen2.5-coder-7b', tokenBudget: 1 })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    store.updateSettings({ lmStudioBaseUrl: 'http://fake:1234' })
+
+    const launch = makeLauncher(cfg, store, {
+      buildCommands: (t) => shimCommands('big-usage', `petree-${t.id}`),
+      loadLmStudioModel: async () => {},
+    })
+    await launch(task)
+
+    expect(store.get(task.id)?.state).toBe('done')
+  })
+
+  it('cancels a task that is stopped while the model is loading', async () => {
+    const { home, cfg, store, task } = setup({ model: 'lmstudio:qwen2.5-coder-7b' })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    store.updateSettings({ lmStudioBaseUrl: 'http://fake:1234' })
+
+    const launch = makeLauncher(cfg, store, {
+      buildCommands: (t) => shimCommands('ok', `petree-${t.id}`),
+      loadLmStudioModel: () => new Promise((resolve) => setTimeout(resolve, 300)),
+    })
+    const running = launch(task)
+    await new Promise((r) => setTimeout(r, 100))
+    const stopped = await launch.stop(task.id)
+    expect(stopped).toBe(true)
+    await running
+
+    expect(store.get(task.id)?.state).toBe('cancelled')
+  })
+
+  it('defaultBuildCommands does not require a token file for an lmstudio task', () => {
+    const { cfg, store, task } = setup({ model: 'lmstudio:qwen2.5-coder-7b' })
+    store.updateSettings({ lmStudioBaseUrl: 'http://fake:1234' })
+    const workDir = join(cfg.home, 'work', task.id)
+    expect(() => defaultBuildCommands(task, cfg, store, workDir)).not.toThrow()
   })
 })
 

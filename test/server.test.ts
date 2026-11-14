@@ -727,6 +727,20 @@ describe('thread API', () => {
     expect((await res.json()).state).toBe('cancelled')
   })
 
+  it('serves quest stats: a running turn timed from startedAt, and the window budget from defaults', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.patch(t.id, { startedAt: new Date(Date.now() - 60_000).toISOString() })
+    const stats = async () => (await fetch(`${base}/api/tasks/${t.id}/stats`)).json()
+    const s = await stats()
+    expect(s).toMatchObject({ windowUsd: null, stages: [{ stage: 'investigate', live: true }] })
+    expect(s.stages[0].wallMs).toBeGreaterThanOrEqual(60_000)
+    const yaml = 'defaults:\n  window_usd: 40\nrepos:\n  demo:\n    url: x\n    image: sandbox-node\n'
+    await fetch(`${base}/api/repos-yaml`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: yaml }) })
+    expect((await stats()).windowUsd).toBe(40)
+  })
+
   it('serves thread files and suggestions', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     const empty = await (await fetch(`${base}/api/tasks/${t.id}/thread`)).json()

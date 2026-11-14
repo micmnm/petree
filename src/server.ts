@@ -281,10 +281,13 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) { res.sendStatus(400); return }
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
+    // A run has no result event (duration_ms) until it ends, so its time so far is the wall clock.
     const live = t.state === 'running'
-      ? sliceStats(readSlice(join(cfg.home, 'logs', `${t.id}.log`), t.logOffset), t.repos.flatMap((r) => cfg.repos[r]?.test ?? []), 0)
+      ? sliceStats(readSlice(join(cfg.home, 'logs', `${t.id}.log`), t.logOffset), t.repos.flatMap((r) => cfg.repos[r]?.test ?? []),
+        t.startedAt ? Math.max(0, Date.now() - Date.parse(t.startedAt)) : 0)
       : null
-    res.json(questStats(t, live))
+    // windowUsd feeds the ≈ window share; null means the dashboard shows none (spec §5.9).
+    res.json({ ...questStats(t, live), windowUsd: cfg.defaults.windowUsd ?? null })
   })
 
   app.get('/api/tasks/:id/logs', (req, res) => {

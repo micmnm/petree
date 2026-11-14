@@ -498,6 +498,80 @@
   .rd-doc { min-width: 0; padding: 26px 30px 34px; background-color: var(--inset); background-image: var(--tex); border: 2px solid var(--line); }
   .rd-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 14px 18px 16px; border-top: 2px solid var(--line); font-size: 14px; color: var(--muted); }
   .rd-foot .th-btns { flex: 1 1 100%; padding-top: 0; }
+  /* Small trophy header: hall-of-fame threads without a merge */
+  .frame > .th-fame { flex-direction: row; align-items: center; gap: 18px; }
+  .th-fame > svg { flex: none; }
+  .th-fame > div { min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  /* Quest stats and quest log (spec §5.9, design §4.9) */
+  .qs-live { display: inline-flex; align-items: center; gap: 6px; font: 20px/1 var(--px); color: var(--go); }
+  .qs-live .cursor { width: 8px; height: 14px; }
+  .qs-tiles { margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+  .qs-tile { min-width: 0; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--inset); border: 2px solid var(--line); }
+  .qs-tile dt { margin: 0; font: 20px/1 var(--px); color: var(--label); }
+  .qs-tile dd { margin: 0; font-size: 13px; line-height: 1.3; color: var(--muted); }
+  .qs-tile .qs-v { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font: 30px/1 var(--px); color: var(--ink); }
+  .qs-go { color: var(--go); }
+  .qs-meter { display: flex; gap: 1px; padding: 2px; border: 2px solid var(--line-strong); }
+  .qs-meter i { width: 5px; height: 10px; background: var(--shell); }
+  .qs-meter i.on { background: var(--go-fill); }
+  .qs-more { background: var(--inset); }
+  .qs-more > summary { min-height: 52px; padding: 6px 14px; }
+  .qs-more-in { display: flex; flex-direction: column; gap: 18px; padding: 0 14px 16px; }
+  .qs-scroll { overflow-x: auto; }
+  .qs-table { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .qs-table th, .qs-table td { padding: 8px 10px 8px 0; border-bottom: 2px dotted var(--line); text-align: right; white-space: nowrap; }
+  .qs-table th:first-child, .qs-table td:nth-child(2) { text-align: left; }
+  .qs-table thead th { border-bottom: 2px solid var(--line); font: 20px/1 var(--px); color: var(--label); }
+  .qs-table tbody th { font: 20px/1 var(--px); color: var(--go); }
+  .qs-table tr.live { background: var(--go-tint); }
+  .qs-table tr.live > :first-child { padding-left: 6px; }
+  .qs-table tr.total > * { border-bottom: 0; font-weight: 700; }
+  .qs-table tr.total th { color: var(--ink); }
+  .qs-table tr.total td:nth-child(2) { font-weight: 400; color: var(--muted); }
+  .qs-foot { display: flex; flex-wrap: wrap; gap: 16px 32px; }
+  .qs-foot > div { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+  .qs-foot h3, .qs-foot p { margin: 0; }
+  .qs-foot p { font-size: 15px; }
+  .qs-m { color: var(--muted); }
+  .qs-tools { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+  .qs-tools li { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 9px; background: var(--screen); border: 2px solid var(--line); font-size: 14px; font-weight: 700; }
+  .qs-tools span { font: 400 20px/1 var(--px); color: var(--muted); }
+  .ql { margin: 0; padding: 0; list-style: none; }
+  .ql li { display: flex; gap: 14px; padding: 12px 0; border-top: 2px dotted var(--line); }
+  .ql-dot { flex: none; width: 12px; height: 12px; margin-top: 5px; }
+  .ql-dot.agent { background: var(--go-fill); }
+  .ql-dot.you { background: var(--gold-fill); }
+  .ql-dot.now { background: var(--need); }
+  .ql-dot.run { border: 2px solid var(--go); }
+  .ql-dot.end { background: var(--line-strong); }
+  .ql-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .ql-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+  .ql-h span:last-child { font-size: 14px; color: var(--muted); }
+  .ql-det { margin: 0; font-size: 15px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .ql .rd-open { margin-top: 4px; }
+  .ql-when { flex: none; padding-top: 2px; font: 20px/1 var(--px); color: var(--label); white-space: nowrap; }
+  /* Victory (spec §5.1e, canvas ArcadeVictory) */
+  .vic { display: flex; flex-direction: column; gap: 24px; }
+  .vic-frame { background: var(--gold-fill); }
+  .vic-in { position: relative; overflow: hidden; align-items: center; gap: 20px; padding: 40px 24px 12px; text-align: center; }
+  .vic-in > :not(.vic-spark) { position: relative; }
+  .vic-spark { position: absolute; top: 14px; left: 14px; }
+  .vic-spark.r { top: 28px; left: auto; right: 28px; }
+  .vic-top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; gap: 16px 32px; }
+  .vic-words { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-bottom: 6px; }
+  .vic-k { font: 30px/1 var(--px); color: var(--go); }
+  .vic-h { margin: 0; font: 400 100px/.85 var(--px); letter-spacing: 2px; color: var(--gold); text-shadow: 5px 5px 0 var(--gold-tint); }
+  .vic-id, .vic-meta { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 16px; }
+  .vic-t { margin: 0; font-size: 24px; font-weight: 700; line-height: 1.25; }
+  .vic-meta { gap: 6px 12px; margin-top: -8px; font-size: 15px; color: var(--muted); }
+  .vic .prog { width: 100%; max-width: 560px; margin-top: 0; }
+  .vic-in .strip { align-self: stretch; }
+  .vic-rep h2 { margin: 0; }
+  .vic-facts { margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 20px; }
+  .vic-facts div { display: flex; flex-direction: column; gap: 4px; padding: 12px 0; border-top: 2px dotted var(--line); }
+  .vic-facts dt { margin: 0; font: 20px/1 var(--px); color: var(--label); }
+  .vic-facts dd { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 14px; color: var(--muted); }
+  .vic-facts b { min-width: 0; font: 400 40px/.9 var(--px); color: var(--ink); overflow-wrap: anywhere; }
   @media (max-width: 600px) {
     #threadView { gap: 22px; }
     .th-head .cart-in { gap: 12px; padding: 14px 14px 6px; }
@@ -506,15 +580,37 @@
     .th-q { font-size: 20px; }
     .th-h1 { font-size: 20px; }
     .th-sum { font-size: 15px; }
-    /* the thread head keeps a full-width track, unlike the compact card track */
-    .th-head .prog { flex-direction: column; align-items: stretch; gap: 8px; }
-    .th-head .prog .track { order: 0; flex: none; height: auto; padding: 4px 4px 0; }
-    .th-head .lv { display: inline; }
-    .th-head .node i { width: 20px; height: 20px; font-size: 20px; }
-    .th-head .node i svg { display: block; }
-    .th-head .node.current i { width: 24px; height: 24px; }
-    .th-head .seg { height: 4px; margin: 0 3px; background: repeating-linear-gradient(90deg, var(--line-strong) 0 4px, transparent 4px 8px); }
-    .th-head .seg.done { margin: 0; background: var(--go-fill); }
+    /* the thread head and Victory keep a full-width track, unlike the compact card track */
+    :is(.th-head, .vic) .prog { flex-direction: column; align-items: stretch; gap: 8px; }
+    :is(.th-head, .vic) .prog .track { order: 0; flex: none; height: auto; padding: 4px 4px 0; }
+    :is(.th-head, .vic) .lv { display: inline; }
+    :is(.th-head, .vic) .node i { width: 20px; height: 20px; font-size: 20px; }
+    :is(.th-head, .vic) .node i svg { display: block; }
+    :is(.th-head, .vic) .node.current i { width: 24px; height: 24px; }
+    :is(.th-head, .vic) .seg { height: 4px; margin: 0 3px; background: repeating-linear-gradient(90deg, var(--line-strong) 0 4px, transparent 4px 8px); }
+    :is(.th-head, .vic) .seg.done { margin: 0; background: var(--go-fill); }
+    /* QUEST STATS: 2×2 headline tiles; the per-stage table becomes one stacked block per stage */
+    .qs-tiles { grid-template-columns: 1fr 1fr; gap: 8px; }
+    .qs-tile .qs-v { font-size: 40px; line-height: .9; }
+    .qs-more > summary, .qs-more-in { padding-left: 10px; padding-right: 10px; }
+    .qs-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+    .qs-table, .qs-table tbody, .qs-table tr, .qs-table th, .qs-table td { display: block; }
+    .qs-table tr { padding: 6px 8px; border-top: 2px dotted var(--line); }
+    .qs-table tbody th, .qs-table td { padding: 3px 0; border: 0; white-space: normal; }
+    .qs-table tr.live > :first-child { padding-left: 0; }
+    .qs-table td { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+    .qs-table td::before { content: attr(data-l); flex: none; font: 400 20px/1 var(--px); color: var(--label); text-align: left; }
+    .qs-table td:empty { display: none; }
+    .ql li { gap: 10px; }
+    .vic-in { gap: 14px; padding: 24px 14px 8px; }
+    .vic-sp { width: 96px; height: 102px; }
+    .vic-top > .ico-t { display: none; }
+    .vic-spark { width: 150px; height: 30px; }
+    .vic-k { font-size: 20px; }
+    .vic-h { font-size: 50px; letter-spacing: 1px; text-shadow: 3px 3px 0 var(--gold-tint); }
+    .vic-t { font-size: 19px; }
+    .vic-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; }
+    .vic-facts b { font-size: 30px; }
     .frame > div { gap: 8px; padding: 12px 14px 14px; }
     .th-big { font-size: 20px; }
     .ym-tag.th-big { padding: 3px 7px 2px; }
@@ -838,6 +934,7 @@
     <span class="th-id" id="thId"></span>
   </div>
   <p class="th-live" id="thLive" role="status"></p>
+  <section class="vic" id="thVic" aria-labelledby="vicH" hidden></section>
   <section class="th-head" id="thHead" aria-labelledby="thTitle"></section>
   <section id="thPanel" aria-label="Where the quest stands"></section>
   <section class="th-sec" id="thDoc" aria-labelledby="thDocH"></section>
@@ -855,15 +952,18 @@
     </div>
     <div class="strip" aria-hidden="true"></div>
   </div></section>
-  <!-- PR 12 placeholder: QUEST STATS (GET /api/tasks/:id/stats). Phone CSS orders it after the details. -->
-  <section class="th-sec th-stats" id="thStats" aria-label="Quest stats" hidden></section>
-  <!-- PR 12 placeholder: QUEST LOG (timeline of turns, approvals and comments). -->
-  <section class="th-sec th-log" id="thLog" aria-label="Quest log" hidden></section>
+  <!-- Phone CSS orders QUEST STATS after the details. -->
+  <section class="th-sec th-stats" id="thStats" aria-label="Quest stats" hidden>
+    <details class="th-det" id="qsDet"><summary><b>QUEST STATS</b><span class="qs-live" id="qsLive" hidden>LIVE<span class="cursor hollow" aria-hidden="true"></span></span><small id="qsSub"></small></summary><div class="th-det-body" id="qsBody"></div></details>
+  </section>
+  <section class="th-sec th-log" id="thLog" aria-label="Quest log" hidden>
+    <details class="th-det" id="qlDet"><summary><b>QUEST LOG</b><span class="th-k" id="qlN"></span><small id="qlLast"></small></summary><div class="th-det-body"><ol class="ql" id="qlList"></ol></div></details>
+  </section>
   <section class="th-sec" id="thDetails" aria-labelledby="thDetH">
     <h2 class="th-h" id="thDetH">DETAILS</h2>
     <details class="th-det" data-det="prompt"><summary><b>ORIGINAL PROMPT</b><span class="th-k" id="thPromptN"></span><small id="thPromptQ"></small></summary><div class="th-det-body"></div></details>
     <details class="th-det" data-det="changes"><summary><b>CHANGES</b><small>diff, local folder and run commands · loads when opened</small></summary><div class="th-det-body"></div></details>
-    <details class="th-det" data-det="runs"><summary><b>STAGE RUNS</b><span class="th-k" id="thRunsN"></span><small>each turn's prompt and result, oldest first</small></summary><div class="th-det-body"></div></details>
+    <details class="th-det" data-det="runs"><summary><b>STAGE RUNS</b><span class="th-k" id="thRunsN"></span><small id="thRunsT">each turn's prompt and result, oldest first</small></summary><div class="th-det-body"></div></details>
     <details class="th-det" data-det="log"><summary><b>LOG</b><small>activity of the last turn · loads when opened</small></summary><div class="th-det-body"></div></details>
     <details class="th-det" data-det="notes" id="thNotesDet" hidden><summary><b>NOTE SUGGESTIONS</b><span class="th-k" id="thNotesN"></span><small>notes the agent wants to keep for these repos</small></summary><div class="th-det-body"></div></details>
     <details class="th-det" data-det="info"><summary><b>INFO</b><small>model, flags, tokens, session, last error</small></summary><div class="th-det-body"></div></details>
@@ -1193,10 +1293,12 @@
     const lv = thLv[t.stage], pending = t.comments.filter((x) => !x.consumed).length
     if (t.bin) {
       const over = t.bin === 'game-over'
-      return `<div class="frame ${over ? 'over' : 'fame'}"><div><span class="th-tag">${over ? 'GAME OVER' : 'HALL OF FAME'}</span>
+      const body = `<span class="th-tag">${over ? 'GAME OVER' : 'QUEST COMPLETE · HALL OF FAME'}</span>
         <p class="th-act">${esc(c.reason ?? '')}</p><span class="th-meta">binned ${age(t.binnedAt ?? t.updatedAt)}</span>
         ${t.archivedAt ? '<span class="th-meta">Archived: it stays readable here but can no longer be restored.</span>'
-          : over ? '<button type="button" class="btn2" data-act="restore" data-key="act:restore"><span><b>CONTINUE?</b><small>restore from the bin</small></span></button>' : ''}</div></div>`
+          : over ? '<button type="button" class="btn2" data-act="restore" data-key="act:restore"><span><b>CONTINUE?</b><small>restore from the bin</small></span></button>' : ''}`
+      // a merge gets the full Victory layout (vicHtml); other wins get this smaller trophy header
+      return `<div class="frame ${over ? 'over' : 'fame'}">${over ? `<div>${body}</div>` : `<div class="th-fame">${TROPHY}<div>${body}</div></div>`}</div>`
     }
     if (c.group === 'questing') {
       const running = t.state === 'running' && t.startedAt
@@ -1285,12 +1387,191 @@
     + (m.queue ? `<span class="th-q">${pending} note${pending === 1 ? '' : 's'} queued</span>` : '')
     + (m.quiet ?? []).map((b, i) => thBtn(b, 'quiet', i)).join('')
 
-  const thShow = (on) => ['thPanel', 'thDoc', 'thOld', 'thMove', 'thDetails'].forEach((id) => { $(id).hidden = !on })
+  const thShow = (on) => {
+    ['thPanel', 'thDoc', 'thOld', 'thMove', 'thStats', 'thLog', 'thDetails'].forEach((id) => { $(id).hidden = !on })
+    if (!on) { $('thVic').hidden = true; $('thHead').hidden = false }
+  }
+
+  // ---- quest stats, quest log, Victory (spec §5.1e, §5.9; design §4.9) ----
+  let qsData = null, qsKey = '', qsMore = false // last /stats answer for `selected`, the task key it was fetched at, PER STAGE open
+  const qsKeyOf = (t) => [t.state, t.stage, t.turns.length, t.bin].join()
+  const qsDur = (ms) => { const m = Math.round(ms / 60000); return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m` }
+  const qsK = (n) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n)
+  const qsSum = (o) => Object.values(o).reduce((a, b) => a + b, 0)
+  const qsFiles = (fs) => fs.reduce((a, f) => [a[0] + f.files, a[1] + f.add, a[2] + f.del], [0, 0, 0])
+  const qsClass = (m) => m ? Object.entries(OCLASSES).find(([k]) => m.includes(k))?.[1] : undefined
+  const qsWhen = (s) => {
+    const d = new Date(s), days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(s).setHours(0, 0, 0, 0)) / 864e5)
+    return `${days === 0 ? 'today' : days === 1 ? 'yesterday' : d.toLocaleDateString([], { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  }
+
+  async function qsLoad(t) {
+    const id = t.id
+    qsKey = qsKeyOf(t)
+    try {
+      const r = await fetch(`/api/tasks/${encodeURIComponent(id)}/stats`)
+      if (!r.ok) throw new Error()
+      const d = await r.json()
+      if (id === selected) qsData = d
+    } catch { if (id === selected) qsData ??= { error: true } }
+    if (id === selected) qsPaint()
+  }
+  function qsPaint() {
+    const t = thTask
+    if (!t) return
+    if ($('qsDet').open) paint($('qsBody'), qsHtml(t, qsData))
+    if (!$('thVic').hidden) paint($('thVic'), vicHtml(t, t.card))
+  }
+
+  // Every number comes from /stats (spec §5.9); the window share only when window_usd is set.
+  function qsHtml(t, d) {
+    if (!d) return '<p class="hint">loading…</p>'
+    if (d.error) return '<p class="nq-err" role="alert">Couldn’t load the stats — petree not reachable.</p>'
+    if (!d.stages.length) return '<p class="th-none">Nothing counted yet. Stats are read from the log as each turn runs.</p>'
+    const s = d.total, w = d.windowUsd, live = d.stages.find((x) => x.live), lv = (x) => thLv[x.stage]
+    const share = (x) => w && x.costUsd != null ? x.costUsd / w * 100 : null
+    const pct = (x) => share(x) == null ? '—' : `≈${Math.round(share(x))}%`
+    const p = share(s), on = Math.min(10, Math.round((p ?? 0) / 10)), cls = qsClass(s.model)
+    const meter = p == null ? '' : `<span class="qs-meter" role="img" aria-label="About ${Math.round(p)}% of one 5-hour window">${'<i class="on"></i>'.repeat(on)}${'<i></i>'.repeat(10 - on)}</span>`
+    const nSub = qsSum(s.subagents), subIn = d.stages.filter((x) => qsSum(x.subagents)).map(lv)
+    const tile = (k, v, sub) => `<div class="qs-tile"><dt>${k}</dt><dd class="qs-v">${v}</dd><dd>${sub}</dd></div>`
+    const tiles = tile('TIME PLAYED', qsDur(s.wallMs).toUpperCase(), live ? `<strong class="qs-go">live · ${lv(live)} ${qsDur(live.wallMs)} so far</strong>` : `agent time, ${d.stages.length} stage${d.stages.length === 1 ? '' : 's'}`)
+      + tile('TURNS', s.turns, `model turns${d.stages.length > 1 || live ? ' · ' + d.stages.map((x) => x.turns + (x.live ? ' live' : '')).join(' + ') : ''}`)
+      + tile('TOKENS', qsK(s.tokensIn), `in · ${qsK(s.tokensOut)} out${s.cacheRead ? ` · ${qsK(s.cacheRead)} cache reads` : ''}${live ? ' · live' : ''}`)
+      + tile('5-H WINDOW', pct(s) + meter, !w ? '<a href="#/options">set in GAME RULES</a>' : s.costUsd == null ? 'no cost in the log' : 'estimate, of one window’s worth')
+      + tile('MODEL', cls ? cls[0] : s.model ? 'OTHER' : '—', cls ? `${cls[1]} · ${cls[2]}` : esc(s.model ?? 'not in the log'))
+      + tile('SUBAGENTS', nSub, nSub ? `${Object.entries(s.subagents).map(([k, n]) => `${esc(k)} ×${n}`).join(' · ')}, in ${subIn.join(' + ')}` : t.party ? 'none spawned' : 'PARTY MODE off')
+
+    const cols = ['STAGE', 'MODEL', 'TIME', 'TURNS', 'TOKENS IN / OUT', 'TOOLS', 'FILES', 'TEST RUNS', ...(w ? ['≈ WINDOW'] : [])]
+    const fcell = (x) => { const [n, a, dl] = qsFiles(x.files); return n ? `${n} · +${a} −${dl}` : '0' }
+    const cells = (x) => [qsClass(x.model)?.[1] ?? esc(x.model ?? '—'), qsDur(x.wallMs), x.turns, `${qsK(x.tokensIn)} / ${qsK(x.tokensOut)}`, qsSum(x.tools), fcell(x), x.testRuns, ...(w ? [pct(x)] : [])]
+    // explicit roles: the phone CSS turns rows into blocks, which drops table semantics in some browsers
+    const row = (head, vals, cls = '') => `<tr role="row"${cls ? ` class="${cls}"` : ''}><th scope="row" role="rowheader">${head}</th>${vals.map((v, i) => `<td role="cell" data-l="${cols[i + 1]}">${v}</td>`).join('')}</tr>`
+    const unplayed = []
+    const rows = thStages.map((st) => {
+      const x = d.stages.find((y) => y.stage === st)
+      if (x) return row(thLv[st] + (x.live ? ' · LIVE' : ''), cells(x), x.live ? 'live' : '')
+      if (t.turns.some((r) => r.stage === st)) return row(thLv[st], cols.slice(1).map(() => '—')) // turns from before stats were kept
+      unplayed.push(thLv[st]); return ''
+    }).join('')
+    const top = Object.entries(s.tools).sort((a, b) => b[1] - a[1]).slice(0, 6)
+    const [fn, fa, fd] = qsFiles(s.files), repos = s.files.filter((f) => f.files)
+    return `<dl class="qs-tiles">${tiles}</dl>
+      <details class="th-det qs-more" id="qsMore"${qsMore ? ' open' : ''}><summary data-key="qs-more"><b>PER STAGE</b><small>model, time, turns, tokens, tools, files, test runs</small></summary><div class="qs-more-in">
+        <div class="qs-scroll"><table class="qs-table" role="table" aria-label="Quest stats per stage"><thead role="rowgroup"><tr role="row">${cols.map((k) => `<th scope="col" role="columnheader">${k}</th>`).join('')}</tr></thead>
+          <tbody role="rowgroup">${rows}${row('TOTAL', [live ? 'so far' : unplayed.length ? `${unplayed.join(', ')} not played` : '', ...cells(s).slice(1)], 'total')}</tbody></table></div>
+        <div class="qs-foot"><div><h3 class="th-k">TOP TOOLS</h3>${top.length ? `<ul class="qs-tools">${top.map(([k, n]) => `<li>${esc(k)} <span>${n}</span></li>`).join('')}</ul>` : '<p class="qs-m">none used</p>'}</div>
+          <div><h3 class="th-k">FILES CHANGED · TEST RUNS</h3>
+            <p>${fn ? `${fn} file${fn === 1 ? '' : 's'}${repos.length > 1 ? ` in ${repos.length} repos` : ''} · +${fa} −${fd} <span class="qs-m">(${repos.map((f) => `${esc(f.repo)} ${f.files}`).join(', ')})</span>` : 'No files changed.'}</p>
+            <p class="qs-m">${s.testRuns} test run${s.testRuns === 1 ? '' : 's'} · pass or fail isn’t tracked</p></div></div></div></details>`
+  }
+
+  // Derived from the task, no storage (spec §5.9). An archived turn's endedAt is when you moved on,
+  // not when the agent finished, so agent results carry no time.
+  const qsReady = { investigate: 'Findings ready', spec: 'Spec written', build: 'Build finished' }
+  const qsPlain = (s) => String(s).split('\n').map((l) => l.replace(/^[#>*\-\s]+/, '').trim()).filter(Boolean).join(' ')
+  function qsLogList(t, c) {
+    const E = [], all = [...t.turns, t], lv = thLv[t.stage]
+    const add = (kind, level, what, who, text = '', when = null, read = null) => E.push({ kind, level, what, who, text, when, read })
+    const cms = [...t.comments].sort((a, b) => a.at.localeCompare(b.at))
+    const notes = (until, stage) => { while (cms.length && (!until || cms[0].at < until)) { const cm = cms.shift(); add('you', thLv[stage], 'Note queued', 'by you', cm.text, cm.at) } }
+    add('you', thLv[all[0].stage], 'Quest started', 'by you', `${all[0].prompt.split('\n').length}-line prompt, repo${t.repos.length === 1 ? '' : 's'} ${t.repos.join(', ')}.`, t.createdAt)
+    t.turns.forEach((r, i) => {
+      const n = all[i + 1], note = n.prompt.trim()
+      notes(r.endedAt, r.stage)
+      add('agent', thLv[r.stage], r.result ? qsReady[r.stage] : 'Turn ended', 'agent', r.result ?? 'No result recorded.', null, r.result && `TURN ${i + 1} RESULT`)
+      add('you', thLv[n.stage], n.stage !== r.stage ? `Approved, on to ${thLv[n.stage]}` : `Sent back to ${thLv[n.stage]}`,
+        t.autoPlay && !note ? 'AUTO-PLAY' : 'by you', note || 'No note.', r.endedAt, note && `TURN ${i + 2} PROMPT`)
+    })
+    const run = ['queued', 'provisioning', 'running', 'paused-rate-limit'].includes(t.state)
+    const what = { queued: 'Queued', provisioning: 'Preparing workspace', running: `${lv} running`, 'paused-rate-limit': 'Waiting out a rate limit',
+      failed: `Failed in ${lv}`, cancelled: 'Paused by you', 'paused-limit': 'Out of tokens' }[t.state] ?? (t.result ? qsReady[t.stage] : 'Turn ended')
+    const now = () => add(c.group === 'your-move' ? 'now' : run ? 'run' : 'agent', lv, what + (c.group === 'your-move' ? ', your move' : ''),
+      t.state === 'cancelled' ? 'by you' : ['failed', 'paused-limit'].includes(t.state) ? 'petree' : 'agent',
+      t.result ?? (t.state === 'failed' ? t.error ?? '' : ''), t.state === 'running' ? t.startedAt : run || t.bin ? null : t.updatedAt, t.result && 'RESULT')
+    if (run) { now(); notes(null, t.stage) } else { notes(null, t.stage); now() }
+    for (const [repo, x] of Object.entries(t.delivery)) {
+      if (x.number) add('you', 'SHIP', `PR #${x.number} opened`, repo)
+      if (x.pr === 'merged') add('agent', 'VICTORY', `PR #${x.number} merged`, x.mergedBy ? `by ${x.mergedBy}` : repo, '', x.mergedAt ?? null)
+      if (x.pr === 'closed') add('end', 'SHIP', `PR #${x.number} closed`, repo)
+      if (x.untracked && x.target) add('you', 'SHIP', `Pushed to ${x.target}`, repo, `Merge not tracked: ${x.untracked}.`)
+    }
+    if (t.bin) add('end', t.bin === 'game-over' ? 'GAME OVER' : 'HALL OF FAME', t.binReason ?? t.bin, '', '', t.binnedAt)
+    return E
+  }
+  function qsLog(t) {
+    const E = qsLogList(t, t.card), last = E.at(-1)
+    setText($('qlN'), String(E.length))
+    setText($('qlLast'), `Last: ${last.what}${last.when ? ' · ' + age(last.when) : ''}`)
+    if (!$('qlDet').open) return
+    paint($('qlList'), E.map((e, i) => {
+      const words = thWords(e.text), long = e.read && words > 50
+      if (long) thReads['log:' + i] = { title: e.read, path: 'quest log', html: renderMarkdown(e.text), words, md: true }
+      return `<li><span class="ql-dot ${e.kind}" aria-hidden="true"></span><div class="ql-main">
+        <div class="ql-h"><span class="th-k">${e.level}</span><b>${esc(e.what)}</b><span>${esc(e.who)}</span></div>
+        ${e.text ? `<p class="ql-det">${esc(qsPlain(e.text))}</p>` : ''}${long ? `<button type="button" class="btn2 rd-open" data-read="log:${i}" data-key="read:log:${i}"><span><b>READ ALL${PLAY}</b><small>open in the reader · ${thNum(words)} words</small></span></button>` : ''}</div>
+        ${e.when ? `<time class="ql-when" datetime="${esc(e.when)}">${qsWhen(e.when)}</time>` : ''}</li>`
+    }).join(''))
+  }
+
+  // Sprout sword-up and the sparkles: canvas ArcadeVictory, colours mapped to tokens.
+  const vicSprout = '<svg class="vic-sp" role="img" aria-label="Sprout with sword raised" width="128" height="136" viewBox="0 0 16 17" shape-rendering="crispEdges">'
+    + '<rect x="4" y="16" width="8" height="1" style="fill:var(--line)"/>'
+    + '<g style="fill:var(--go-fill)"><rect x="3" y="0" width="3" height="1"/><rect x="10" y="0" width="3" height="1"/><rect x="4" y="1" width="3" height="1"/><rect x="9" y="1" width="3" height="1"/></g>'
+    + '<g style="fill:var(--go)"><rect x="7" y="1" width="2" height="1"/><rect x="5" y="2" width="6" height="1"/><rect x="7" y="3" width="2" height="1"/></g>'
+    + '<g style="fill:var(--sp-armour)"><rect x="5" y="4" width="6" height="1"/><rect x="4" y="5" width="8" height="1"/><rect x="4" y="6" width="1" height="1"/><rect x="11" y="6" width="1" height="1"/><rect x="4" y="7" width="6" height="1"/><rect x="5" y="10" width="6" height="1"/><rect x="5" y="11" width="4" height="1"/><rect x="13" y="1" width="1" height="6"/><rect x="11" y="9" width="2" height="1"/></g>'
+    + '<rect x="5" y="6" width="6" height="1" style="fill:var(--sp-visor)"/>'
+    + '<g style="fill:var(--muted)"><rect x="10" y="7" width="2" height="1"/><rect x="5" y="8" width="6" height="1"/><rect x="9" y="11" width="2" height="1"/><rect x="5" y="13" width="2" height="1"/><rect x="9" y="13" width="2" height="2"/><rect x="4" y="14" width="3" height="1"/><rect x="9" y="15" width="3" height="1"/></g>'
+    + '<g style="fill:var(--gold)"><rect x="1" y="9" width="10" height="1"/><rect x="0" y="10" width="2" height="1"/></g>'
+    + '<g style="fill:var(--gold-fill)"><rect x="6" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="5" y="12" width="6" height="1"/><rect x="12" y="7" width="3" height="1"/><rect x="13" y="8" width="1" height="1"/></g></svg>'
+  const vicSparks = '<svg class="vic-spark" aria-hidden="true" width="300" height="60" viewBox="0 0 50 10" shape-rendering="crispEdges">'
+    + '<g style="fill:var(--gold-fill)"><rect x="2" y="2" width="1" height="1"/><rect x="14" y="6" width="1" height="1"/><rect x="13" y="7" width="3" height="1"/><rect x="14" y="8" width="1" height="1"/><rect x="38" y="1" width="1" height="1"/></g>'
+    + '<g style="fill:var(--go-fill)"><rect x="7" y="8" width="1" height="1"/><rect x="25" y="3" width="1" height="1"/><rect x="46" y="6" width="1" height="1"/></g>'
+    + '<g style="fill:var(--line-strong)"><rect x="20" y="9" width="1" height="1"/><rect x="31" y="6" width="1" height="1"/></g></svg>'
+    + '<svg class="vic-spark r" aria-hidden="true" width="300" height="60" viewBox="0 0 50 10" shape-rendering="crispEdges">'
+    + '<g style="fill:var(--gold-fill)"><rect x="4" y="7" width="1" height="1"/><rect x="33" y="1" width="1" height="1"/><rect x="32" y="2" width="3" height="1"/><rect x="33" y="3" width="1" height="1"/><rect x="47" y="8" width="1" height="1"/></g>'
+    + '<g style="fill:var(--go-fill)"><rect x="12" y="2" width="1" height="1"/><rect x="22" y="8" width="1" height="1"/><rect x="41" y="5" width="1" height="1"/></g>'
+    + '<g style="fill:var(--line-strong)"><rect x="17" y="5" width="1" height="1"/><rect x="27" y="9" width="1" height="1"/></g></svg>'
+  const vicSpan = (ms) => {
+    const m = Math.round(ms / 60000), h = Math.floor(m / 60), d = Math.floor(h / 24)
+    return d ? `${d} day${d === 1 ? '' : 's'} ${h % 24} h` : h ? `${h} h ${m % 60} min` : `${m} min`
+  }
+
+  // Merged threads (spec §5.1e): replaces head, panel and documents; stats, log and details stay below.
+  function vicHtml(t, c) {
+    const won = Object.values(t.delivery).filter((x) => x.pr === 'merged')
+    const at = won.map((x) => x.mergedAt).filter(Boolean).sort().at(-1)
+    const by = [...new Set(won.map((x) => x.mergedBy).filter(Boolean))]
+    const hosts = [...new Set(won.map((x) => /dev\.azure\.com|visualstudio\.com/.test(x.url ?? '') ? 'Azure DevOps' : 'GitHub'))]
+    const steps = c.progress.slice(0, 4).map((s, i) => s.mark === 'done' ? STEPS[i][0].toLowerCase() : '').filter(Boolean)
+    const f = qsData?.total?.files, [fn, fa, fd] = qsFiles(f ?? [])
+    const fact = (k, v, x = '') => `<div><dt>${k}</dt><dd><b>${v}</b>${x ? `<span>${x}</span>` : ''}</dd></div>`
+    const prs = c.prs.filter((p) => p.pr === 'merged' && thUrl(p.url)).map((p) =>
+      `<a class="th-pr" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.repo)} ↗ PR #${esc(p.number ?? '?')} merged</a>`).join('')
+    return `<div class="cart-frame vic-frame"><div class="cart-in vic-in">${vicSparks}
+        <div class="vic-top">${vicSprout}<div class="vic-words"><span class="vic-k">QUEST COMPLETE</span><h1 class="vic-h" id="vicH">VICTORY!</h1></div>${TROPHY.replace('width="56" height="48"', 'width="98" height="84"')}</div>
+        <div class="vic-id">${emblemHtml(t)}<span class="th-q">${qnum(c.q)}</span><p class="vic-t">${esc(c.topic)}</p></div>
+        <div class="vic-meta">${chips(c.repos)}${prs}${at ? `<span>merged ${age(at)}</span>` : ''}</div>
+        ${progress(c)}
+        <div class="strip" aria-hidden="true"></div></div></div>
+      <section class="frame vic-rep" aria-labelledby="vicRepH"><div>
+        <h2 class="th-h3" id="vicRepH">QUEST REPORT</h2>
+        <dl class="vic-facts">${fact('STAGES RUN', steps.length, steps.join(', '))}${fact('TURNS', t.turns.length + 1)}
+          ${fact('FILES CHANGED', f ? fn : qsData ? '—' : '…', f ? `+${fa} −${fd}` : qsData ? 'not counted' : 'loading')}
+          ${fact('TOKENS', qsK(t.turns.reduce((n, r) => n + r.tokensUsed, t.tokensUsed)))}
+          ${fact('START TO MERGE', at ? vicSpan(Date.parse(at) - Date.parse(t.createdAt)) : '—', at ? '' : 'merge time not reported')}
+          ${fact('MERGED BY', by.length ? esc(by.join(', ')) : '—', hosts.length ? `on ${hosts.join(' and ')}` : '')}</dl>
+        <p class="th-say">Merged. Start a new quest for more.</p>
+        <div class="th-btns"><a class="btn-start th-go" href="#/">${PLAY}<span class="stack"><b class="w30">NEXT QUEST</b><span class="sub">back to the inbox</span></span></a>
+          <a class="btn2" href="#/new"><span><b>PRESS START</b><small>start a new thread</small></span></a></div></div></section>`
+  }
 
   function thOpen(id) {
     selected = id; thTask = null; thInfo = { spec: '', findings: '', suggestions: [] }
     thOldOpen.clear(); thLiveKey = null; thReplied = false
     $('threadView').querySelectorAll('#thDetails details').forEach((d) => { d.open = false; d.querySelector('.th-det-body').innerHTML = '' })
+    qsData = null; qsKey = ''; $('qsDet').open = $('qlDet').open = false
+    paint($('qsBody'), ''); paint($('qlList'), '')
     thNote.value = localStorage.getItem(thDraftKey()) || ''
     setText($('thErr'), ''); setText($('thOut'), ''); setText($('thLive'), '')
     thShow(false)
@@ -1332,6 +1613,17 @@
     setText($('thRunsN'), String(t.turns.length + 1))
     $('thNotesDet').hidden = !n
     setText($('thNotesN'), String(n))
+    const runMs = (s) => [...t.turns, { stage: t.stage, stats: t.turnStats }].reduce((ms, r) => ms + (r.stage === s && r.stats ? r.stats.wallMs : 0), 0)
+    setText($('thRunsT'), thStages.filter(runMs).map((s) => `${thLv[s]} ${qsDur(runMs(s))} · `).join('') + "each turn's prompt and result, oldest first")
+    const vic = t.bin === 'hall-of-fame' && /^merged/.test(t.binReason ?? '')
+    for (const el of ['thHead', 'thPanel', 'thDoc', 'thOld']) $(el).hidden = vic
+    $('thVic').hidden = !vic
+    $('qsLive').hidden = t.state !== 'running'
+    setText($('qsSub'), t.state === 'running' ? `counters tick while ${thLv[t.stage]} runs` : 'time, turns, tokens, model, subagents · loads when opened')
+    // Refetch while live, or once after the task moved on; the Victory report needs the file counts.
+    qsPaint()
+    if (($('qsDet').open || vic) && (t.state === 'running' || qsKeyOf(t) !== qsKey)) qsLoad(t)
+    qsLog(t)
     thMeasure($('threadView'))
     // Announce state changes only, not the minute ticks of a running turn.
     const key = [t.state, t.stage, t.bin].join()
@@ -1389,8 +1681,8 @@
     const t = thTask, id = selected, body = d.querySelector('.th-det-body'), kind = d.dataset.det
     if (!t) return
     if (kind === 'prompt') body.innerHTML = thBlock('prompt', 'ORIGINAL PROMPT', 'first turn', t.turns[0]?.prompt ?? t.prompt, false)
-    else if (kind === 'runs') body.innerHTML = [...t.turns, { ...t, endedAt: null }].map((r, i) => `<div class="th-runs">
-        <div class="th-runh"><span class="th-k">${thLv[r.stage]}</span><b>Turn ${i + 1}</b><small>${r.endedAt ? 'ended ' + age(r.endedAt) : 'current turn'} · ${thNum(r.tokensUsed)} tokens</small></div>
+    else if (kind === 'runs') body.innerHTML = [...t.turns, { ...t, endedAt: null, stats: t.turnStats }].map((r, i) => `<div class="th-runs">
+        <div class="th-runh"><span class="th-k">${thLv[r.stage]}</span><b>Turn ${i + 1}</b><small>${r.endedAt ? 'ended ' + age(r.endedAt) : 'current turn'} · ${thNum(r.tokensUsed)} tokens${r.stats?.wallMs ? ` · ${qsDur(r.stats.wallMs)}` : ''}</small></div>
         <span class="th-k">PROMPT</span>${thBlock(`run:${i}:p`, `TURN ${i + 1} PROMPT`, thLv[r.stage], r.prompt, false)}
         <span class="th-k">RESULT</span>${r.result ? thBlock(`run:${i}:r`, `TURN ${i + 1} RESULT`, thLv[r.stage], r.result) : '<p class="th-none">no result recorded</p>'}</div>`).join('')
     else if (kind === 'info') body.innerHTML = `<dl class="th-info">
@@ -1540,7 +1832,10 @@
   $('threadView').addEventListener('toggle', (e) => {
     const d = e.target
     if (d.dataset?.old) thOldOpen[d.open ? 'add' : 'delete'](d.dataset.old)
-    if (d.open && d.dataset?.det) thDetail(d)
+    if (d.id === 'qsMore') qsMore = d.open
+    if (d.open && thTask && d.id === 'qsDet') { qsPaint(); qsLoad(thTask) }
+    else if (d.open && thTask && d.id === 'qlDet') qsLog(thTask)
+    else if (d.open && d.dataset?.det) thDetail(d)
     else if (d.open) thMeasure(d)
   }, true)
 

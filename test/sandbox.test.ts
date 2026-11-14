@@ -17,7 +17,7 @@ const task: TaskRecord = {
   id: 'abc123', prompt: 'fix the bug', repos: ['demo'], mode: 'unattended',
   state: 'provisioning', sessionId: null, tokensUsed: 0, tokenBudget: 500000,
   timeoutMinutes: 30, error: null, result: null, model: null, turns: [], createdAt: '', updatedAt: '',
-  restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'build', comments: [],
+  restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'build', comments: [], delivery: {},
 }
 
 describe('buildSandboxCommands', () => {

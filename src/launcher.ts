@@ -3,7 +3,7 @@ import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readSync
 import { join } from 'node:path'
 import type { PetreeConfig } from './config.js'
 import { prepareWorkspace } from './git.js'
-import { commitChanges } from './gitops.js'
+import { commitChanges, headSha, repoStatus } from './gitops.js'
 import { CliRunner } from './runner.js'
 import { buildSandboxCommands, readToken, type SandboxCommands } from './sandbox.js'
 import { threadTitle, type TaskRecord, type TaskStore } from './store.js'
@@ -132,6 +132,12 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
       } catch (err) {
         commitErrors.push(`commit failed for ${repo}: ${String(err)}`)
       }
+      // headSha throws on a wrecked repo, so a bogus ahead=0 is never recorded.
+      try {
+        const dir = join(workDir, repo)
+        const head = headSha(dir)
+        safely(() => store.setDelivery(task.id, repo, { ahead: repoStatus(dir, cfg.repos[repo]?.defaultBranch ?? 'main').ahead, head }))
+      } catch { /* nothing to record */ }
     }
     // The task is already in a terminal state by now (done/failed/paused), so this
     // can't go through transition() — patch the error field directly, appending to

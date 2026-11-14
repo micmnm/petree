@@ -285,6 +285,40 @@ describe('makeLauncher', () => {
     expect(branch).toBe(`petree/${task.id}`)
   })
 
+  it('records ahead and head per repo after a build turn', async () => {
+    const { home, cfg, store, task } = setup()
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    process.env.WD = join(home, 'work', task.id)
+    process.env.FAKE_CONTAINER_EXEC = JSON.stringify([process.execPath, '-e',
+      `require('fs').writeFileSync(process.env.WD+'/demo/a.txt','x');` +
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'r'}))`])
+    try {
+      await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })(task)
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    const repoDir = join(home, 'work', task.id, 'demo')
+    const head = execFileSync('git', ['-C', repoDir, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()
+    expect(store.get(task.id)!.delivery).toEqual({ demo: { ahead: 1, head } })
+  })
+
+  it('records no delivery when the repo is unreadable after the turn', async () => {
+    const { home, cfg, store, task } = setup()
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    process.env.WD = join(home, 'work', task.id)
+    process.env.FAKE_CONTAINER_EXEC = JSON.stringify([process.execPath, '-e',
+      `require('fs').rmSync(process.env.WD+'/demo/.git',{recursive:true,force:true});` +
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'r'}))`])
+    try {
+      await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })(task)
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    expect(store.get(task.id)!.delivery).toEqual({})
+  })
+
   it('surfaces a commit failure on task.error without clobbering a successful result', async () => {
     const home = mkdtempSync(join(tmpdir(), 'petree-home-'))
     mkdirSync(join(home, 'logs'), { recursive: true })

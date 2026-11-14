@@ -16,7 +16,7 @@ function task(over: Partial<TaskRecord> = {}): TaskRecord {
     id: 'abc123', prompt: 'fix the bug\nmore', repos: ['demo'], mode: 'unattended',
     state: 'waiting-for-you', sessionId: null, tokensUsed: 0, tokenBudget: 1,
     timeoutMinutes: 30, error: null, result: null, model: null, turns: [], createdAt: '', updatedAt: '',
-    restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'investigate', comments: [],
+    restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'investigate', comments: [], delivery: {},
     ...over,
   }
 }
@@ -92,6 +92,43 @@ describe('cardFor progress', () => {
   it('build becomes done once its turn is done', () => {
     const p = cardFor(task({ stage: 'build', state: 'done', turns: [turn('investigate'), turn('spec')] }), null, cfg).progress
     expect(p[2]).toEqual({ step: 'build', mark: 'done' })
+  })
+
+  const built = (delivery: TaskRecord['delivery']) => task({ stage: 'build', state: 'done', delivery })
+  const gh = 'https://github.com/o/r/pull/7'
+  const open = { ahead: 2, head: 'a', target: 'feat', url: gh, number: 7, pr: 'open' as const, prHead: 'a' }
+  const ship = (d: TaskRecord['delivery']) => marks(built(d)).slice(3)
+
+  it.each([
+    ['no delivery record', {}, ['skipped', 'skipped']],
+    ['no commits', { demo: { ahead: 0, head: 'a' } }, ['skipped', 'skipped']],
+    ['commits, no PR', { demo: { ahead: 1, head: 'a' } }, ['current', 'todo']],
+    ['pushed to an untracked host', { demo: { ahead: 1, head: 'a', target: 'f', untracked: 'gh not installed' } }, ['done', 'todo']],
+    ['PR open', { demo: open }, ['done', 'current']],
+    ['PR merged', { demo: { ...open, pr: 'merged' as const } }, ['done', 'done']],
+    ['PR closed', { demo: { ...open, pr: 'closed' as const } }, ['done', 'todo']],
+    ['one repo shipped, one not', { demo: open, b: { ahead: 1, head: 'b' } }, ['current', 'current']],
+  ])('SHIP/VICTORY: %s', (_n, d, expected) => {
+    expect(ship(d)).toEqual(expected)
+  })
+
+  it('SHIP/VICTORY stay todo until the build is done', () => {
+    expect(marks(task({ stage: 'build', state: 'running', delivery: { demo: open } })).slice(3)).toEqual(['todo', 'todo'])
+  })
+
+  it.each([
+    ['unshipped commits', { demo: { ahead: 1, head: 'a' } }, 'Open the PR', 'Build finished'],
+    ['PR head behind local head', { demo: { ...open, head: 'b' } }, 'Push the update to PR #7', 'PR #7 open — waiting for merge'],
+    ['open PR on GitHub', { demo: open }, 'Merge PR #7 on GitHub', 'PR #7 open — waiting for merge'],
+    ['open PR on Azure', { demo: { ...open, url: 'https://dev.azure.com/o/p/_git/r/pullrequest/7' } }, 'Merge PR #7 on Azure DevOps', 'PR #7 open — waiting for merge'],
+  ])('PR action and line: %s', (_n, d, label, line) => {
+    const c = cardFor(built(d), null, cfg)
+    expect(c).toMatchObject({ group: 'your-move', action: { label }, line })
+  })
+
+  it('lists PRs on the card, and a pushed-only repo has none', () => {
+    const c = cardFor(built({ demo: open, b: { ahead: 1, head: 'b', target: 'x' } }), null, cfg)
+    expect(c.prs).toEqual([{ repo: 'demo', url: gh, pr: 'open', number: 7 }])
   })
 
   it('moving back resets later steps to todo', () => {

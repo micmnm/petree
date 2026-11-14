@@ -1,7 +1,7 @@
 import type { PetreeConfig } from './config.js'
 import type { ThreadStatus } from './notes.js'
 import { STAGES, threadTitle } from './store.js'
-import type { Stage, TaskRecord } from './store.js'
+import type { Delivery, Stage, TaskRecord } from './store.js'
 
 export type Group = 'your-move' | 'questing' | 'hall-of-fame' | 'game-over'
 export type Step = Stage | 'pr' | 'merged'
@@ -16,6 +16,7 @@ export interface Card {
   reason?: string
   progress: ProgressStep[]
   repos: { name: string; tags: string[] }[]
+  prs: { repo: string; url: string; pr: Delivery['pr']; number?: number }[]
 }
 
 const LEVEL: Record<Stage, string> = { investigate: 'SCOUT', spec: 'PLAN', build: 'CRAFT' }
@@ -33,8 +34,29 @@ function progressFor(task: TaskRecord): ProgressStep[] {
     if (i > at) return { step, mark: 'todo' }
     return buildDone ? { step, mark: 'done' } : { step, mark: 'current', ...(tone && { tone }) }
   })
-  // ponytail: SHIP/VICTORY need delivery data; stay todo until the delivery record lands.
-  return [...steps, { step: 'pr', mark: 'todo' }, { step: 'merged', mark: 'todo' }]
+  const committed = Object.values(task.delivery).filter((d) => d.ahead > 0)
+  let ship: ProgressStep['mark'] = 'todo'
+  let merged: ProgressStep['mark'] = 'todo'
+  if (buildDone) {
+    if (!committed.length) ship = merged = 'skipped'
+    else {
+      ship = committed.every((d) => d.pr || (d.untracked && d.target)) ? 'done' : 'current'
+      merged = committed.every((d) => d.pr === 'merged') ? 'done' : committed.some((d) => d.pr === 'open') ? 'current' : 'todo'
+    }
+  }
+  const last = (step: Step, mark: ProgressStep['mark']): ProgressStep =>
+    ({ step, mark, ...(mark === 'current' && { tone: 'needs-you' as const }) })
+  return [...steps, last('pr', ship), last('merged', merged)]
+}
+
+const hostOf = (url: string) => /\/\/github\.com\//.test(url) ? 'GitHub' : 'Azure DevOps'
+
+function prLabel(ds: Delivery[]): string | null {
+  if (ds.some((d) => d.ahead > 0 && !d.target && !d.pr)) return 'Open the PR'
+  const open = ds.filter((d) => d.pr === 'open')
+  const stale = open.find((d) => d.prHead !== d.head)
+  if (stale) return `Push the update to PR #${stale.number}`
+  return open[0] ? `Merge PR #${open[0].number} on ${hostOf(open[0].url ?? '')}` : null
 }
 
 export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: PetreeConfig, now: Date = new Date()): Card {
@@ -45,6 +67,8 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
   let action: Card['action'] = null
   let reason: string | undefined
   const detail = status?.needsYou ?? null
+  const deliveries = Object.values(task.delivery)
+  const openPr = deliveries.find((d) => d.pr === 'open')
 
   switch (task.state) {
     case 'queued': line = 'Queued'; break
@@ -72,6 +96,9 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
       group = 'your-move'
       if (task.state === 'waiting-for-you') {
         action = { label: `Read the ${task.stage === 'spec' ? 'spec' : 'findings'}, then approve or comment`, detail }
+      } else if (prLabel(deliveries)) {
+        action = { label: prLabel(deliveries)!, detail }
+        if (openPr) line = `PR #${openPr.number} open — waiting for merge`
       } else if (detail) {
         action = { label: 'Reply', detail }
       }
@@ -87,5 +114,7 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
     ...(reason && { reason }),
     progress: progressFor(task),
     repos: task.repos.map((name) => ({ name, tags: cfg.repos[name]?.tags ?? [] })),
+    prs: Object.entries(task.delivery).filter(([, d]) => d.url)
+      .map(([repo, d]) => ({ repo, url: d.url!, pr: d.pr, number: d.number })),
   }
 }

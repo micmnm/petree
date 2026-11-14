@@ -63,6 +63,10 @@ export function repoStatus(repoDir: string, baseBranch: string): RepoStatus {
   return { hasChanges: ahead > 0, ahead, baseBranch }
 }
 
+export function headSha(repoDir: string): string {
+  return git(repoDir, ['rev-parse', 'HEAD']).trim()
+}
+
 export function diffBranch(repoDir: string, baseBranch: string): { stat: string; patch: string } {
   const base = `origin/${baseBranch}`
   try {

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { parseConfigText, resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
-import { localCheckout, repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch } from './gitops.js'
+import { localCheckout, repoStatus, diffBranch, pushBranch, createPullRequest, taskBranch, headSha } from './gitops.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
@@ -298,7 +298,9 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (!norm) return
     const repoDir = join(cfg.home, 'work', t.id, repo as string)
     if (!existsSync(repoDir)) { res.status(400).json({ error: 'no work dir for task' }); return }
-    res.json(pushBranch(repoDir, t.id, norm))
+    const pushed = pushBranch(repoDir, t.id, norm)
+    if (pushed.ok) store.setDelivery(t.id, repo as string, { target: norm, prHead: headSha(repoDir) })
+    res.json(pushed)
   })
 
   app.post('/api/tasks/:id/pr', (req, res) => {
@@ -314,7 +316,12 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (!pushed.ok) { res.json(pushed); return }
     const base = cfg.repos[repo as string]?.defaultBranch ?? 'main'
     const title = `petree ${t.id}: ${threadTitle(t)}`
-    res.json(createPullRequest(repoDir, norm, base, title, t.turns[0]?.prompt ?? t.prompt))
+    const made = createPullRequest(repoDir, norm, base, title, t.turns[0]?.prompt ?? t.prompt)
+    if (made.ok && made.url) {
+      const number = Number(/\/pull\/(\d+)/.exec(made.url)?.[1]) || undefined
+      store.setDelivery(t.id, repo as string, { target: norm, url: made.url, number, pr: 'open', prHead: headSha(repoDir) })
+    }
+    res.json(made)
   })
 
   app.post('/api/tasks/:id/resume', (req, res) => {

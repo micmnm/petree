@@ -427,6 +427,35 @@ describe('threads', () => {
     expect(t.comments).toEqual([])
   })
 
+  it('adds the delivery column to an old database and merges per-repo entries', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'petree-db-')), 'old.db')
+    const old = new Database(file)
+    old.exec(`CREATE TABLE tasks (
+      id TEXT PRIMARY KEY, prompt TEXT NOT NULL, repos TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'unattended', state TEXT NOT NULL,
+      session_id TEXT, tokens_used INTEGER NOT NULL DEFAULT 0,
+      token_budget INTEGER NOT NULL, timeout_minutes INTEGER NOT NULL,
+      error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result TEXT, model TEXT)`)
+    old.prepare(`INSERT INTO tasks (id, prompt, repos, state, token_budget, timeout_minutes, created_at, updated_at)
+      VALUES ('old1', 'p', '["a","b"]', 'done', 1, 1, 'x', 'x')`).run()
+    old.close()
+    const s = new TaskStore(file)
+    expect(s.get('old1')!.delivery).toEqual({})
+    s.setDelivery('old1', 'a', { ahead: 1, head: 'h1' })
+    s.setDelivery('old1', 'b', { ahead: 0, head: 'h2' })
+    const t = s.setDelivery('old1', 'a', { target: 'feat', pr: 'open' })
+    expect(t.delivery).toEqual({ a: { ahead: 1, head: 'h1', target: 'feat', pr: 'open' }, b: { ahead: 0, head: 'h2' } })
+  })
+
+  it('setDelivery moves updated_at only when something changed', async () => {
+    const t = store.create(input)
+    const a = store.setDelivery(t.id, 'demo', { ahead: 1, head: 'h' })
+    await new Promise((r) => setTimeout(r, 5))
+    const b = store.setDelivery(t.id, 'demo', { ahead: 1, head: 'h' })
+    expect(b.updatedAt).toBe(a.updatedAt)
+    expect(() => store.setDelivery('nope', 'demo', {})).toThrow()
+  })
+
   it('addComment keeps state and prompt', () => {
     const t = store.create(input)
     store.transition(t.id, 'provisioning')

@@ -45,6 +45,21 @@ export interface TaskRecord {
   logOffset: number
   stage: Stage
   comments: Comment[]
+  delivery: Record<string, Delivery>
+}
+
+// Per-repo ship state (spec §5.4); ahead/head are set at turn end, the rest by /push, /pr and PR polling.
+export interface Delivery {
+  ahead: number
+  head: string
+  target?: string
+  url?: string
+  number?: number
+  pr?: 'open' | 'merged' | 'closed'
+  prHead?: string
+  mergedAt?: string
+  mergedBy?: string
+  untracked?: string
 }
 
 // States a task must reach before it becomes eligible for automatic
@@ -105,6 +120,7 @@ function rowToTask(r: any): TaskRecord {
     error: r.error, result: r.result ?? null, model: r.model ?? null,
     turns: (JSON.parse(r.turns ?? '[]') as Turn[]).map((t) => ({ ...t, stage: t.stage ?? 'build' })),
     stage: r.stage, comments: JSON.parse(r.comments ?? '[]'),
+    delivery: JSON.parse(r.delivery ?? '{}'),
     createdAt: r.created_at, updatedAt: r.updated_at,
     restarts: r.restarts ?? 0, retryAt: r.retry_at ?? null,
     startedAt: r.started_at ?? null, logOffset: r.log_offset ?? 0,
@@ -133,6 +149,7 @@ export class TaskStore {
     // Default 'build' so pre-threads rows read as already-building tasks.
     if (!cols.includes('stage')) this.db.exec("ALTER TABLE tasks ADD COLUMN stage TEXT NOT NULL DEFAULT 'build'")
     if (!cols.includes('comments')) this.db.exec('ALTER TABLE tasks ADD COLUMN comments TEXT')
+    if (!cols.includes('delivery')) this.db.exec('ALTER TABLE tasks ADD COLUMN delivery TEXT')
 
     this.db.exec(`CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -207,6 +224,18 @@ export class TaskStore {
     if (!t) throw new Error(`no task ${id}`)
     this.db.prepare('UPDATE tasks SET result = ?, updated_at = ? WHERE id = ?')
       .run(text, new Date().toISOString(), id)
+    return this.get(id)!
+  }
+
+  // Merges patch into the repo's entry; updated_at moves only when something changed.
+  setDelivery(id: string, repo: string, patch: Partial<Delivery>): TaskRecord {
+    const t = this.get(id)
+    if (!t) throw new Error(`no task ${id}`)
+    const prev = t.delivery[repo]
+    const next = { ...prev, ...patch } as Delivery
+    if (JSON.stringify(next) === JSON.stringify(prev)) return t
+    this.db.prepare('UPDATE tasks SET delivery = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify({ ...t.delivery, [repo]: next }), new Date().toISOString(), id)
     return this.get(id)!
   }
 

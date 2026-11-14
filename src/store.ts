@@ -87,9 +87,27 @@ export const SETTLED_STATES: TaskState[] = ['done', 'failed', 'cancelled', 'paus
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-export interface RetentionSettings {
+export interface Settings {
   binDays: number
   hallOfFameDays: number
+  lmStudioBaseUrl: string | null
+  lmStudioHighModel: string | null
+  lmStudioMedModel: string | null
+  lmStudioLowModel: string | null
+}
+
+// task.model carries this prefix for LM Studio-backed tasks, the concrete
+// model id following it — e.g. 'lmstudio:qwen2.5-coder-7b'. Everything past
+// task creation (sandbox env/args, scheduler serialization, budget bypass)
+// branches on this prefix rather than a separate column.
+export const LMSTUDIO_PREFIX = 'lmstudio:'
+
+export function isLmStudioModel(model: string | null | undefined): boolean {
+  return !!model && model.startsWith(LMSTUDIO_PREFIX)
+}
+
+export function lmStudioModelId(model: string): string {
+  return model.slice(LMSTUDIO_PREFIX.length)
 }
 
 // States a turn can be archived from, then requeued with a follow-up prompt
@@ -198,6 +216,9 @@ export class TaskStore {
     const scols = (this.db.prepare('PRAGMA table_info(settings)').all() as { name: string }[]).map((c) => c.name)
     if (!scols.includes('bin_days')) this.db.exec('ALTER TABLE settings ADD COLUMN bin_days INTEGER NOT NULL DEFAULT 14')
     if (!scols.includes('hall_of_fame_days')) this.db.exec('ALTER TABLE settings ADD COLUMN hall_of_fame_days INTEGER NOT NULL DEFAULT 3')
+    for (const c of ['lm_studio_base_url', 'lm_studio_high_model', 'lm_studio_med_model', 'lm_studio_low_model']) {
+      if (!scols.includes(c)) this.db.exec(`ALTER TABLE settings ADD COLUMN ${c} TEXT`)
+    }
   }
 
   private backfillSeq(): void {
@@ -413,27 +434,58 @@ export class TaskStore {
     return r.c
   }
 
-  nextQueued(now: Date = new Date()): TaskRecord | undefined {
+  // skipLocalModel excludes queued lmstudio:-prefixed tasks, so cloud tasks
+  // keep flowing through the scheduler while a local-model task is already
+  // running — see scheduler.ts.
+  nextQueued(now: Date = new Date(), opts: { skipLocalModel?: boolean } = {}): TaskRecord | undefined {
+    const clause = opts.skipLocalModel ? 'AND (model IS NULL OR model NOT LIKE ?)' : ''
+    const params = opts.skipLocalModel ? [now.toISOString(), `${LMSTUDIO_PREFIX}%`] : [now.toISOString()]
     const r = this.db.prepare(`SELECT * FROM tasks WHERE state = 'queued'
-      AND (retry_at IS NULL OR retry_at <= ?)
-      ORDER BY created_at ASC, rowid ASC LIMIT 1`).get(now.toISOString())
+      AND (retry_at IS NULL OR retry_at <= ?) ${clause}
+      ORDER BY created_at ASC, rowid ASC LIMIT 1`).get(...params)
     return r ? rowToTask(r) : undefined
   }
 
-  getSettings(): RetentionSettings {
-    const r = this.db.prepare('SELECT bin_days, hall_of_fame_days FROM settings WHERE id = 1')
-      .get() as { bin_days: number; hall_of_fame_days: number }
-    return { binDays: r.bin_days, hallOfFameDays: r.hall_of_fame_days }
+  // LM Studio holds one model in memory at a time; true means some task is
+  // already running/provisioning against it, so the scheduler should let no
+  // other local-model task start until it finishes.
+  hasActiveLocalModel(): boolean {
+    const r = this.db.prepare(
+      `SELECT COUNT(*) AS c FROM tasks WHERE state IN ('running', 'provisioning') AND model LIKE ?`,
+    ).get(`${LMSTUDIO_PREFIX}%`) as { c: number }
+    return r.c > 0
   }
 
-  updateSettings(patch: Partial<RetentionSettings>): RetentionSettings {
+  getSettings(): Settings {
+    const r = this.db.prepare(`SELECT bin_days, hall_of_fame_days, lm_studio_base_url,
+        lm_studio_high_model, lm_studio_med_model, lm_studio_low_model
+      FROM settings WHERE id = 1`).get() as {
+      bin_days: number; hall_of_fame_days: number; lm_studio_base_url: string | null
+      lm_studio_high_model: string | null; lm_studio_med_model: string | null; lm_studio_low_model: string | null
+    }
+    return {
+      binDays: r.bin_days, hallOfFameDays: r.hall_of_fame_days,
+      lmStudioBaseUrl: r.lm_studio_base_url ?? null,
+      lmStudioHighModel: r.lm_studio_high_model ?? null,
+      lmStudioMedModel: r.lm_studio_med_model ?? null,
+      lmStudioLowModel: r.lm_studio_low_model ?? null,
+    }
+  }
+
+  updateSettings(patch: Partial<Settings>): Settings {
     const cur = this.getSettings()
-    const next: RetentionSettings = {
+    const next: Settings = {
       binDays: patch.binDays ?? cur.binDays,
       hallOfFameDays: patch.hallOfFameDays ?? cur.hallOfFameDays,
+      lmStudioBaseUrl: patch.lmStudioBaseUrl !== undefined ? patch.lmStudioBaseUrl : cur.lmStudioBaseUrl,
+      lmStudioHighModel: patch.lmStudioHighModel !== undefined ? patch.lmStudioHighModel : cur.lmStudioHighModel,
+      lmStudioMedModel: patch.lmStudioMedModel !== undefined ? patch.lmStudioMedModel : cur.lmStudioMedModel,
+      lmStudioLowModel: patch.lmStudioLowModel !== undefined ? patch.lmStudioLowModel : cur.lmStudioLowModel,
     }
-    this.db.prepare('UPDATE settings SET bin_days = ?, hall_of_fame_days = ?, updated_at = ? WHERE id = 1')
-      .run(next.binDays, next.hallOfFameDays, new Date().toISOString())
+    this.db.prepare(`UPDATE settings SET bin_days = ?, hall_of_fame_days = ?, lm_studio_base_url = ?,
+        lm_studio_high_model = ?, lm_studio_med_model = ?, lm_studio_low_model = ?, updated_at = ? WHERE id = 1`)
+      .run(next.binDays, next.hallOfFameDays, next.lmStudioBaseUrl,
+        next.lmStudioHighModel, next.lmStudioMedModel, next.lmStudioLowModel, new Date().toISOString())
     return next
   }
 

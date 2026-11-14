@@ -285,6 +285,106 @@ describe('API', () => {
     expect((await res.json()).model).toBeNull()
   })
 
+  it('rejects an lmstudio tier with no model mapped to it in Settings', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', repos: ['demo'], model: 'lmstudio-high' }),
+    })
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/no model mapped to lmstudio tier "high"/)
+  })
+
+  it('resolves an lmstudio tier mapped in Settings into a stored lmstudio: model', async () => {
+    await fetch(`${base}/api/settings`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lmStudioHighModel: 'big-model' }),
+    })
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', repos: ['demo'], model: 'lmstudio-high' }),
+    })
+    expect(res.status).toBe(201)
+    expect((await res.json()).model).toBe('lmstudio:big-model')
+  })
+
+  it('accepts an lmstudio-custom pick without needing a Settings mapping', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', repos: ['demo'], model: 'lmstudio-custom:some-model' }),
+    })
+    expect(res.status).toBe(201)
+    expect((await res.json()).model).toBe('lmstudio:some-model')
+  })
+
+  it('rejects an lmstudio-custom model id with disallowed characters', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'x', repos: ['demo'], model: 'lmstudio-custom:not a valid id!' }),
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('rejects Settings tier mappings with disallowed characters', async () => {
+    const res = await fetch(`${base}/api/settings`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lmStudioHighModel: 'not a valid id!' }),
+    })
+    expect(res.status).toBe(400)
+  })
+
+  it('resumes, follows up and restores with an lmstudio tier the same way create does', async () => {
+    await fetch(`${base}/api/settings`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lmStudioMedModel: 'mid-model' }),
+    })
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1, model: 'haiku' })
+    store.transition(t.id, 'provisioning')
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'failed', { error: 'x' })
+    const resumed = await fetch(`${base}/api/tasks/${t.id}/resume`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'lmstudio-med' }),
+    })
+    expect((await resumed.json()).model).toBe('lmstudio:mid-model')
+
+    const t2 = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    store.transition(t2.id, 'provisioning')
+    store.transition(t2.id, 'running')
+    store.setResult(t2.id, 'r')
+    store.transition(t2.id, 'done')
+    const next = await fetch(`${base}/api/tasks/${t2.id}/next`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'go', model: 'lmstudio-med' }),
+    })
+    expect((await next.json()).model).toBe('lmstudio:mid-model')
+
+    const t3 = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1, model: 'haiku' })
+    store.transition(t3.id, 'provisioning')
+    store.transition(t3.id, 'running')
+    store.transition(t3.id, 'paused-limit')
+    expect((await post(`/api/tasks/${t3.id}/restore`, { model: 'lmstudio-low' })).status).toBe(400)
+    const restored = await post(`/api/tasks/${t3.id}/restore`, { model: 'lmstudio-med' })
+    expect(await restored.json()).toMatchObject({ model: 'lmstudio:mid-model', state: 'queued', bin: null })
+  })
+
+  it('GET /api/lmstudio/models and /health report unreachable when no base URL is configured', async () => {
+    const models = await (await fetch(`${base}/api/lmstudio/models`)).json()
+    expect(models).toEqual({ reachable: false, models: [] })
+    const health = await (await fetch(`${base}/api/lmstudio/health`)).json()
+    expect(health).toEqual({ reachable: false })
+  })
+
+  it('GET /api/lmstudio/models and /health report unreachable for a configured but dead URL', async () => {
+    await fetch(`${base}/api/settings`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ lmStudioBaseUrl: 'http://127.0.0.1:1' }),
+    })
+    const models = await (await fetch(`${base}/api/lmstudio/models`)).json()
+    expect(models).toEqual({ reachable: false, models: [] })
+    const health = await (await fetch(`${base}/api/lmstudio/health`)).json()
+    expect(health).toEqual({ reachable: false })
+  })
+
   it('returns a per-repo diff with a review command', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     seedWorkRepo(home, t.id, 'demo')
@@ -399,9 +499,11 @@ describe('API', () => {
     expect(task.turns[0].result).toBe('findings')
   })
 
+  const noLmStudio = { lmStudioBaseUrl: null, lmStudioHighModel: null, lmStudioMedModel: null, lmStudioLowModel: null }
+
   it('returns default retention settings and updates them, validating input', async () => {
     const got = await (await fetch(`${base}/api/settings`)).json()
-    expect(got).toEqual({ binDays: 14, hallOfFameDays: 3 })
+    expect(got).toEqual({ binDays: 14, hallOfFameDays: 3, ...noLmStudio })
     const updated = await fetch(`${base}/api/settings`, {
       method: 'PUT', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ binDays: 7, hallOfFameDays: 2 }),

@@ -1149,7 +1149,7 @@
   </div></section>
 
   <section class="cart-frame" aria-labelledby="rules-h"><div class="cart-in o-panel">
-    <div class="sec-head"><h2 id="rules-h">GAME RULES</h2><span class="hint">Defaults for every quest and how long old ones stay around.</span></div>
+    <div class="sec-head"><h2 id="rules-h">GAME RULES</h2><span class="hint">Defaults for every quest, local models, and how long old ones stay around.</span></div>
     <form class="o-rules o-form" id="rules">
       <label class="o-field"><span class="o-k">CONCURRENCY</span><span class="o-num"><input type="number" name="concurrency" min="1" step="1" placeholder="3">quests at once</span>
         <span class="o-help">How many quests run at the same time. Extra ones wait their turn. Takes effect after a restart.</span></label>
@@ -1165,9 +1165,19 @@
         <span class="o-help">Quests leave the GAME OVER bin after this. Until then CONTINUE? brings them back.</span></label>
       <label class="o-field"><span class="o-k">HALL OF FAME CLEAN-UP</span><span class="o-num"><input type="number" name="hallOfFameDays" min="1" step="1">days</span>
         <span class="o-help">Victories leave the inbox after this. They stay reachable by link.</span></label>
+      <label class="o-field o-wide"><span class="o-k">LM STUDIO</span><input type="url" name="lmStudioBaseUrl" placeholder="http://localhost:1234" autocomplete="off">
+        <span class="o-help">Local models served by LM Studio on this machine. Give a class a model below and it joins CHOOSE YOUR CLASS. Empty hides them all.</span></label>
+      <label class="o-field"><span class="o-k">WARLOCK · MODEL</span><input name="lmStudioHighModel" list="lmModels" placeholder="unset" autocomplete="off">
+        <span class="o-help">Your biggest local model.</span></label>
+      <label class="o-field"><span class="o-k">DRUID · MODEL</span><input name="lmStudioMedModel" list="lmModels" placeholder="unset" autocomplete="off">
+        <span class="o-help">A mid-size local model.</span></label>
+      <label class="o-field"><span class="o-k">GOBLIN · MODEL</span><input name="lmStudioLowModel" list="lmModels" placeholder="unset" autocomplete="off">
+        <span class="o-help">Your smallest, fastest local model.</span></label>
+      <datalist id="lmModels"></datalist>
     </form>
     <div class="o-acts">
       <button type="button" class="btn2" id="clearNowBtn"><span><b>SWEEP NOW</b><small>clear bins past these days</small></span></button>
+      <button type="button" class="btn2" id="lmLoadBtn"><span><b>LOAD MODELS</b><small>ask LM Studio what it has</small></span></button>
       <span class="o-msg" id="rulesMsg" role="status"></span>
     </div>
     <div class="cl" id="chBox"></div>
@@ -1739,10 +1749,12 @@
   // Class for the next turn: kept across repaints (they'd reset a <select>), forgotten per thread.
   let thPick = { id: null, model: null }
   const thPicked = (t) => (thPick.id === t.id ? thPick.model : null) ?? t.model ?? 'default'
+  // Option values are stored models, so a thread's own model shows selected; an LM Studio pick goes out as lmstudio-custom.
+  const thWire = (m) => m.startsWith(LM) ? `lmstudio-custom:${m.slice(LM.length)}` : m
   const thClassHtml = (t) => {
-    const cur = thPicked(t)
-    const opts = [...CLASSES.map((c) => [c[2], `${c[0]} · ${c[1]}`]), ['default', 'DEFAULT'],
-      ...(t.model && !CLASSES.some((c) => c[2] === t.model) ? [[t.model, t.model]] : [])]
+    const cur = thPicked(t), all = allClasses().map((c) => [c[4] ?? c[2], `${c[0]} · ${c[1]}`])
+    const opts = [...all, ['default', 'DEFAULT'],
+      ...(t.model && !all.some((c) => c[0] === t.model) ? [[t.model, className(t.model)]] : [])]
     return `<label class="th-class">CLASS<select data-th-class data-key="th-class">${opts.map(([v, w]) =>
       `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(w)}</option>`).join('')}</select></label>`
   }
@@ -1766,7 +1778,6 @@
   const qsK = (n) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n)
   const qsSum = (o) => Object.values(o).reduce((a, b) => a + b, 0)
   const qsFiles = (fs) => fs.reduce((a, f) => [a[0] + f.files, a[1] + f.add, a[2] + f.del], [0, 0, 0])
-  const qsClass = (m) => m ? Object.entries(OCLASSES).find(([k]) => m.includes(k))?.[1] : undefined
   const qsWhen = (s) => {
     const d = new Date(s), days = Math.round((new Date().setHours(0, 0, 0, 0) - new Date(s).setHours(0, 0, 0, 0)) / 864e5)
     return `${days === 0 ? 'today' : days === 1 ? 'yesterday' : d.toLocaleDateString([], { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
@@ -1799,7 +1810,7 @@
     const s = d.total, w = d.windowUsd, live = d.stages.find((x) => x.live), lv = (x) => thLv[x.stage]
     const share = (x) => w && x.costUsd != null ? x.costUsd / w * 100 : null
     const pct = (x) => share(x) == null ? '—' : `≈${Math.round(share(x))}%`
-    const p = share(s), on = Math.min(10, Math.round((p ?? 0) / 10)), cls = qsClass(s.model)
+    const p = share(s), on = Math.min(10, Math.round((p ?? 0) / 10)), cls = classOf(s.model)
     const meter = p == null ? '' : `<span class="qs-meter" role="img" aria-label="About ${Math.round(p)}% of one 5-hour window">${'<i class="on"></i>'.repeat(on)}${'<i></i>'.repeat(10 - on)}</span>`
     const nSub = qsSum(s.subagents), subIn = d.stages.filter((x) => qsSum(x.subagents)).map(lv)
     const tile = (k, v, sub) => `<div class="qs-tile"><dt>${k}</dt><dd class="qs-v">${v}</dd><dd>${sub}</dd></div>`
@@ -1807,12 +1818,12 @@
       + tile('TURNS', s.turns, `model turns${d.stages.length > 1 || live ? ' · ' + d.stages.map((x) => x.turns + (x.live ? ' live' : '')).join(' + ') : ''}`)
       + tile('TOKENS', qsK(s.tokensIn), `in · ${qsK(s.tokensOut)} out${s.cacheRead ? ` · ${qsK(s.cacheRead)} cache reads` : ''}${live ? ' · live' : ''}`)
       + tile('5-H WINDOW', pct(s) + meter, !w ? '<a href="#/options">set in GAME RULES</a>' : s.costUsd == null ? 'no cost in the log' : 'estimate, of one window’s worth')
-      + tile('MODEL', cls ? cls[0] : s.model ? 'OTHER' : '—', cls ? `${cls[1]} · ${cls[2]}` : esc(s.model ?? 'not in the log'))
+      + tile('MODEL', cls ? cls[0] : s.model ? 'OTHER' : '—', esc(cls ? `${cls[1]} · ${cls[2]}` : s.model ?? 'not in the log'))
       + tile('SUBAGENTS', nSub, nSub ? `${Object.entries(s.subagents).map(([k, n]) => `${esc(k)} ×${n}`).join(' · ')}, in ${subIn.join(' + ')}` : t.party ? 'none spawned' : 'PARTY MODE off')
 
     const cols = ['STAGE', 'MODEL', 'TIME', 'TURNS', 'TOKENS IN / OUT', 'TOOLS', 'FILES', 'TEST RUNS', ...(w ? ['≈ WINDOW'] : [])]
     const fcell = (x) => { const [n, a, dl] = qsFiles(x.files); return n ? `${n} · +${a} −${dl}` : '0' }
-    const cells = (x) => [qsClass(x.model)?.[1] ?? esc(x.model ?? '—'), qsDur(x.wallMs), x.turns, `${qsK(x.tokensIn)} / ${qsK(x.tokensOut)}`, qsSum(x.tools), fcell(x), x.testRuns, ...(w ? [pct(x)] : [])]
+    const cells = (x) => [esc(classOf(x.model)?.[1] ?? x.model ?? '—'), qsDur(x.wallMs), x.turns, `${qsK(x.tokensIn)} / ${qsK(x.tokensOut)}`, qsSum(x.tools), fcell(x), x.testRuns, ...(w ? [pct(x)] : [])]
     // explicit roles: the phone CSS turns rows into blocks, which drops table semantics in some browsers
     const row = (head, vals, cls = '') => `<tr role="row"${cls ? ` class="${cls}"` : ''}><th scope="row" role="rowheader">${head}</th>${vals.map((v, i) => `<td role="cell" data-l="${cols[i + 1]}">${v}</td>`).join('')}</tr>`
     const unplayed = []
@@ -2045,7 +2056,7 @@
     const ask = act === 'ask' || act === 'final'
     const withNote = ['next', 'retry', 'queue'].includes(act) || ask || (act === 'resume' && note)
     // Sent only when changed: an omitted model keeps the thread's own (server convention).
-    const picked = thPicked(t), cls = picked !== (t.model ?? 'default') ? { model: picked } : {}
+    const picked = thPicked(t), cls = picked !== (t.model ?? 'default') ? { model: thWire(picked) } : {}
     b.disabled = true
     try {
       if (act === 'pr' || act === 'push') {
@@ -2079,7 +2090,7 @@
         <span class="th-k">PROMPT</span>${thBlock(`run:${i}:p`, `TURN ${i + 1} PROMPT`, thLv[r.stage], r.prompt, false)}
         <span class="th-k">RESULT</span>${r.result ? thBlock(`run:${i}:r`, `TURN ${i + 1} RESULT`, thLv[r.stage], r.result) : '<p class="th-none">no result recorded</p>'}</div>`).join('')
     else if (kind === 'info') body.innerHTML = `<dl class="th-info">
-        <div><dt>MODEL</dt><dd>${esc(t.model || 'default')}</dd></div>
+        <div><dt>MODEL</dt><dd>${esc(t.model ? className(t.model) : 'default')}</dd></div>
         <div><dt>PARTY MODE</dt><dd>${t.party ? 'on' : 'off'}</dd></div>
         <div><dt>AUTO-PLAY</dt><dd>${t.autoPlay ? 'on' : 'off'}</dd></div>
         <div><dt>INTERVIEW</dt><dd>${t.interview ? 'on' : 'off'}</dd></div>
@@ -2236,6 +2247,19 @@
 
   // ---- new quest (#/new, spec §5.1f) ----
   const CLASSES = [['SAGE', 'Opus', 'opus', 'deep thinking, slower'], ['KNIGHT', 'Sonnet', 'sonnet', 'balanced, all-round'], ['ROGUE', 'Haiku', 'haiku', 'quick and cheap']]
+  // LM Studio tiers from GAME RULES: [word, tier, settings key, line]. The server stores LM + model id.
+  const LM = 'lmstudio:'
+  const LM_TIERS = [['WARLOCK', 'high', 'lmStudioHighModel', 'local · your biggest model'], ['DRUID', 'med', 'lmStudioMedModel', 'local · mid-size'], ['GOBLIN', 'low', 'lmStudioLowModel', 'local · small and fast']]
+  // CLASSES-shaped (label is the model id) plus the stored model at [4]; only mapped tiers, only with a base URL.
+  const lmClasses = () => days.lmStudioBaseUrl ? LM_TIERS.filter((c) => days[c[2]]).map(([w, tier, k, line]) => [w, days[k], `lmstudio-${tier}`, line, LM + days[k]]) : []
+  const allClasses = () => [...CLASSES, ...lmClasses()]
+  // [word, label, line] for a stored or logged model; the stats log carries LM Studio's bare id.
+  const classOf = (m) => {
+    if (!m) return
+    const id = m.startsWith(LM) ? m.slice(LM.length) : m, lm = lmClasses().find((c) => c[1] === id)
+    if (lm) return [lm[0], lm[1], lm[3]]
+    return m.startsWith(LM) ? ['LOCAL', id, 'LM Studio'] : Object.entries(OCLASSES).find(([k]) => m.includes(k))?.[1]
+  }
   const LEVELS = [['SCOUT', 'investigate', 'look around, write findings, stop for you'], ['PLAN', 'spec', 'write a spec, stop for approval'], ['CRAFT', 'build', 'make the change, test, report back']]
   const BOX = '<svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/>'
     + '<g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg>'
@@ -2246,7 +2270,7 @@
   const repoOf = (name) => allRepos.find((r) => r.name === name)
   // Preselects the first repo's default_model like the server's resolveModel; anything else sends 'default'.
   const repoClass = () => CLASSES.find((c) => c[2] === repoOf(nq.repos[0])?.defaultModel)
-  const pickedClass = () => CLASSES.find((c) => c[2] === nq.model) ?? repoClass()
+  const pickedClass = () => allClasses().find((c) => c[2] === nq.model) ?? repoClass()
   // Rewriting a role="alert" with the same text would announce it again.
   const setText = (el, s) => { if (el.textContent !== s) el.textContent = s }
   const tile = (type, name, value, on, body) => `<label class="pick"><input type="${type}" name="${name}" value="${esc(value)}" data-key="${name}:${esc(value)}"${on ? ' checked' : ''}>
@@ -2308,8 +2332,8 @@
         `<span class="pk-n"><i style="background:${hue(r.name)}"></i><span>${esc(r.name)}</span></span><small>${esc([...r.tags, age(r.usage.lastQuestAt)].join(' · '))}</small>`)).join('') + '</div>' : '')
 
     const def = repoClass(), cls = pickedClass()
-    paint($('nqClass'), CLASSES.map((c) => tile('radio', 'nq-model', c[2], c === cls,
-      `<span class="pk-h"><b>${c[0]}</b><strong>· ${c[1]}</strong></span><small>${c[3]}</small>${c === def ? `<em class="nq-def">default for ${esc(nq.repos[0])}</em>` : ''}`)).join(''))
+    paint($('nqClass'), allClasses().map((c) => tile('radio', 'nq-model', c[2], c[2] === cls?.[2],
+      `<span class="pk-h"><b>${c[0]}</b><strong>· ${esc(c[1])}</strong></span><small>${c[3]}</small>${c === def ? `<em class="nq-def">default for ${esc(nq.repos[0])}</em>` : ''}`)).join(''))
     paint($('nqStage'), LEVELS.map(([n, v, line], i) => tile('radio', 'nq-stage', v, v === nq.stage,
       `<span class="pk-h"><b>${n}</b><span class="nq-lv">LV ${i + 1}</span></span><small>${line}</small>`)).join(''))
     const sw = (k, name, line, off) => `<button type="button" class="nq-sw" role="switch" aria-checked="${nq[k]}" data-sw="${k}" data-key="sw:${k}"${off ? ' disabled' : ''}>
@@ -2454,12 +2478,14 @@
   const reposYamlMsg = $('reposYamlMsg')
   const flashReposYamlMsg = (text) => { reposYamlMsg.textContent = text; setTimeout(() => (reposYamlMsg.textContent = ''), 2500) }
   const rules = $('rules').elements
+  const LM_KEYS = ['lmStudioBaseUrl', ...LM_TIERS.map((c) => c[2])]
 
   async function loadSettings() {
     try { days = await (await fetch('/api/settings')).json() } catch { return }
     rules.binDays.value = rules.binDays.defaultValue = days.binDays
     rules.hallOfFameDays.value = rules.hallOfFameDays.defaultValue = days.hallOfFameDays
-    renderInbox()
+    for (const k of LM_KEYS) rules[k].value = rules[k].defaultValue = days[k] ?? ''
+    renderInbox(); renderNew()
   }
   loadSettings()
   async function loadReposYaml() {
@@ -2606,7 +2632,7 @@
   $('sortBar').innerHTML = Object.entries(SORTS).map(([value, [word]]) => pick({ name: 'sort', value, on: value === sortBy, word, sm: true })).join('')
 
   const played = (ms) => ms >= 3_600_000 ? `${Math.round(ms / 3_600_000)}h` : `${Math.round(ms / 60_000)}m`
-  const className = (m) => { const c = m && Object.entries(OCLASSES).find(([k]) => m.includes(k))?.[1]; return c ? `${c[0]} · ${c[1]}` : m || '—' }
+  const className = (m) => { const c = classOf(m); return c ? `${c[0]} · ${c[1]}` : m || '—' }
   const stat = (n, label, big = false) => `<span class="o-stat${big ? ' big' : ''}"><b>${n}</b>${label}</span>`
   // 8 weekly bars, 4 px per quest up to 6; an empty week keeps a 2 px stub
   const spark = (w) => `<svg class="o-spark" role="img" aria-label="Quests per week, last 8 weeks: ${w.join(', ')}" width="85" height="24" viewBox="0 0 85 24" shape-rendering="crispEdges">${
@@ -2754,9 +2780,11 @@
       const res = await fetch('/api/defaults', send('PUT', patch))
       if (res.ok) wrote++; else rulesErr = (await res.json().catch(() => ({}))).error || 'defaults not saved'
     }
-    if (changed(rules.binDays) || changed(rules.hallOfFameDays)) {
-      const res = await fetch('/api/settings', send('PUT', { binDays: Number(rules.binDays.value), hallOfFameDays: Number(rules.hallOfFameDays.value) }))
-      if (res.ok) wrote++; else rulesErr ||= (await res.json().catch(() => ({}))).error || 'bin days not saved'
+    if (['binDays', 'hallOfFameDays', ...LM_KEYS].some((k) => changed(rules[k]))) {
+      // an empty LM Studio box clears it (the server reads '' as null)
+      const res = await fetch('/api/settings', send('PUT', { binDays: Number(rules.binDays.value), hallOfFameDays: Number(rules.hallOfFameDays.value),
+        ...Object.fromEntries(LM_KEYS.map((k) => [k, rules[k].value.trim()])) }))
+      if (res.ok) wrote++; else rulesErr ||= (await res.json().catch(() => ({}))).error || 'settings not saved'
     }
     $('rulesMsg').textContent = rulesErr
     await Promise.all([loadRepos(), ...(rulesErr ? [] : [loadReposYaml(), loadSettings()])]).catch(() => {})
@@ -2795,6 +2823,13 @@
       const { archived } = await (await fetch('/api/prune', { method: 'POST' })).json().catch(() => ({}))
       $('rulesMsg').textContent = archived == null ? 'Sweep failed.' : `Swept ${archived} quest${archived === 1 ? '' : 's'}.`
       refresh()
+    } else if (b.id === 'lmLoadBtn') {
+      // Asks the URL as typed, saved or not; the tier boxes then suggest what it lists.
+      const url = rules.lmStudioBaseUrl.value.trim()
+      if (!url) { $('rulesMsg').textContent = 'Set the LM Studio URL first.'; return }
+      const r = await fetch('/api/lmstudio/models?baseUrl=' + encodeURIComponent(url)).then((x) => x.json()).catch(() => ({}))
+      $('lmModels').innerHTML = (r.models ?? []).map((m) => `<option value="${esc(m.id)}">`).join('')
+      $('rulesMsg').textContent = r.error ?? (r.reachable ? `LM Studio has ${r.models.length} model${r.models.length === 1 ? '' : 's'}: pick one per class.` : 'LM Studio not reachable at that URL.')
     } else if (b.id === 'saveReposYaml') {
       const res = await fetch('/api/repos-yaml', send('PUT', { content: reposYamlText.value }))
       if (!res.ok) { reposYamlMsg.textContent = (await res.json().catch(() => ({}))).error || 'failed to save'; return }

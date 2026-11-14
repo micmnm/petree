@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { claudeMounts } from './claude-home.js'
 import type { PetreeConfig } from './config.js'
 import { composePrompt } from './prompt.js'
-import type { TaskRecord } from './store.js'
+import { isLmStudioModel, lmStudioModelId, type TaskRecord } from './store.js'
 
 export function readToken(home: string): string {
   const file = join(home, 'token')
@@ -43,6 +43,15 @@ export interface SandboxCommands {
   inspect: string[]
 }
 
+// Rewrites a host-facing LM Studio base URL so a container can reach it on
+// macOS + Docker Desktop, where host.docker.internal always resolves without
+// any extra `docker run` flag (e.g. --add-host is not needed here).
+export function hostDockerInternalUrl(baseUrl: string): string {
+  const url = new URL(baseUrl)
+  url.hostname = 'host.docker.internal'
+  return url.toString()
+}
+
 // Detached (-d, no --rm): the container is owned by the docker daemon and
 // survives petree restarts; petree removes it explicitly once the turn is
 // finalized. See docs/superpowers/specs/2026-08-03-restart-survival-design.md.
@@ -51,10 +60,19 @@ export function buildSandboxCommands(
   cfg: PetreeConfig,
   workDir: string,
   oauthToken: string,
+  lmStudioBaseUrl?: string | null,
 ): SandboxCommands {
   const image = pickImage(task.repos, cfg)
   const name = containerName(task.id)
   const home = claudeMounts(cfg)
+  const useLmStudio = isLmStudioModel(task.model)
+  if (useLmStudio && !lmStudioBaseUrl) {
+    throw new Error(`task model "${task.model}" needs an LM Studio base URL, but none is configured`)
+  }
+  const authEnv = useLmStudio
+    ? ['-e', `ANTHROPIC_BASE_URL=${hostDockerInternalUrl(lmStudioBaseUrl as string)}`, '-e', 'ANTHROPIC_AUTH_TOKEN=lm-studio']
+    : ['-e', `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`]
+  const modelArg = useLmStudio ? lmStudioModelId(task.model as string) : task.model
   const create = [
     'docker', 'run', '-d', '--init',
     '--name', name,
@@ -63,11 +81,11 @@ export function buildSandboxCommands(
     '-v', `${join(cfg.home, 'notes')}:/petree/notes:ro`,
     '-v', `${join(cfg.home, 'sessions', task.id)}:/home/dev/.claude`,
     ...home.volumes,
-    '-e', `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`,
+    ...authEnv,
     '-w', '/work',
     image,
     'claude', '-p', composePrompt(task, cfg, home.setup),
-    ...(task.model ? ['--model', task.model] : []),
+    ...(modelArg ? ['--model', modelArg] : []),
     ...(task.party ? [] : ['--disallowedTools', 'Task', 'Agent']),
     '--output-format', 'stream-json', '--verbose',
     '--dangerously-skip-permissions',

@@ -10,12 +10,55 @@ import { openPr } from './prs.js'
 import { CliRunner } from './runner.js'
 import { buildSandboxCommands, readToken, type SandboxCommands } from './sandbox.js'
 import { readSlice, sliceStats, type TurnStats } from './stats.js'
-import { threadTitle, type TaskRecord, type TaskStore } from './store.js'
+import { isLmStudioModel, lmStudioModelId, threadTitle, type TaskRecord, type TaskStore } from './store.js'
 
 export interface LauncherOptions {
   buildCommands?: (task: TaskRecord, workDir: string) => SandboxCommands
   // Injected by tests so AUTO-PLAY never pushes or calls gh/az.
   openPr?: typeof openPr
+  loadLmStudioModel?: (baseUrl: string, modelId: string) => Promise<void>
+}
+
+// readToken() throws when ~/.petree/token is missing — fine for cloud tasks,
+// but someone who only ever runs local models via LM Studio may never create
+// that file, so local-model tasks must not require it.
+export function defaultBuildCommands(task: TaskRecord, cfg: PetreeConfig, store: TaskStore, workDir: string): SandboxCommands {
+  if (isLmStudioModel(task.model)) {
+    return buildSandboxCommands(task, cfg, workDir, '', store.getSettings().lmStudioBaseUrl)
+  }
+  return buildSandboxCommands(task, cfg, workDir, readToken(cfg.home))
+}
+
+// LM Studio's REST docs don't expose a separate "is it actually loaded yet"
+// status field, so the load POST itself is treated as blocking-until-ready —
+// a deliberate simplification to revisit against a real server later.
+export async function defaultLoadLmStudioModel(baseUrl: string, modelId: string): Promise<void> {
+  const signal = AbortSignal.timeout(120_000)
+  try {
+    const res = await fetch(`${baseUrl}/api/v1/models`, { signal })
+    if (!res.ok) throw new Error(`status ${res.status}`)
+  } catch (err) {
+    throw new Error(`LM Studio unreachable at ${baseUrl}: ${err instanceof Error ? err.message : String(err)}`)
+  }
+
+  let res: Response
+  try {
+    res = await fetch(`${baseUrl}/api/v1/models/load`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: modelId }),
+      signal,
+    })
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(`loading model "${modelId}" in LM Studio timed out after 120s`)
+    }
+    throw new Error(`loading model "${modelId}" in LM Studio failed: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  if (!res.ok) {
+    const body = await res.text().catch(() => '')
+    throw new Error(`loading model "${modelId}" in LM Studio failed: status ${res.status} ${body}`.trim())
+  }
 }
 
 export interface Launcher {
@@ -56,7 +99,8 @@ function countLinesFrom(file: string, offset: number): number {
 export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: LauncherOptions = {}): Launcher {
   const buildCommands =
     opts.buildCommands ??
-    ((task: TaskRecord, workDir: string) => buildSandboxCommands(task, cfg, workDir, readToken(cfg.home)))
+    ((task: TaskRecord, workDir: string) => defaultBuildCommands(task, cfg, store, workDir))
+  const loadLmStudioModel = opts.loadLmStudioModel ?? defaultLoadLmStudioModel
 
   const runners = new Map<string, CliRunner>()
   const cancelled = new Set<string>()
@@ -227,6 +271,23 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     await prepareWorkspace(cfg, task.repos, workDir, task.id)
     if (cancelledEarly(task.id)) return
 
+    if (isLmStudioModel(task.model)) {
+      const { lmStudioBaseUrl } = store.getSettings()
+      if (!lmStudioBaseUrl) {
+        store.transition(task.id, 'failed', { error: 'LM Studio base URL is not configured in Options' })
+        return
+      }
+      try {
+        await loadLmStudioModel(lmStudioBaseUrl, lmStudioModelId(task.model as string))
+      } catch (err) {
+        store.transition(task.id, 'failed', { error: err instanceof Error ? err.message : String(err) })
+        return
+      }
+      // Loading can take up to ~2 minutes — a stop() requested during that
+      // wait must cancel now rather than silently proceed into docker run.
+      if (cancelledEarly(task.id)) return
+    }
+
     const commands = buildCommands(task, workDir)
     // A stale container from an interrupted previous turn may still hold the name.
     await runCommand(commands.remove)
@@ -237,7 +298,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     const runner = new CliRunner({
       commands: { create: commands.create, stream: commands.stream, wait: commands.wait, kill: commands.kill },
       timeoutMs: turnMinutes(task, cfg.defaults) * 60_000,
-      tokenBudget: task.tokenBudget,
+      tokenBudget: isLmStudioModel(task.model) ? Infinity : task.tokenBudget,
       alreadyUsed: task.tokensUsed,
     })
     // stop() may have landed during the awaits above, with no runner yet to kill.
@@ -257,7 +318,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
       // no create: the container already exists (running, or exited while we were down)
       commands: { stream: commands.stream, wait: commands.wait, kill: commands.kill },
       timeoutMs: remaining,
-      tokenBudget: task.tokenBudget,
+      tokenBudget: isLmStudioModel(task.model) ? Infinity : task.tokenBudget,
       alreadyUsed: task.tokensUsed,
       skipLines,
     })

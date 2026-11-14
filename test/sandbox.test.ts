@@ -130,6 +130,36 @@ describe('buildSandboxCommands', () => {
   })
 })
 
+describe('buildSandboxCommands — LM Studio', () => {
+  it('routes an lmstudio: task to the host via host.docker.internal, using the bare model id', () => {
+    const cmds = buildSandboxCommands(
+      { ...task, model: 'lmstudio:qwen2.5-coder-7b' }, cfg, '/w', 't', 'http://localhost:1234',
+    )
+    const cmd = cmds.create
+    expect(cmd.join(' ')).toContain('ANTHROPIC_BASE_URL=http://host.docker.internal:1234')
+    expect(cmd.join(' ')).toContain('ANTHROPIC_AUTH_TOKEN=lm-studio')
+    expect(cmd.join(' ')).not.toContain('CLAUDE_CODE_OAUTH_TOKEN')
+    expect(cmd).toContain('--model')
+    expect(cmd[cmd.indexOf('--model') + 1]).toBe('qwen2.5-coder-7b')
+  })
+
+  it('throws when an lmstudio: task has no configured base URL', () => {
+    expect(() => buildSandboxCommands({ ...task, model: 'lmstudio:qwen2.5-coder-7b' }, cfg, '/w', 't'))
+      .toThrow(/lmstudio:qwen2\.5-coder-7b.*LM Studio base URL/)
+    expect(() => buildSandboxCommands({ ...task, model: 'lmstudio:qwen2.5-coder-7b' }, cfg, '/w', 't', null))
+      .toThrow(/LM Studio base URL/)
+  })
+
+  it('leaves a normal cloud task unaffected when a 5th arg is not passed', () => {
+    const cmds = buildSandboxCommands({ ...task, model: 'haiku' }, cfg, '/w', 't')
+    const cmd = cmds.create
+    expect(cmd.join(' ')).toContain('CLAUDE_CODE_OAUTH_TOKEN=t')
+    expect(cmd.join(' ')).not.toContain('ANTHROPIC_BASE_URL')
+    expect(cmd.join(' ')).not.toContain('ANTHROPIC_AUTH_TOKEN')
+    expect(cmd[cmd.indexOf('--model') + 1]).toBe('haiku')
+  })
+})
+
 describe('pickImage', () => {
   const two = (a: string, b: string): PetreeConfig => ({
     ...cfg,

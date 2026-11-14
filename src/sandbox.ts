@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { claudeMounts } from './claude-home.js'
 import type { PetreeConfig } from './config.js'
 import { composePrompt } from './prompt.js'
 import type { TaskRecord } from './store.js'
@@ -53,6 +54,7 @@ export function buildSandboxCommands(
 ): SandboxCommands {
   const image = pickImage(task.repos, cfg)
   const name = containerName(task.id)
+  const home = claudeMounts(cfg)
   const create = [
     'docker', 'run', '-d', '--init',
     '--name', name,
@@ -60,14 +62,16 @@ export function buildSandboxCommands(
     '-v', `${join(cfg.home, 'shared', 'skills')}:/home/dev/.claude/skills:ro`,
     '-v', `${join(cfg.home, 'notes')}:/petree/notes:ro`,
     '-v', `${join(cfg.home, 'sessions', task.id)}:/home/dev/.claude`,
+    ...home.volumes,
     '-e', `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`,
     '-w', '/work',
     image,
-    'claude', '-p', composePrompt(task, cfg),
+    'claude', '-p', composePrompt(task, cfg, home.setup),
     ...(task.model ? ['--model', task.model] : []),
     ...(task.party ? [] : ['--disallowedTools', 'Task', 'Agent']),
     '--output-format', 'stream-json', '--verbose',
     '--dangerously-skip-permissions',
+    ...home.flags,
   ]
   // Resume only when the transcript from a previous run actually exists on the
   // host (cwd inside the container is always /work, so the project key is

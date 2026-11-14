@@ -2,6 +2,10 @@ import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
+import {
+  claudeMounts, listing, pluginAllowlist, sandboxReport, scanClaudeHome, settingsOf, settingsYaml, syncClaudeHome,
+  validateSettings, writeMcpFile,
+} from './claude-home.js'
 import { parseConfigText, resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
 import { ensureGitConfig, localCheckout, repoStatus, diffBranch, pushBranch, taskBranch, headSha } from './gitops.js'
@@ -264,7 +268,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   })
 
   app.put('/api/defaults', (req, res) => {
-    const { hash, ...rest } = (req.body ?? {}) as Record<string, unknown>
+    const { hash, claude_home, ...rest } = (req.body ?? {}) as Record<string, unknown>
     const patch = pickFields(rest, DEFAULT_KEYS)
     for (const [k, v] of Object.entries(patch)) {
       if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
@@ -272,9 +276,36 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
         return
       }
     }
+    const scan = claude_home !== undefined ? scanClaudeHome(cfg) : null
+    const ch = scan && validateSettings(claude_home, scan)
+    if (typeof ch === 'string') { res.status(400).json({ error: ch }); return }
+    if (ch) patch.claude_home = settingsYaml(ch)
     const text = readReposText()
     if (!hashOk(res, text, hash, false)) return
+    // The MCP file first: if it can't be written, repos.yaml isn't either (spec §8).
+    if (ch && scan) {
+      try { writeMcpFile(cfg.home, scan, ch.mcp) } catch (err) {
+        res.status(500).json({ error: err instanceof Error ? err.message : String(err) })
+        return
+      }
+    }
     if (applyEdit(res, () => setDefaults(text, patch))) res.json({ ok: true, hash: hashText(readReposText()) })
+  })
+
+  // GAME RULES › FROM YOUR ~/.claude: names and flags only, never file bodies or secret values.
+  app.get('/api/claude-home', (_req, res) => {
+    const scan = scanClaudeHome(cfg)
+    const s = settingsOf(cfg)
+    res.json({ ...listing(scan), mcpError: scan.mcpError,
+      chosen: { ...s, plugins: pluginAllowlist(s, scan), pluginsSaved: s.plugins !== null } })
+  })
+
+  app.post('/api/claude-home/sync', (req, res) => {
+    try {
+      res.json(syncClaudeHome(cfg, { dryRun: (req.body ?? {}).dryRun === true }))
+    } catch (err) {
+      res.status(err instanceof NotEditable ? 422 : 500).json({ error: err instanceof Error ? err.message : String(err) })
+    }
   })
 
   app.get('/api/tasks/:id', (req, res) => {
@@ -294,7 +325,9 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
         t.startedAt ? Math.max(0, Date.now() - Date.parse(t.startedAt)) : 0)
       : null
     // windowUsd feeds the ≈ window share; null means the dashboard shows none (spec §5.9).
-    res.json({ ...questStats(t, live), windowUsd: cfg.defaults.windowUsd ?? null, now: text !== null ? nowPlaying(text) : null })
+    // sandbox compares the run's init event with the current allowlists, not a launch snapshot.
+    const sandbox = sandboxReport(text ?? readSlice(join(cfg.home, 'logs', `${t.id}.log`), t.logOffset), claudeMounts(cfg))
+    res.json({ ...questStats(t, live), windowUsd: cfg.defaults.windowUsd ?? null, now: text !== null ? nowPlaying(text) : null, sandbox })
   })
 
   app.get('/api/tasks/:id/logs', (req, res) => {

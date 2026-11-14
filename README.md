@@ -13,9 +13,13 @@ Spec: docs/superpowers/specs/2026-07-30-petree-sandbox-orchestrator-design.md
    `~/.petree/token` and `chmod 600 ~/.petree/token`.
    Never put ANTHROPIC_API_KEY in the environment — it would bypass your
    Max subscription and bill the API directly.
-5. Copy agent skills into `~/.petree/shared/skills/`:
-   `cp -R ~/.claude/plugins/cache/addy-agent-skills/agent-skills/<version>/skills/* ~/.petree/shared/skills/`
-   — copy, not symlink (a symlink would dangle inside the container).
+5. (Optional) Your `~/.claude` instructions, skills, plugins and MCP servers are
+   picked in Options › GAME RULES › FROM YOUR ~/.claude and mounted read-only;
+   the installed interview plugins (agent-skills, superpowers) are on until you
+   save your own list. `npm run sync [-- --dry-run]` does that page's SYNC headless:
+   it reports new, gone and changed items, drops gone ones and rewrites
+   `~/.petree/claude.mcp.json`. Skills copied into `~/.petree/shared/skills/`
+   still load for every quest (copy, not symlink: a symlink would dangle).
 6. (Optional) install and authenticate the [GitHub CLI](https://cli.github.com)
    (`gh auth login`) on the host to enable the "Create PR" button on a task's
    Result tab. Without it, you can still push branches and open PRs manually.

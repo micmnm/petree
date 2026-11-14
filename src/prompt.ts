@@ -175,13 +175,31 @@ const STATUS_SECTION = [
   'needs-you: <one sentence: the decision or action you need from the user, or "nothing">',
 ]
 
-export function composePrompt(task: TaskRecord, cfg: PetreeConfig): string {
+// `setup` names what claudeMounts loaded (spec §5.4); empty → no section.
+export function userSetupSection(setup: string[]): string[] {
+  if (!setup.length) return []
+  const what = setup.length > 1 ? `${setup.slice(0, -1).join(', ')} and ${setup.at(-1)}` : setup[0]
+  return [
+    '## The user\'s own setup',
+    '',
+    `The user's own ${what} are loaded, read-only. Where they conflict with this prompt's stage`,
+    'instructions or the `/work/_thread/` file contracts (status.txt, questions.json, findings.md,',
+    'spec.md), this prompt wins. You run unattended in a sandbox: instructions that assume an',
+    'interactive user, the user\'s machine (local paths, local tools, MCP servers that aren\'t',
+    'connected) or asking before acting don\'t apply; skip those steps and say so in your final',
+    'message. Never copy instruction or skill text into repo files, documents, commits or PRs.',
+    '',
+  ]
+}
+
+export function composePrompt(task: TaskRecord, cfg: PetreeConfig, setup: string[] = []): string {
   const head = [
     ...(task.prompt ? [task.prompt, ''] : []),
     ...stageSection(task),
     '',
     ...notesSections(task.repos),
     '',
+    ...userSetupSection(setup),
     ...STATUS_SECTION,
   ]
   const conventions = repoConventions(task, cfg)

@@ -1,5 +1,6 @@
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
+import { scanClaudeHome, settingsOf, writeMcpFile } from './claude-home.js'
 import { loadConfig } from './config.js'
 import { makeLauncher } from './launcher.js'
 import { pollPrs } from './prs.js'
@@ -12,6 +13,12 @@ import { TaskStore } from './store.js'
 const cfg = loadConfig()
 for (const dir of ['logs', 'work', 'shared/skills', 'notes']) {
   mkdirSync(join(cfg.home, dir), { recursive: true })
+}
+// Picks up host-side edits to an allowlisted MCP server's command or token.
+try {
+  writeMcpFile(cfg.home, scanClaudeHome(cfg), settingsOf(cfg).mcp)
+} catch (err) {
+  console.warn(`claude.mcp.json not regenerated: ${err instanceof Error ? err.message : String(err)}`)
 }
 const store = new TaskStore(join(cfg.home, 'petree.db'))
 const launcher = makeLauncher(cfg, store)

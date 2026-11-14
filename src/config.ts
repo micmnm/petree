@@ -30,6 +30,16 @@ export interface Defaults {
   instructions: string
   /** User-calibrated API-equivalent dollars per 5-hour window; unset means no share is shown. */
   windowUsd?: number | null
+  /** GAME RULES › FROM YOUR ~/.claude; undefined until repos.yaml has a claude_home block. */
+  claudeHome?: ClaudeHomeSettings
+}
+
+export interface ClaudeHomeSettings {
+  instructions: boolean
+  skills: string[]
+  /** null = never saved: the interview plugins count as allowed (decision N2). */
+  plugins: string[] | null
+  mcp: string[]
 }
 
 // Command lists accept either a YAML list or a bare string, so both
@@ -49,6 +59,9 @@ export interface PetreeConfig {
   defaults: Defaults
   repos: Record<string, RepoConfig>
   allowClone: string[]
+  /** Host ~/.claude and ~/.claude.json; unset (as in tests) means nothing from them is read or mounted. */
+  claudeHome?: string
+  claudeJson?: string
 }
 
 // js-yaml 5 loads with CORE_SCHEMA (strict YAML 1.2), which no longer enables
@@ -66,6 +79,15 @@ function loadReposYaml(text: string): unknown {
   const docs = loadYamlAll(text, { schema: SCHEMA })
   if (docs.length > 1) throw new Error('expected a single YAML document in repos.yaml')
   return docs[0]
+}
+
+function parseClaudeHome(c: Record<string, unknown>): ClaudeHomeSettings {
+  return {
+    instructions: c.instructions !== false,
+    skills: toList(c.skills),
+    plugins: c.plugins == null ? null : toList(c.plugins),
+    mcp: toList(c.mcp),
+  }
 }
 
 // Split out from loadConfig so the dashboard's repos.yaml editor can validate
@@ -101,6 +123,7 @@ export function parseConfigText(text: string): Omit<PetreeConfig, 'home'> {
       defaultModel: d.default_model != null ? String(d.default_model) : null,
       instructions: toText(d.instructions),
       windowUsd: d.window_usd != null ? Number(d.window_usd) : null,
+      claudeHome: d.claude_home != null ? parseClaudeHome(d.claude_home as Record<string, unknown>) : undefined,
     },
     repos,
     allowClone: (raw.allow_clone as string[]) ?? [],
@@ -110,7 +133,14 @@ export function parseConfigText(text: string): Omit<PetreeConfig, 'home'> {
 export function loadConfig(
   home: string = process.env.PETREE_HOME ?? join(homedir(), '.petree'),
 ): PetreeConfig {
-  return { home, ...parseConfigText(readFileSync(join(home, 'repos.yaml'), 'utf8')) }
+  // Claude Code keeps .claude.json inside $CLAUDE_CONFIG_DIR when set, else next to ~/.claude.
+  const dir = process.env.CLAUDE_CONFIG_DIR
+  return {
+    home,
+    ...parseConfigText(readFileSync(join(home, 'repos.yaml'), 'utf8')),
+    claudeHome: dir ?? join(homedir(), '.claude'),
+    claudeJson: dir ? join(dir, '.claude.json') : join(homedir(), '.claude.json'),
+  }
 }
 
 export function resolveModel(

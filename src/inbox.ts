@@ -1,4 +1,4 @@
-import type { PetreeConfig } from './config.js'
+import { turnMinutes, type PetreeConfig } from './config.js'
 import { answerText, interviewPhase } from './interview.js'
 import type { Questionnaire } from './interview.js'
 import type { ThreadStatus } from './notes.js'
@@ -90,9 +90,9 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
     case 'paused-rate-limit': line = 'Waiting out a rate limit'; break
     case 'paused-limit':
       if (task.error !== 'timeout') { line = 'Out of tokens'; break }
-      line = `Timed out after ${task.timeoutMinutes} min`
+      line = `Timed out in ${level}`
       group = 'your-move'
-      action = { label: `The ${level} turn hit its ${task.timeoutMinutes}-min limit — resume it or drop it`, detail }
+      action = { label: `The ${level} turn hit its time limit — RESUME gives it ${turnMinutes(task, cfg.defaults)} min`, detail }
       break
     case 'cancelled':
       line = 'Paused by you'

@@ -8,7 +8,7 @@ export const REPO_KEYS = [
   'url', 'default_branch', 'image', 'instructions', 'setup', 'build', 'test', 'run',
   'skills', 'tags', 'default_model', 'path',
 ]
-export const DEFAULT_KEYS = ['concurrency', 'token_budget', 'timeout_minutes', 'window_usd']
+export const DEFAULT_KEYS = ['concurrency', 'token_budget', 'timeout_minutes', 'build_timeout_minutes', 'window_usd']
 
 /** The block can't be spliced safely (anchors, flow style, no block mapping). */
 export class NotEditable extends Error {}

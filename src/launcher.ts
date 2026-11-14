@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import type { PetreeConfig } from './config.js'
+import { turnMinutes, type PetreeConfig } from './config.js'
 import { prepareWorkspace } from './git.js'
 import { aheadCount, commitChanges, commitStat, ensureGitConfig, headSha, taskBranch } from './gitops.js'
 import { waitingQuestions } from './interview.js'
@@ -236,7 +236,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
 
     const runner = new CliRunner({
       commands: { create: commands.create, stream: commands.stream, wait: commands.wait, kill: commands.kill },
-      timeoutMs: task.timeoutMinutes * 60_000,
+      timeoutMs: turnMinutes(task, cfg.defaults) * 60_000,
       tokenBudget: task.tokenBudget,
       alreadyUsed: task.tokensUsed,
     })
@@ -252,7 +252,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     const commands = buildCommands(task, workDir)
     const skipLines = countLinesFrom(logFile, task.logOffset)
     const elapsed = Date.now() - Date.parse(task.startedAt ?? task.updatedAt)
-    const remaining = Math.max(0, task.timeoutMinutes * 60_000 - elapsed)
+    const remaining = Math.max(0, turnMinutes(task, cfg.defaults) * 60_000 - elapsed)
     const runner = new CliRunner({
       // no create: the container already exists (running, or exited while we were down)
       commands: { stream: commands.stream, wait: commands.wait, kill: commands.kill },

@@ -1154,7 +1154,9 @@
       <label class="o-field"><span class="o-k">TOKEN BUDGET</span><span class="o-num"><input type="number" name="token_budget" min="1" step="1" placeholder="500000">tokens per quest</span>
         <span class="o-help">A quest that runs out stops and lands in GAME OVER as “out of tokens”.</span></label>
       <label class="o-field"><span class="o-k">TIMEOUT</span><span class="o-num"><input type="number" name="timeout_minutes" min="1" step="1" placeholder="30">minutes per turn</span>
-        <span class="o-help">A turn that runs longer is stopped.</span></label>
+        <span class="o-help">A SCOUT or PLAN turn that runs longer is stopped; RESUME picks it up.</span></label>
+      <label class="o-field"><span class="o-k">CRAFT TIMEOUT</span><span class="o-num"><input type="number" name="build_timeout_minutes" min="1" step="1" placeholder="180">minutes per CRAFT turn</span>
+        <span class="o-help">Building and testing take longer, so CRAFT turns get their own limit.</span></label>
       <label class="o-field"><span class="o-k">WINDOW BUDGET</span><span class="o-num"><input type="number" name="window_usd" min="0" step="any" placeholder="unset">USD per 5-hour window</span>
         <span class="o-help">What one 5-hour window is worth in API dollars. Only feeds the ≈ window share in QUEST STATS.</span></label>
       <label class="o-field"><span class="o-k">GAME OVER CLEAN-UP</span><span class="o-num"><input type="number" name="binDays" min="1" step="1">days</span>
@@ -2412,7 +2414,7 @@
 
   // ---- options (#/options): roster, repo edit form, GAME RULES, raw repos.yaml ----
   const NEW = '+' // drafts key of the repo being recruited; never a valid repo name
-  const DEFAULT_KEYS = ['concurrency', 'token_budget', 'timeout_minutes', 'window_usd']
+  const DEFAULT_KEYS = ['concurrency', 'token_budget', 'timeout_minutes', 'build_timeout_minutes', 'window_usd']
   const OCLASSES = { opus: ['SAGE', 'Opus', 'deep thinking, slower'], sonnet: ['KNIGHT', 'Sonnet', 'balanced, all-round'], haiku: ['ROGUE', 'Haiku', 'quick and cheap'] }
   const IMAGES = { 'sandbox-node': 'NODE', 'sandbox-dotnet': 'DOTNET', 'sandbox-full': 'FULL' }
   // build/test wording mirrors composePrompt (src/prompt.ts); petree itself never gates SHIP on them

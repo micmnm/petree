@@ -61,9 +61,11 @@ describe('cardFor', () => {
   })
 
   it('a turn that timed out is a move to resume, not out of tokens', () => {
-    expect(cardFor(task({ state: 'paused-limit', stage: 'build', error: 'timeout' }), null, cfg)).toMatchObject({
-      line: 'Timed out after 30 min', group: 'your-move', action: { label: 'The CRAFT turn hit its 30-min limit — resume it or drop it' },
+    const withBuild = { ...cfg, defaults: { ...cfg.defaults, buildTimeoutMinutes: 180 } } as PetreeConfig
+    expect(cardFor(task({ state: 'paused-limit', stage: 'build', error: 'timeout' }), null, withBuild)).toMatchObject({
+      line: 'Timed out in CRAFT', group: 'your-move', action: { label: 'The CRAFT turn hit its time limit — RESUME gives it 180 min' },
     })
+    expect(cardFor(task({ state: 'paused-limit', stage: 'spec', error: 'timeout' }), null, withBuild).action?.label).toBe('The PLAN turn hit its time limit — RESUME gives it 30 min')
   })
 
   it('shows paused-by-you as a move and out-of-tokens as game over', () => {

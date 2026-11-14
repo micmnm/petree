@@ -23,6 +23,8 @@ export interface RepoConfig {
 
 export interface Defaults {
   timeoutMinutes: number
+  /** CRAFT turns build and test, so they get their own, longer limit. */
+  buildTimeoutMinutes?: number
   tokenBudget: number
   concurrency: number
   defaultModel: string | null
@@ -118,6 +120,7 @@ export function parseConfigText(text: string): Omit<PetreeConfig, 'home'> {
   return {
     defaults: {
       timeoutMinutes: Number(d.timeout_minutes ?? 30),
+      buildTimeoutMinutes: Number(d.build_timeout_minutes ?? 180),
       tokenBudget: Number(d.token_budget ?? 500_000),
       concurrency: Number(d.concurrency ?? 3),
       defaultModel: d.default_model != null ? String(d.default_model) : null,
@@ -141,6 +144,11 @@ export function loadConfig(
     claudeHome: dir ?? join(homedir(), '.claude'),
     claudeJson: dir ? join(dir, '.claude.json') : join(homedir(), '.claude.json'),
   }
+}
+
+/** The time limit for a task's current turn: CRAFT turns get at least the build limit. */
+export function turnMinutes(task: { stage: string; timeoutMinutes: number }, d: Defaults): number {
+  return task.stage === 'build' ? Math.max(task.timeoutMinutes, d.buildTimeoutMinutes ?? task.timeoutMinutes) : task.timeoutMinutes
 }
 
 export function resolveModel(

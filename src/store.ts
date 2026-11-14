@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
+import { mergeStats, type TurnStats } from './stats.js'
 
 export type TaskState =
   | 'queued' | 'provisioning' | 'running'
@@ -21,6 +22,7 @@ export interface Turn {
   tokensUsed: number
   endedAt: string
   stage: Stage
+  stats?: TurnStats | null
 }
 
 export interface TaskRecord {
@@ -48,6 +50,7 @@ export interface TaskRecord {
   delivery: Record<string, Delivery>
   party: boolean
   autoPlay: boolean
+  turnStats?: TurnStats | null
 }
 
 // Per-repo ship state (spec §5.4); ahead/head are set at turn end, the rest by /push, /pr and PR polling.
@@ -127,6 +130,7 @@ function rowToTask(r: any): TaskRecord {
     createdAt: r.created_at, updatedAt: r.updated_at,
     restarts: r.restarts ?? 0, retryAt: r.retry_at ?? null,
     startedAt: r.started_at ?? null, logOffset: r.log_offset ?? 0,
+    turnStats: r.turn_stats ? JSON.parse(r.turn_stats) : null,
   }
 }
 
@@ -155,6 +159,7 @@ export class TaskStore {
     if (!cols.includes('delivery')) this.db.exec('ALTER TABLE tasks ADD COLUMN delivery TEXT')
     if (!cols.includes('party')) this.db.exec('ALTER TABLE tasks ADD COLUMN party INTEGER NOT NULL DEFAULT 1')
     if (!cols.includes('auto_play')) this.db.exec('ALTER TABLE tasks ADD COLUMN auto_play INTEGER NOT NULL DEFAULT 0')
+    if (!cols.includes('turn_stats')) this.db.exec('ALTER TABLE tasks ADD COLUMN turn_stats TEXT')
 
     this.db.exec(`CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -244,6 +249,13 @@ export class TaskStore {
     return this.get(id)!
   }
 
+  // Adds one run's stats to the current turn's running total.
+  addTurnStats(id: string, run: TurnStats): void {
+    const t = this.get(id)
+    if (!t) throw new Error(`no task ${id}`)
+    this.db.prepare('UPDATE tasks SET turn_stats = ? WHERE id = ?').run(JSON.stringify(mergeStats(t.turnStats, run)), id)
+  }
+
   // Comments never change state or prompt; followUp folds the pending ones in.
   addComment(id: string, text: string): TaskRecord {
     const t = this.get(id)
@@ -270,7 +282,7 @@ export class TaskStore {
       }
       const turns: Turn[] = [
         ...t.turns,
-        { prompt: t.prompt, result: t.result, tokensUsed: t.tokensUsed, endedAt: new Date().toISOString(), stage: t.stage },
+        { prompt: t.prompt, result: t.result, tokensUsed: t.tokensUsed, endedAt: new Date().toISOString(), stage: t.stage, stats: t.turnStats },
       ]
       const pending = t.comments.filter((c) => !c.consumed)
       const full = pending.length
@@ -278,7 +290,7 @@ export class TaskStore {
           .filter(Boolean).join('\n\n')
         : prompt
       const comments = t.comments.map((c) => ({ ...c, consumed: true }))
-      this.db.prepare(`UPDATE tasks SET prompt = ?, model = ?, tokens_used = 0, result = NULL, error = NULL,
+      this.db.prepare(`UPDATE tasks SET prompt = ?, model = ?, tokens_used = 0, result = NULL, error = NULL, turn_stats = NULL,
         turns = ?, stage = ?, comments = ?, state = 'queued', restarts = 0, retry_at = NULL, updated_at = ? WHERE id = ?`)
         .run(full, model !== undefined ? model : t.model, JSON.stringify(turns), to, JSON.stringify(comments),
           new Date().toISOString(), id)

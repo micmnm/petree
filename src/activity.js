@@ -70,22 +70,41 @@ function pushFile(stats, p) {
   if (f && !stats.files.includes(f)) stats.files.push(f)
 }
 
+// `in` counts fresh + cache-creation + cache-read input, as the quest stats do.
+function apiUsage(u) {
+  const cr = u.cache_read_input_tokens ?? 0
+  return { in: (u.input_tokens ?? 0) + (u.cache_creation_input_tokens ?? 0) + cr, out: u.output_tokens ?? 0, cacheRead: cr }
+}
+
+function modelUsage(u) {
+  const cr = u.cacheReadInputTokens ?? 0
+  return { in: (u.inputTokens ?? 0) + (u.cacheCreationInputTokens ?? 0) + cr, out: u.outputTokens ?? 0, cacheRead: cr }
+}
+
+function sumUsage(list) {
+  return list.reduce((a, u) => ({ in: a.in + u.in, out: a.out + u.out, cacheRead: a.cacheRead + u.cacheRead }), { in: 0, out: 0, cacheRead: 0 })
+}
+
 /**
  * Parse a raw log (stream-json lines plus any stderr noise) into a timeline and
  * run statistics. Unparseable lines are kept as `raw` entries — petree's log is
  * the container's whole stdout/stderr, not only Claude's protocol.
+ * `opts.testCommands`: repo test commands, counted in `stats.testRuns` when a Bash call contains one.
  */
-export function summarizeLog(text) {
+export function summarizeLog(text, opts = {}) {
   const stats = {
     turns: 0, toolCalls: 0, toolCounts: {}, files: [], commands: 0,
     tokens: 0, errors: 0, sessionId: null, model: null,
     durationMs: null, costUsd: null, numTurns: null,
     finished: null, todos: [], lines: 0, noise: 0,
+    wallMs: 0, turnsSum: 0, tokensIn: 0, tokensOut: 0, cacheRead: 0, subagents: {}, testRuns: 0,
   }
   const entries = []
   const byToolId = new Map() // tool_use id -> its timeline entry, so results attach to the call
   const seenBlocks = new Map() // assistant message id -> blocks already rendered
   const countedUsage = new Set()
+  const msgUsage = new Map() // assistant message id -> latest usage (early blocks carry partial output_tokens)
+  let resultUsage = null // last result's usage; wins over the per-message sum
 
   const add = (e) => { entries.push(e); return e }
 
@@ -117,6 +136,7 @@ export function summarizeLog(text) {
       const sub = msg.parent_tool_use_id ? 'subagent' : ''
       if (id === null || !seenBlocks.has(id)) { stats.turns++; if (id !== null) seenBlocks.set(id, 0) }
       const u = msg.message.usage
+      if (u) msgUsage.set(id ?? `anon${stats.lines}`, apiUsage(u))
       // Same accounting as the runner: non-cached input+output, once per message id.
       if (u && (id === null || !countedUsage.has(id))) {
         if (id !== null) countedUsage.add(id)
@@ -138,7 +158,15 @@ export function summarizeLog(text) {
           const name = String(b.name ?? 'tool')
           stats.toolCalls++
           stats.toolCounts[name] = (stats.toolCounts[name] ?? 0) + 1
-          if (name === 'Bash') stats.commands++
+          if (name === 'Bash') {
+            stats.commands++
+            const cmd = String(b.input?.command ?? '')
+            if ((opts.testCommands ?? []).some((c) => c && cmd.includes(c))) stats.testRuns++
+          }
+          if (name === 'Task' || name === 'Agent') {
+            const k = String(b.input?.subagent_type ?? 'unknown')
+            stats.subagents[k] = (stats.subagents[k] ?? 0) + 1
+          }
           if (WRITE_TOOLS.has(name)) pushFile(stats, b.input?.file_path || b.input?.notebook_path)
           if (name === 'TodoWrite' && Array.isArray(b.input?.todos)) stats.todos = b.input.todos
           const entry = add({
@@ -176,6 +204,15 @@ export function summarizeLog(text) {
       stats.durationMs = typeof msg.duration_ms === 'number' ? msg.duration_ms : stats.durationMs
       stats.costUsd = typeof msg.total_cost_usd === 'number' ? msg.total_cost_usd : stats.costUsd
       stats.numTurns = typeof msg.num_turns === 'number' ? msg.num_turns : stats.numTurns
+      // A process can emit several results (background-task notifications): duration and
+      // num_turns are per result, while cost, usage and modelUsage are process-cumulative.
+      stats.wallMs += typeof msg.duration_ms === 'number' ? msg.duration_ms : 0
+      stats.turnsSum += typeof msg.num_turns === 'number' ? msg.num_turns : 0
+      // Verified on a real log: result.usage is the main agent only; modelUsage also
+      // covers subagents, so it is preferred.
+      const mu = msg.modelUsage && typeof msg.modelUsage === 'object' ? Object.values(msg.modelUsage) : []
+      if (mu.length) resultUsage = sumUsage(mu.map(modelUsage))
+      else if (msg.usage) resultUsage = apiUsage(msg.usage)
       stats.finished = { ok, text: body }
       add({
         kind: ok ? 'result' : 'error', icon: ok ? '✔' : '✕',
@@ -186,6 +223,11 @@ export function summarizeLog(text) {
     // stream_event partials and other protocol chatter carry no standalone
     // meaning here — the assembled assistant/user/result messages above cover it.
   }
+
+  const tok = resultUsage ?? sumUsage([...msgUsage.values()])
+  stats.tokensIn = tok.in
+  stats.tokensOut = tok.out
+  stats.cacheRead = tok.cacheRead
 
   const hidden = Math.max(0, entries.length - MAX_ENTRIES)
   return { stats, entries: hidden ? entries.slice(-MAX_ENTRIES) : entries, hidden, total: entries.length }

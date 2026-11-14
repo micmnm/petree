@@ -225,6 +225,7 @@ describe('API', () => {
     expect(repos).toContainEqual({
       name: 'demo', defaultBranch: 'main', image: 'sandbox-node', defaultModel: null,
       instructions: '', setup: [], build: [], test: [], run: ['npm start'], tags: [], path: null, local: null,
+      usage: expect.objectContaining({ quests: 0, weekly: Array(8).fill(0) }),
     })
   })
 

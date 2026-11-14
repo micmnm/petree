@@ -19,7 +19,7 @@ repos:
     image: sandbox-node
 `)
     const cfg = loadConfig(home)
-    expect(cfg.defaults).toEqual({ timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '' })
+    expect(cfg.defaults).toEqual({ timeoutMinutes: 30, tokenBudget: 500000, concurrency: 3, defaultModel: null, instructions: '', windowUsd: null })
     expect(cfg.repos.demo.url).toBe('file:///tmp/demo')
     expect(cfg.repos.demo.defaultBranch).toBe('main')
     expect(cfg.repos.demo.setup).toEqual([])
@@ -39,7 +39,17 @@ repos:
   demo: { url: x, image: sandbox-node }
 `)
     const cfg = loadConfig(home)
-    expect(cfg.defaults).toEqual({ timeoutMinutes: 10, tokenBudget: 1000, concurrency: 1, defaultModel: null, instructions: '' })
+    expect(cfg.defaults).toEqual({ timeoutMinutes: 10, tokenBudget: 1000, concurrency: 1, defaultModel: null, instructions: '', windowUsd: null })
+  })
+
+  it('parses window_usd', () => {
+    const home = petreeHome(`
+defaults:
+  window_usd: 12.5
+repos:
+  demo: { url: x, image: sandbox-node }
+`)
+    expect(loadConfig(home).defaults.windowUsd).toBe(12.5)
   })
 
   it('rejects a repo without an image', () => {

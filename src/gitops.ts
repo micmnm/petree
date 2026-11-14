@@ -47,6 +47,13 @@ export function commitChanges(repoDir: string, taskId: string, message: string):
   return true
 }
 
+// Files/insertions/deletions of HEAD, from `git show --shortstat`.
+export function commitStat(repoDir: string): { files: number; add: number; del: number } {
+  const out = git(repoDir, ['show', '--shortstat', '--format=', 'HEAD'])
+  const n = (re: RegExp) => Number(re.exec(out)?.[1] ?? 0)
+  return { files: n(/(\d+) files? changed/), add: n(/(\d+) insertions?\(\+\)/), del: n(/(\d+) deletions?\(-\)/) }
+}
+
 export interface RepoStatus {
   hasChanges: boolean
   ahead: number

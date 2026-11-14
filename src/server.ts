@@ -11,6 +11,8 @@ import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
 import { acceptNote, dropSuggestion, listSuggestions, NoteInputError, readThreadFile, readThreadStatus } from './notes.js'
 import { pickImage } from './sandbox.js'
+import { questStats, readSlice, sliceStats } from './stats.js'
+import { repoUsage } from './usage.js'
 import {
   DEFAULT_KEYS, REPO_KEYS, NotEditable, addRepo, hashText, pickFields, readRepoFields,
   removeRepo, repoEditable, replaceRepo, setDefaults,
@@ -117,6 +119,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   app.post('/api/prune', (_req, res) => { res.json(store.prune()) })
 
   app.get('/api/repos', async (_req, res) => {
+    const usage = repoUsage(store.list(), cfg)
     res.json(
       await Promise.all(
         Object.entries(cfg.repos).map(async ([name, r]) => ({
@@ -132,6 +135,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
           tags: r.tags,
           path: r.path ?? null,
           local: r.path ? await localCheckout(r.path) : null,
+          usage: usage[name],
         })),
       ),
     )
@@ -265,6 +269,16 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     const t = store.get(req.params.id)
     if (t) res.json(withCard(t))
     else res.sendStatus(404)
+  })
+
+  app.get('/api/tasks/:id/stats', (req, res) => {
+    if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) { res.sendStatus(400); return }
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    const live = t.state === 'running'
+      ? sliceStats(readSlice(join(cfg.home, 'logs', `${t.id}.log`), t.logOffset), t.repos.flatMap((r) => cfg.repos[r]?.test ?? []), 0)
+      : null
+    res.json(questStats(t, live))
   })
 
   app.get('/api/tasks/:id/logs', (req, res) => {

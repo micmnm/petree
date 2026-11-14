@@ -28,6 +28,8 @@ export interface Defaults {
   defaultModel: string | null
   /** Free-form prompt text prepended to every task, whatever its repos. */
   instructions: string
+  /** User-calibrated API-equivalent dollars per 5-hour window; unset means no share is shown. */
+  windowUsd?: number | null
 }
 
 // Command lists accept either a YAML list or a bare string, so both
@@ -98,6 +100,7 @@ export function parseConfigText(text: string): Omit<PetreeConfig, 'home'> {
       concurrency: Number(d.concurrency ?? 3),
       defaultModel: d.default_model != null ? String(d.default_model) : null,
       instructions: toText(d.instructions),
+      windowUsd: d.window_usd != null ? Number(d.window_usd) : null,
     },
     repos,
     allowClone: (raw.allow_clone as string[]) ?? [],

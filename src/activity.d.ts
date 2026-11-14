@@ -32,11 +32,18 @@ export interface ActivityStats {
   todos: ActivityTodo[]
   lines: number
   noise: number
+  wallMs: number
+  turnsSum: number
+  tokensIn: number
+  tokensOut: number
+  cacheRead: number
+  subagents: Record<string, number>
+  testRuns: number
 }
 
 export declare const MAX_ENTRIES: number
 
-export declare function summarizeLog(text: string): {
+export declare function summarizeLog(text: string, opts?: { testCommands?: string[] }): {
   stats: ActivityStats
   entries: ActivityEntry[]
   hidden: number

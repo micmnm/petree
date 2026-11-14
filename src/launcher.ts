@@ -3,11 +3,12 @@ import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readSync
 import { join } from 'node:path'
 import type { PetreeConfig } from './config.js'
 import { prepareWorkspace } from './git.js'
-import { commitChanges, headSha, repoStatus, taskBranch } from './gitops.js'
+import { commitChanges, commitStat, headSha, repoStatus, taskBranch } from './gitops.js'
 import { readThreadStatus } from './notes.js'
 import { openPr } from './prs.js'
 import { CliRunner } from './runner.js'
 import { buildSandboxCommands, readToken, type SandboxCommands } from './sandbox.js'
+import { readSlice, sliceStats, type TurnStats } from './stats.js'
 import { threadTitle, type TaskRecord, type TaskStore } from './store.js'
 
 export interface LauncherOptions {
@@ -127,9 +128,11 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     const latest = store.get(task.id) ?? task
     const title = threadTitle(latest)
     const commitErrors: string[] = []
+    const files: TurnStats['files'] = []
     for (const repo of task.repos) {
       try {
         const committed = commitChanges(join(workDir, repo), task.id, `petree ${task.id}: ${title}`)
+        if (committed) files.push({ repo, ...commitStat(join(workDir, repo)) })
         if (committed && latest.stage !== 'build') {
           commitErrors.push(`${latest.stage} turn changed files in ${repo}`)
         }
@@ -151,6 +154,13 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
       const combined = [current?.error, ...commitErrors].filter(Boolean).join('; ')
       safely(() => store.patch(task.id, { error: combined }))
     }
+
+    // This run's log slice joins the turn's running total (resumes accumulate).
+    safely(() => {
+      const elapsed = latest.startedAt ? Date.now() - Date.parse(latest.startedAt) : 0
+      const tests = task.repos.flatMap((r) => cfg.repos[r]?.test ?? [])
+      store.addTurnStats(task.id, sliceStats(readSlice(logFile, latest.logOffset), tests, elapsed, files))
+    })
 
     // The turn is finalized — the detached container is no longer needed.
     await runCommand(commands.remove)

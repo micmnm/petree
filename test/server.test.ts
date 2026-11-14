@@ -734,7 +734,8 @@ describe('thread API', () => {
     store.patch(t.id, { startedAt: new Date(Date.now() - 60_000).toISOString() })
     const stats = async () => (await fetch(`${base}/api/tasks/${t.id}/stats`)).json()
     const s = await stats()
-    expect(s).toMatchObject({ windowUsd: null, stages: [{ stage: 'investigate', live: true }] })
+    expect(s).toMatchObject({ windowUsd: null, now: null, stages: [{ stage: 'investigate', live: true }] })
+    expect(await (await fetch(`${base}/api/hud`)).json()).toEqual({ xp: 0, lv: 1, bar: 0, streak: 0 })
     expect(s.stages[0].wallMs).toBeGreaterThanOrEqual(60_000)
     const yaml = 'defaults:\n  window_usd: 40\nrepos:\n  demo:\n    url: x\n    image: sandbox-node\n'
     await fetch(`${base}/api/repos-yaml`, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: yaml }) })

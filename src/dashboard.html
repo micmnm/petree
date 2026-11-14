@@ -65,6 +65,13 @@
   .brand { flex: 1 1 auto; display: flex; align-items: flex-end; gap: 10px; min-height: 44px; text-decoration: none; }
   .brand .word { font: 40px/1 var(--px); letter-spacing: 1px; }
   .sprout { flex: none; width: 48px; height: 51px; }
+  /* Sprout poses (§4.11): every SVG copy carries all parts, the class picks them */
+  .sprout:not(.wave) .pose-wave, .sprout:not(.walk) .pose-stride, .sprout.walk .pose-legs { display: none; }
+  .hud-stat { display: flex; align-items: center; gap: 10px; font: 30px/1 var(--px); color: var(--gold); white-space: nowrap; }
+  .hud-xp { display: flex; gap: 2px; padding: 2px; border: 2px solid var(--line-strong); background: var(--inset); }
+  .hud-xp i { width: 10px; height: 16px; }
+  .hud-xp i.on { background: var(--gold-fill); }
+  .hud-fire { display: inline-flex; align-items: center; gap: 4px; }
   .ym-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 6px; background: var(--chip-bg); color: var(--chip-ink); box-shadow: inset 0 0 0 2px var(--chip-frame); clip-path: var(--step); text-decoration: none; font: 20px/1 var(--px); }
   .ym-chip .num { min-width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; background: var(--chip-num); color: var(--need); font-size: 30px; }
   .tags { display: flex; gap: 2px; padding: 2px; background: var(--inset); border: 2px solid var(--line-strong); }
@@ -126,6 +133,13 @@
   .ym-det { font-size: 14px; line-height: 1.4; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .qs { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 2px solid var(--line); border-left: 4px solid var(--go-fill); }
   .qs-tag, .qs-time { display: inline-flex; align-items: center; gap: 7px; color: var(--go); font: 20px/1 var(--px); white-space: nowrap; }
+  /* questing trail (§4.1): a lit head walks the 16 cells; static dots under reduced motion */
+  .np-trail { flex: 0 1 auto; min-width: 0; display: flex; gap: 3px; overflow: hidden; }
+  .np-trail i { flex: none; width: 6px; height: 6px; background: var(--line); animation: npTrail 1.6s steps(3, end) infinite; animation-delay: calc(var(--i) * .1s - 1.6s); }
+  @keyframes npTrail { 0% { background: var(--go-fill); } 25%, 100% { background: var(--line); } }
+  .np { display: flex; align-items: baseline; gap: 10px; min-width: 0; margin: 0; }
+  .np b { flex: none; font: 400 20px/1 var(--px); color: var(--go); }
+  .np span { min-width: 0; font: 14px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
   /* Level track (§4.3) */
   .prog { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
@@ -191,6 +205,7 @@
     .brand { grid-area: brand; min-width: 0; gap: 8px; }
     .brand .word { font-size: 30px; }
     .hud .sprout { width: 32px; height: 34px; }
+    .hud-stat { display: none; } /* §5: LV/XP/streak may drop on phone; the two-row grid has no cell for it */
     .ym-chip { grid-area: chip; gap: 6px; padding: 0 10px 0 6px; }
     .ym-chip .num { min-width: 28px; height: 30px; }
     .gear { grid-area: gear; width: 44px; height: 44px; }
@@ -572,6 +587,8 @@
   .vic-facts dt { margin: 0; font: 20px/1 var(--px); color: var(--label); }
   .vic-facts dd { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; font-size: 14px; color: var(--muted); }
   .vic-facts b { min-width: 0; font: 400 40px/.9 var(--px); color: var(--ink); overflow-wrap: anywhere; }
+  .vic-facts .hud-reward { grid-column: 1 / -1; }
+  .hud-reward b { color: var(--gold); }
   @media (max-width: 600px) {
     #threadView { gap: 22px; }
     .th-head .cart-in { gap: 12px; padding: 14px 14px 6px; }
@@ -831,12 +848,16 @@
         <g style="fill:var(--go)"><rect x="7" y="1" width="2" height="1"/><rect x="5" y="2" width="6" height="1"/><rect x="7" y="3" width="2" height="1"/></g>
         <g style="fill:var(--sp-armour)"><rect x="5" y="4" width="6" height="1"/><rect x="4" y="5" width="8" height="1"/><rect x="4" y="6" width="1" height="1"/><rect x="11" y="6" width="1" height="1"/><rect x="4" y="7" width="6" height="1"/><rect x="5" y="10" width="6" height="1"/><rect x="5" y="11" width="4" height="1"/><rect x="12" y="11" width="1" height="4"/></g>
         <rect x="5" y="6" width="6" height="1" style="fill:var(--sp-visor)"/>
-        <g style="fill:var(--muted)"><rect x="10" y="7" width="2" height="1"/><rect x="5" y="8" width="6" height="1"/><rect x="9" y="11" width="2" height="1"/><rect x="5" y="13" width="2" height="2"/><rect x="9" y="13" width="2" height="2"/><rect x="4" y="15" width="3" height="1"/><rect x="9" y="15" width="3" height="1"/></g>
+        <g style="fill:var(--muted)"><rect x="10" y="7" width="2" height="1"/><rect x="5" y="8" width="6" height="1"/><rect x="9" y="11" width="2" height="1"/><rect x="9" y="13" width="2" height="2"/><rect x="9" y="15" width="3" height="1"/></g>
+        <g class="pose-legs" style="fill:var(--muted)"><rect x="5" y="13" width="2" height="2"/><rect x="4" y="15" width="3" height="1"/></g>
+        <g class="pose-stride" style="fill:var(--muted)"><rect x="5" y="13" width="2" height="1"/><rect x="4" y="14" width="3" height="1"/></g>
+        <g class="pose-wave"><rect x="3" y="7" width="1" height="1" style="fill:var(--sp-armour)"/><rect x="2" y="4" width="1" height="3" style="fill:var(--sp-armour)"/><rect x="1" y="2" width="2" height="2" style="fill:var(--muted)"/></g>
         <g style="fill:var(--gold)"><rect x="3" y="9" width="8" height="1"/><rect x="2" y="10" width="2" height="1"/></g>
         <g style="fill:var(--gold-fill)"><rect x="6" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="5" y="12" width="6" height="1"/><rect x="12" y="9" width="1" height="1"/><rect x="11" y="10" width="3" height="1"/></g>
       </svg>
       <span class="word">PETREE</span>
     </a>
+    <div class="hud-stat" id="hudStat" role="img" hidden></div>
     <a class="ym-chip" id="ymChip" href="#your-move" hidden><span class="num" id="ymCount">0</span>YOUR MOVE</a>
     <div class="tags" id="tagBar" role="group" aria-label="Filter quests by tag" hidden></div>
     <a class="btn-start" href="#/new">
@@ -1093,6 +1114,13 @@
 
   // ---- pixel bits ----
   const SPROUT = document.querySelector('.brand .sprout').outerHTML
+  const poseLabel = (p) => 'Sprout, the Petree knight, ' + { idle: 'standing guard', wave: 'waving: a quest needs you', walk: 'marching: a quest is under way' }[p]
+  const poseSprout = (p) => SPROUT.replace('class="sprout"', `class="sprout ${p}"`).replace(/aria-label="[^"]*"/, `aria-label="${poseLabel(p)}"`)
+  const poseOf = (group) => group === 'your-move' ? 'wave' : group === 'questing' ? 'walk' : 'idle'
+  const npTrail = `<span class="np-trail" aria-hidden="true">${Array.from({ length: 16 }, (_, i) => `<i style="--i:${i}"></i>`).join('')}</span>`
+  const hudFlame = '<svg aria-hidden="true" width="15" height="21" viewBox="0 0 5 7" shape-rendering="crispEdges">'
+    + '<g style="fill:var(--gold)"><rect x="2" y="0" width="1" height="1"/><rect x="2" y="1" width="2" height="1"/><rect x="1" y="2" width="3" height="1"/><rect x="0" y="3" width="5" height="3"/><rect x="1" y="6" width="3" height="1"/></g>'
+    + '<g style="fill:var(--gold-fill)"><rect x="2" y="3" width="1" height="1"/><rect x="1" y="4" width="3" height="2"/></g></svg>'
   const PLAY = '<svg aria-hidden="true" width="6" height="11" viewBox="0 0 4 7" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="1" height="7"/><rect x="1" y="1" width="1" height="5"/><rect x="2" y="2" width="1" height="3"/><rect x="3" y="3" width="1" height="1"/></svg>'
   const CHECK = '<svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="2" width="1" height="2"/><rect x="1" y="3" width="1" height="2"/><rect x="2" y="4" width="1" height="2"/><rect x="3" y="3" width="1" height="2"/><rect x="4" y="2" width="1" height="2"/><rect x="5" y="1" width="1" height="2"/><rect x="6" y="0" width="1" height="2"/></svg>'
   const CARET = '<svg aria-hidden="true" width="14" height="8" viewBox="0 0 7 4" shape-rendering="crispEdges" fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="2" y="1" width="3" height="1"/><rect x="1" y="2" width="5" height="1"/><rect x="0" y="3" width="7" height="1"/></svg>'
@@ -1126,7 +1154,7 @@
     const move = need
       ? `<div class="ym"><span class="ym-tag">${PLAY}YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
           <span class="ym-act">${esc(c.action?.label ?? c.line)}</span>${c.action?.detail ? `<span class="ym-det">${esc(c.action.detail)}</span>` : ''}</div>`
-      : `<div class="qs"><span class="qs-tag">QUESTING…<span class="cursor hollow" aria-hidden="true"></span></span>
+      : `<div class="qs"><span class="qs-tag">QUESTING…<span class="cursor hollow" aria-hidden="true"></span></span>${t.state === 'running' ? npTrail : ''}
           <span class="qs-time">${t.state === 'running' && t.startedAt ? elapsed(t.startedAt) : esc(c.line.toUpperCase())}</span></div>`
     return `<a class="cart ${need ? 'need' : 'run'}" href="#/t/${encodeURIComponent(t.id)}" data-key="${esc(t.id)}"><div class="cart-frame"><div class="cart-in">
       <div class="c-top">${emblemHtml(t)}<span class="c-id"><span class="q">${qnum(c.q)}</span><span class="c-meta">${esc(t.repos.join(', '))} · ${age(t.updatedAt)}</span></span>
@@ -1180,6 +1208,9 @@
     $('ymChip').hidden = !needAll
     $('ymCount').textContent = needAll
     $('ymChip').setAttribute('aria-label', `${needAll} quest${needAll === 1 ? '' : 's'} need your move`)
+    const pose = needAll ? 'wave' : tasks.some((t) => t.card.group === 'questing') ? 'walk' : 'idle'
+    const sp = document.querySelector('.brand .sprout')
+    sp.setAttribute('class', 'sprout ' + pose); sp.setAttribute('aria-label', poseLabel(pose))
 
     const shown = (t) => !filter || t.card.repos.some((r) => r.tags.includes(filter))
     const [mine, run, fame, gone] = ['your-move', 'questing', 'hall-of-fame', 'game-over'].map((g) =>
@@ -1282,7 +1313,7 @@
       ? c.prs.map((p) => thUrl(p.url) ? `<a class="th-pr" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.repo)} ↗ PR #${esc(p.number ?? '?')} ${esc(p.pr ?? '')}</a>` : '').join('')
       : '<span>no PR yet</span>'
     return `<div class="cart-frame${c.group === 'your-move' ? ' need' : ''}"><div class="cart-in">
-      <div class="th-title">${emblemHtml(t)}<div class="th-name"><span class="th-q">${qnum(c.q)}</span><h1 class="th-h1" id="thTitle">${esc(c.topic)}</h1></div>${SPROUT}</div>
+      <div class="th-title">${emblemHtml(t)}<div class="th-name"><span class="th-q">${qnum(c.q)}</span><h1 class="th-h1" id="thTitle">${esc(c.topic)}</h1></div>${poseSprout(poseOf(c.group))}</div>
       <p class="th-sum">${esc(c.summary)}</p>
       ${progress(c)}
       <div class="th-foot">${chips(c.repos)}${prs}<span class="age">${age(t.updatedAt)}</span></div>
@@ -1304,8 +1335,9 @@
       const running = t.state === 'running' && t.startedAt
       const at = running ? new Date(t.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
       return `<div class="frame go th-qs"><div><div class="th-qs-main">
-        <div class="th-qs-t"><span class="qs-tag th-big">QUESTING…<span class="cursor hollow" aria-hidden="true"></span></span><span class="qs-time">${running ? elapsed(t.startedAt) : esc(c.line.toUpperCase())}</span></div>
+        <div class="th-qs-t"><span class="qs-tag th-big">QUESTING…<span class="cursor hollow" aria-hidden="true"></span></span><span class="qs-time">${running ? elapsed(t.startedAt) : esc(c.line.toUpperCase())}</span>${running ? npTrail : ''}</div>
         <p class="th-act">${esc(c.line)}</p>
+        ${running ? `<p class="np"><b>NOW PLAYING</b><span title="${esc(qsData?.now ?? '')}">${esc(qsData?.now ?? 'warming up…')}</span></p>` : ''}
         <span class="th-meta">${lv} run${running ? ` · started ${at}` : ''}</span></div>
         ${['queued', 'provisioning', 'running'].includes(t.state) ? '<button type="button" class="btn2" data-act="stop" data-key="act:stop"><span><b>PAUSE</b><small>stop this turn</small></span></button>' : ''}</div></div>`
     }
@@ -1421,6 +1453,7 @@
     if (!t) return
     if ($('qsDet').open) paint($('qsBody'), qsHtml(t, qsData))
     if (!$('thVic').hidden) paint($('thVic'), vicHtml(t, t.card))
+    if (t.card.group === 'questing') paint($('thPanel'), thPanelHtml(t, t.card)) // NOW PLAYING
   }
 
   // Every number comes from /stats (spec §5.9); the window share only when window_usd is set.
@@ -1544,7 +1577,7 @@
     const by = [...new Set(won.map((x) => x.mergedBy).filter(Boolean))]
     const hosts = [...new Set(won.map((x) => /dev\.azure\.com|visualstudio\.com/.test(x.url ?? '') ? 'Azure DevOps' : 'GitHub'))]
     const steps = c.progress.slice(0, 4).map((s, i) => s.mark === 'done' ? STEPS[i][0].toLowerCase() : '').filter(Boolean)
-    const f = qsData?.total?.files, [fn, fa, fd] = qsFiles(f ?? [])
+    const f = qsData?.total?.files, [fn, fa, fd] = qsFiles(f ?? []), h = hudData
     const fact = (k, v, x = '') => `<div><dt>${k}</dt><dd><b>${v}</b>${x ? `<span>${x}</span>` : ''}</dd></div>`
     const prs = c.prs.filter((p) => p.pr === 'merged' && thUrl(p.url)).map((p) =>
       `<a class="th-pr" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.repo)} ↗ PR #${esc(p.number ?? '?')} merged</a>`).join('')
@@ -1560,7 +1593,8 @@
           ${fact('FILES CHANGED', f ? fn : qsData ? '—' : '…', f ? `+${fa} −${fd}` : qsData ? 'not counted' : 'loading')}
           ${fact('TOKENS', qsK(t.turns.reduce((n, r) => n + r.tokensUsed, t.tokensUsed)))}
           ${fact('START TO MERGE', at ? vicSpan(Date.parse(at) - Date.parse(t.createdAt)) : '—', at ? '' : 'merge time not reported')}
-          ${fact('MERGED BY', by.length ? esc(by.join(', ')) : '—', hosts.length ? `on ${hosts.join(' and ')}` : '')}</dl>
+          ${fact('MERGED BY', by.length ? esc(by.join(', ')) : '—', hosts.length ? `on ${hosts.join(' and ')}` : '')}
+          <div class="hud-reward"><dt>REWARD</dt><dd><b>+1 XP${h ? ` · LV ${h.lv}` : ''}</b>${h ? `<span>${5 - h.bar} XP to LV ${h.lv + 1}</span>` : ''}</dd></div></dl>
         <p class="th-say">Merged. Start a new quest for more.</p>
         <div class="th-btns"><a class="btn-start th-go" href="#/">${PLAY}<span class="stack"><b class="w30">NEXT QUEST</b><span class="sub">back to the inbox</span></span></a>
           <a class="btn2" href="#/new"><span><b>PRESS START</b><small>start a new thread</small></span></a></div></div></section>`
@@ -1620,9 +1654,9 @@
     $('thVic').hidden = !vic
     $('qsLive').hidden = t.state !== 'running'
     setText($('qsSub'), t.state === 'running' ? `counters tick while ${thLv[t.stage]} runs` : 'time, turns, tokens, model, subagents · loads when opened')
-    // Refetch while live, or once after the task moved on; the Victory report needs the file counts.
+    // Refetch while live (NOW PLAYING reads it too), or once after the task moved on; the Victory report needs the file counts.
     qsPaint()
-    if (($('qsDet').open || vic) && (t.state === 'running' || qsKeyOf(t) !== qsKey)) qsLoad(t)
+    if (t.state === 'running' || (($('qsDet').open || vic) && qsKeyOf(t) !== qsKey)) qsLoad(t)
     qsLog(t)
     thMeasure($('threadView'))
     // Announce state changes only, not the minute ticks of a running turn.
@@ -2298,6 +2332,18 @@
     }
   })
 
+  // ---- HUD: LV / XP / streak (spec §5.11); the Victory REWARD tile reads it too ----
+  let hudData = null
+  async function hudLoad() {
+    try { const r = await fetch('/api/hud'); if (r.ok) hudData = await r.json() } catch {}
+    const h = hudData
+    if (!h) return
+    $('hudStat').hidden = false
+    $('hudStat').setAttribute('aria-label', `Level ${h.lv}, ${h.bar} of 5 XP to level ${h.lv + 1}${h.streak ? `, ${h.streak}-day merge streak` : ''}`)
+    paint($('hudStat'), `LV ${h.lv}<span class="hud-xp">${'<i class="on"></i>'.repeat(h.bar)}${'<i></i>'.repeat(5 - h.bar)}</span>`
+      + (h.streak ? `<span class="hud-fire">${hudFlame}${h.streak}</span>` : ''))
+  }
+
   async function refresh() {
     try {
       const res = await fetch('/api/tasks')
@@ -2308,6 +2354,7 @@
       $('offline').hidden = false // the last list stays on screen
       return
     }
+    hudLoad()
     renderInbox()
     if (view === 'thread' && selected) await renderThread()
   }

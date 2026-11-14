@@ -5,9 +5,9 @@ import { describe, it, expect } from 'vitest'
 import type { PetreeConfig } from '../src/config.js'
 import { TaskStore } from '../src/store.js'
 import type { TaskRecord } from '../src/store.js'
-import { emptyStats, mergeStats, questStats, sliceStats } from '../src/stats.js'
+import { emptyStats, mergeStats, nowPlaying, questStats, sliceStats } from '../src/stats.js'
 import type { TurnStats } from '../src/stats.js'
-import { repoUsage } from '../src/usage.js'
+import { hud, repoUsage } from '../src/usage.js'
 
 const j = (o: unknown) => JSON.stringify(o)
 const use = (name: string, input: unknown, id: string, extra = {}) =>
@@ -94,12 +94,13 @@ describe('accumulation', () => {
   })
 })
 
+const base = { prompt: 'p', mode: 'unattended', sessionId: null, tokensUsed: 0, tokenBudget: 1, timeoutMinutes: 1, error: null, result: null, model: null, restarts: 0, retryAt: null, startedAt: null, logOffset: 0, comments: [], delivery: {}, party: true, autoPlay: false, turnStats: null, seq: 1, bin: null, binReason: null, binnedAt: null, archivedAt: null }
+const task = (over: Partial<TaskRecord>) => ({ ...base, id: 'x', repos: ['demo'], state: 'running', stage: 'investigate', turns: [], createdAt: '2026-11-13T00:00:00Z', updatedAt: '2026-11-13T00:00:00Z', ...over }) as TaskRecord
+
 describe('repoUsage', () => {
   const cfg = { home: '/h', defaults: {}, repos: { demo: { tags: [] }, idle: { tags: [] } }, allowClone: [] } as unknown as PetreeConfig
   const now = new Date('2026-11-14T12:00:00Z')
-  const base = { prompt: 'p', mode: 'unattended', sessionId: null, tokensUsed: 0, tokenBudget: 1, timeoutMinutes: 1, error: null, result: null, model: null, restarts: 0, retryAt: null, startedAt: null, logOffset: 0, comments: [], delivery: {}, party: true, autoPlay: false, turnStats: null, seq: 1, bin: null, binReason: null, binnedAt: null, archivedAt: null }
-  const task = (over: Partial<TaskRecord>) => ({ ...base, id: 'x', repos: ['demo'], state: 'running', stage: 'investigate', turns: [], createdAt: '2026-11-13T00:00:00Z', updatedAt: '2026-11-13T00:00:00Z', ...over }) as TaskRecord
-  const s = (over: Partial<TurnStats>) => ({ ...emptyStats(), ...over })
+  const s =(over: Partial<TurnStats>) => ({ ...emptyStats(), ...over })
 
   it('aggregates fixture rows per repo', () => {
     const rows = [
@@ -123,5 +124,47 @@ describe('repoUsage', () => {
       task({ id: 'o', state: 'done', archivedAt: '2026-11-01T00:00:00Z' }),
     ]
     expect(repoUsage(rows, cfg, now).demo).toMatchObject({ quests: 3, won: 1, lost: 0, inPlay: 0 })
+  })
+})
+
+describe('hud', () => {
+  // Local-time constructors so day boundaries hold in any TZ.
+  const at = (day: number, h = 12) => new Date(2026, 10, day, h).toISOString()
+  const won = (id: string, mergedAt: string | null, binnedAt = at(1)) => task({
+    id, state: 'done', bin: 'hall-of-fame', binReason: 'merged · PR #1', binnedAt,
+    delivery: mergedAt ? { demo: { ahead: 1, head: 'h', pr: 'merged', mergedAt } } : {},
+  })
+  const today = new Date(2026, 10, 14, 0, 5)
+
+  it('is level 1 with nothing merged', () => {
+    expect(hud([], today)).toEqual({ xp: 0, lv: 1, bar: 0, streak: 0 })
+  })
+
+  it('counts merges only: LV every 5, bar is the remainder', () => {
+    const rows = [...'abcdefg'].map((id) => won(id, at(1)))
+    rows.push(task({ id: 'f', bin: 'hall-of-fame', binReason: 'finished · findings kept' }), task({ id: 'o', bin: 'game-over', binReason: 'dropped by you' }))
+    expect(hud(rows, today)).toMatchObject({ xp: 7, lv: 2, bar: 2 })
+  })
+
+  it('streak runs over local days ending today, by latest mergedAt else binnedAt', () => {
+    // 14th just after midnight, 13th via binnedAt, 12th late evening; the 10th is past a gap
+    const rows = [won('a', at(14, 0)), won('b', null, at(13)), won('c', at(12, 23)), won('d', at(10))]
+    expect(hud(rows, today).streak).toBe(3)
+    // a later merge of another repo moves the day
+    const two = task({ ...won('e', null), delivery: { a: { ahead: 1, head: 'h', mergedAt: at(9) }, b: { ahead: 1, head: 'h', mergedAt: at(11) } } })
+    expect(hud([...rows, two], today).streak).toBe(5)
+  })
+
+  it('a streak ending yesterday still counts; one ending earlier is broken', () => {
+    expect(hud([won('a', at(13, 23)), won('b', at(12))], today).streak).toBe(2)
+    expect(hud([won('a', at(12))], today).streak).toBe(0)
+  })
+})
+
+describe('nowPlaying', () => {
+  it('is the latest tool call, or null without one', () => {
+    expect(nowPlaying(LOG)).toBe('Task · x')
+    expect(nowPlaying(LOG.split('\n').slice(0, 4).join('\n'))).toBe('Read · a/b.ts')
+    expect(nowPlaying('noise\n' + j({ type: 'result' }))).toBeNull()
   })
 })

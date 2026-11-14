@@ -11,8 +11,8 @@ import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
 import { acceptNote, dropSuggestion, listSuggestions, NoteInputError, readThreadFile, readThreadStatus } from './notes.js'
 import { pickImage } from './sandbox.js'
-import { questStats, readSlice, sliceStats } from './stats.js'
-import { repoUsage } from './usage.js'
+import { nowPlaying, questStats, readSlice, sliceStats } from './stats.js'
+import { hud, repoUsage } from './usage.js'
 import {
   DEFAULT_KEYS, REPO_KEYS, NotEditable, addRepo, hashText, pickFields, readRepoFields,
   removeRepo, repoEditable, replaceRepo, setDefaults,
@@ -124,6 +124,9 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   })
 
   app.post('/api/prune', (_req, res) => { res.json({ archived: store.sweep() }) })
+
+  // Archived rows count too: XP is lifetime.
+  app.get('/api/hud', (_req, res) => { res.json(hud(store.list())) })
 
   app.get('/api/repos', async (_req, res) => {
     const usage = repoUsage(store.list(), cfg)
@@ -282,12 +285,13 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
     // A run has no result event (duration_ms) until it ends, so its time so far is the wall clock.
-    const live = t.state === 'running'
-      ? sliceStats(readSlice(join(cfg.home, 'logs', `${t.id}.log`), t.logOffset), t.repos.flatMap((r) => cfg.repos[r]?.test ?? []),
+    const text = t.state === 'running' ? readSlice(join(cfg.home, 'logs', `${t.id}.log`), t.logOffset) : null
+    const live = text !== null
+      ? sliceStats(text, t.repos.flatMap((r) => cfg.repos[r]?.test ?? []),
         t.startedAt ? Math.max(0, Date.now() - Date.parse(t.startedAt)) : 0)
       : null
     // windowUsd feeds the ≈ window share; null means the dashboard shows none (spec §5.9).
-    res.json({ ...questStats(t, live), windowUsd: cfg.defaults.windowUsd ?? null })
+    res.json({ ...questStats(t, live), windowUsd: cfg.defaults.windowUsd ?? null, now: text !== null ? nowPlaying(text) : null })
   })
 
   app.get('/api/tasks/:id/logs', (req, res) => {

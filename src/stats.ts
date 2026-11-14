@@ -37,7 +37,13 @@ export function sliceStats(
   }
 }
 
-const sumMaps = (a: Record<string, number>, b: Record<string, number>) => {
+// NOW PLAYING: the latest tool call. Only the tail is parsed; a cut first line is just noise.
+export function nowPlaying(text: string): string | null {
+  const e = summarizeLog(text.slice(-200_000)).entries.reverse().find((x) => x.kind === 'tool' && x.name !== 'tool result')
+  return e ? [e.name, e.summary].filter(Boolean).join(' · ') : null
+}
+
+const sumMaps =(a: Record<string, number>, b: Record<string, number>) => {
   const out = { ...a }
   for (const [k, v] of Object.entries(b)) out[k] = (out[k] ?? 0) + v
   return out

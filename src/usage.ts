@@ -19,6 +19,27 @@ export interface RepoUsage {
 
 const WEEK_MS = 7 * 86_400_000
 
+// A win is a merge; findings kept or pushed-untracked are hall-of-fame but not wins.
+const merged = (t: TaskRecord) => t.bin === 'hall-of-fame' && !!t.binReason?.startsWith('merged')
+
+export interface Hud { xp: number; lv: number; bar: number; streak: number }
+
+// Spec §5.11. Days are the server's local days; a merge's day is its latest mergedAt, else binnedAt.
+export function hud(tasks: TaskRecord[], now: Date = new Date()): Hud {
+  const days = new Set<string>()
+  let xp = 0
+  for (const t of tasks.filter(merged)) {
+    xp++
+    const at = Object.values(t.delivery).map((d) => d.mergedAt).filter(Boolean).sort().at(-1) ?? t.binnedAt
+    if (at) days.add(new Date(at).toDateString())
+  }
+  const d = new Date(now)
+  if (!days.has(d.toDateString())) d.setDate(d.getDate() - 1) // today without a merge yet keeps yesterday's streak
+  let streak = 0
+  while (days.has(d.toDateString())) { streak++; d.setDate(d.getDate() - 1) }
+  return { xp, lv: 1 + Math.floor(xp / 5), bar: xp % 5, streak }
+}
+
 // Per-repo aggregates over every row; a few hundred rows in JS per request, no cache.
 export function repoUsage(tasks: TaskRecord[], cfg: PetreeConfig, now: Date = new Date()): Record<string, RepoUsage> {
   const month = now.toISOString().slice(0, 7)
@@ -46,8 +67,7 @@ export function repoUsage(tasks: TaskRecord[], cfg: PetreeConfig, now: Date = ne
       const u = out[name]
       if (!u) continue
       u.quests++
-      // A win is a merge; findings kept or pushed-untracked are hall-of-fame but not wins.
-      if (group === 'hall-of-fame') { if (t.binReason?.startsWith('merged')) u.won++ }
+      if (group === 'hall-of-fame') { if (merged(t)) u.won++ }
       else if (group === 'game-over') u.lost++
       else if (!t.archivedAt) u.inPlay++
       if (!u.lastQuestAt || t.createdAt > u.lastQuestAt) u.lastQuestAt = t.createdAt

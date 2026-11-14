@@ -255,7 +255,8 @@ export class TaskStore {
       .run(to, patch.error !== undefined ? patch.error : t.error,
         patch.model !== undefined ? patch.model : t.model, new Date().toISOString(),
         clearBackoff ? 1 : 0, clearBackoff ? 1 : 0, id)
-    if (to === 'paused-limit') return this.bin(id, 'game-over', 'out of tokens')
+    // A turn that hit its time limit is resumable work, not a loss; only a spent token budget ends the quest.
+    if (to === 'paused-limit' && patch.error !== 'timeout') return this.bin(id, 'game-over', 'out of tokens')
     return this.get(id)!
   }
 

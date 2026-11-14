@@ -1710,7 +1710,7 @@
     }
     if (t.state === 'failed') return { primary: B('resume', 'RETRY STAGE', `re-run the ${t.stage} turn`), quiet: [over],
       help: 'Optional. With a note, RETRY STAGE starts a fresh turn with it; without one it re-runs the failed turn.' }
-    if (t.state === 'cancelled') return { primary: B('resume', 'RESUME', `re-run the ${t.stage} turn`), secondary: retry('send note · new turn'), quiet: [over],
+    if (t.state === 'cancelled' || t.state === 'paused-limit') return { primary: B('resume', 'RESUME', `re-run the ${t.stage} turn`), secondary: retry('send note · new turn'), quiet: [over],
       help: 'Optional. RESUME re-runs the paused turn; RETRY STAGE starts a new one with your note.' }
     if (t.state === 'done' && t.stage === 'build') {
       const d = Object.entries(t.delivery), rework = retry('send note · rework build')
@@ -1845,7 +1845,7 @@
     })
     const run = ['queued', 'provisioning', 'running', 'paused-rate-limit'].includes(t.state)
     const what = { queued: 'Queued', provisioning: 'Preparing workspace', running: `${lv} running`, 'paused-rate-limit': 'Waiting out a rate limit',
-      failed: `Failed in ${lv}`, cancelled: 'Paused by you', 'paused-limit': 'Out of tokens' }[t.state] ?? (t.result ? qsReady[t.stage] : 'Turn ended')
+      failed: `Failed in ${lv}`, cancelled: 'Paused by you', 'paused-limit': t.error === 'timeout' ? 'Timed out' : 'Out of tokens' }[t.state] ?? (t.result ? qsReady[t.stage] : 'Turn ended')
     const now = () => add(c.group === 'your-move' ? 'now' : run ? 'run' : 'agent', lv, what + (c.group === 'your-move' ? ', your move' : ''),
       t.state === 'cancelled' ? 'by you' : ['failed', 'paused-limit'].includes(t.state) ? 'petree' : 'agent',
       t.result ?? (t.state === 'failed' ? t.error ?? '' : ''), t.state === 'running' ? t.startedAt : run || t.bin ? null : t.updatedAt, t.result && 'RESULT')

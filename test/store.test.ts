@@ -272,6 +272,9 @@ describe('TaskStore bins and identity', () => {
     const f = store.create(input)
     toRunning(f.id)
     expect(store.transition(f.id, 'failed', { error: 'x' }).bin).toBeNull()
+    const slow = store.create(input)
+    toRunning(slow.id)
+    expect(store.transition(slow.id, 'paused-limit', { error: 'timeout' }).bin).toBeNull()
   })
 
   it('restore: paused-limit resets tokens and requeues; other states only unbin', () => {

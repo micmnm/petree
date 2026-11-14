@@ -88,7 +88,12 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
     case 'provisioning': line = 'Preparing workspace'; break
     case 'running': line = interviewPhase(task).kind === 'ask' ? `Preparing questions · ${level} · ${mins}m` : `Running ${level} · ${mins}m`; break
     case 'paused-rate-limit': line = 'Waiting out a rate limit'; break
-    case 'paused-limit': line = 'Out of tokens'; break
+    case 'paused-limit':
+      if (task.error !== 'timeout') { line = 'Out of tokens'; break }
+      line = `Timed out after ${task.timeoutMinutes} min`
+      group = 'your-move'
+      action = { label: `The ${level} turn hit its ${task.timeoutMinutes}-min limit — resume it or drop it`, detail }
+      break
     case 'cancelled':
       line = 'Paused by you'
       group = 'your-move'

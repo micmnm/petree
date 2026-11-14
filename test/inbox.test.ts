@@ -60,6 +60,12 @@ describe('cardFor', () => {
     expect(c.progress[1]).toMatchObject({ mark: 'current', tone: 'failed' })
   })
 
+  it('a turn that timed out is a move to resume, not out of tokens', () => {
+    expect(cardFor(task({ state: 'paused-limit', stage: 'build', error: 'timeout' }), null, cfg)).toMatchObject({
+      line: 'Timed out after 30 min', group: 'your-move', action: { label: 'The CRAFT turn hit its 30-min limit — resume it or drop it' },
+    })
+  })
+
   it('shows paused-by-you as a move and out-of-tokens as game over', () => {
     expect(cardFor(task({ state: 'cancelled' }), null, cfg)).toMatchObject({
       line: 'Paused by you', group: 'your-move', action: { label: 'Paused — resume or send a note' },

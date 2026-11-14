@@ -605,7 +605,8 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
 
   app.get('/', (_req, res) => {
     const html = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'dashboard.html'), 'utf8')
-    res.type('html').send(html)
+    // no-cache: browsers revalidate (ETag) on every load, so an upgrade never runs stale UI code.
+    res.set('Cache-Control', 'no-cache').type('html').send(html)
   })
 
   // Browser modules the dashboard imports. Allowlisted by name — never a path
@@ -613,7 +614,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   for (const name of ['markdown.js', 'activity.js']) {
     app.get(`/${name}`, (_req, res) => {
       const file = join(dirname(fileURLToPath(import.meta.url)), name)
-      res.type('application/javascript').send(readFileSync(file, 'utf8'))
+      res.set('Cache-Control', 'no-cache').type('application/javascript').send(readFileSync(file, 'utf8'))
     })
   }
 

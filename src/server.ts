@@ -594,9 +594,18 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
 
   // CONTINUE?
   app.post('/api/tasks/:id/restore', (req, res) => {
-    if (!store.get(req.params.id)) { res.sendStatus(404); return }
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    const { model } = (req.body ?? {}) as { model?: string }
+    if (model !== undefined && !MODELS.includes(model)) {
+      res.status(400).json({ error: `unknown model: ${model}` })
+      return
+    }
+    const effectiveModel = model !== undefined
+      ? resolveModel(model, cfg.repos[t.repos[0]]?.defaultModel ?? null, cfg.defaults.defaultModel)
+      : undefined
     try {
-      res.json(store.restore(req.params.id))
+      res.json(store.restore(t.id, effectiveModel))
       void scheduler.tick()
     } catch {
       res.status(409).json({ error: 'only a game-over thread that is not archived can be restored' })

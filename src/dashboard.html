@@ -522,6 +522,8 @@
   .th-quiet b { font: 400 30px/.85 var(--px); }
   .th-quiet small { font-size: 13px; font-weight: 700; line-height: 1.2; }
   .th-btns .th-q { font-size: 14px; color: var(--muted); }
+  .th-class { display: inline-flex; flex-direction: column; gap: 2px; color: var(--label); font: 20px/1 var(--px); }
+  .th-class select { min-height: 44px; padding: 0 10px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 20px/1 var(--px); cursor: pointer; }
   [data-act]:disabled { opacity: .6; cursor: wait; }
   .th-go[data-off]:disabled { opacity: .55; cursor: not-allowed; }
   /* answered recap (interview spec §5.6) */
@@ -1521,7 +1523,7 @@
       const body = `<span class="th-tag">${over ? 'GAME OVER' : 'QUEST COMPLETE · HALL OF FAME'}</span>
         <p class="th-act">${esc(c.reason ?? '')}</p><span class="th-meta">binned ${age(t.binnedAt ?? t.updatedAt)}</span>
         ${t.archivedAt ? '<span class="th-meta">Archived: it stays readable here but can no longer be restored.</span>'
-          : over ? '<button type="button" class="btn2" data-act="restore" data-key="act:restore"><span><b>CONTINUE?</b><small>restore from the bin</small></span></button>' : ''}`
+          : over ? `<div class="th-btns"><button type="button" class="btn2" data-act="restore" data-key="act:restore"><span><b>CONTINUE?</b><small>restore from the bin</small></span></button>${thClassHtml(t)}</div>` : ''}`
       // a merge gets the full Victory layout (vicHtml); other wins get this smaller trophy header
       return `<div class="frame ${over ? 'over' : 'fame'}">${over ? `<div>${body}</div>` : `<div class="th-fame">${TROPHY}<div>${body}</div></div>`}</div>`
     }
@@ -1734,11 +1736,23 @@
     if (kind === 'two') return `<button type="button" class="btn2" ${data}><span><b>${b.word}</b><small>${esc(b.sub)}</small></span></button>`
     return `<button type="button" class="th-quiet${i ? '' : ' push'}" ${data}><b>${b.word}</b><small>${esc(b.sub)}</small></button>`
   }
+  // Class for the next turn: kept across repaints (they'd reset a <select>), forgotten per thread.
+  let thPick = { id: null, model: null }
+  const thPicked = (t) => (thPick.id === t.id ? thPick.model : null) ?? t.model ?? 'default'
+  const thClassHtml = (t) => {
+    const cur = thPicked(t)
+    const opts = [...CLASSES.map((c) => [c[2], `${c[0]} · ${c[1]}`]), ['default', 'DEFAULT'],
+      ...(t.model && !CLASSES.some((c) => c[2] === t.model) ? [[t.model, t.model]] : [])]
+    return `<label class="th-class">CLASS<select data-th-class data-key="th-class">${opts.map(([v, w]) =>
+      `<option value="${esc(v)}"${v === cur ? ' selected' : ''}>${esc(w)}</option>`).join('')}</select></label>`
+  }
+  const TURN_ACTS = ['resume', 'retry', 'next', 'ask', 'final']
   const thBtns = (m, pending) => (m.primary ? thBtn(m.primary, 'go') : '')
     + (m.skip ? '<button type="button" class="th-link" data-act="next" data-stage="build" data-key="act:skip">skip to CRAFT</button>' : '')
     + (m.secondary ? thBtn(m.secondary, 'two') : '')
     + (m.queue ? `<span class="th-q">${pending} note${pending === 1 ? '' : 's'} queued</span>` : '')
     + (m.quiet ?? []).map((b, i) => thBtn(b, 'quiet', i)).join('')
+    + ([m.primary, m.secondary, ...(m.quiet ?? [])].some((b) => TURN_ACTS.includes(b?.act)) ? thClassHtml(thTask) : '')
 
   const thShow = (on) => {
     ['thPanel', 'thDoc', 'thOld', 'thMove', 'thStats', 'thLog', 'thDetails'].forEach((id) => { $(id).hidden = !on })
@@ -2001,6 +2015,9 @@
     if (thNote.value) localStorage.setItem(thDraftKey(), thNote.value)
     else localStorage.removeItem(thDraftKey())
   })
+  document.addEventListener('change', (e) => {
+    if (e.target.matches('[data-th-class]') && thTask) thPick = { id: thTask.id, model: e.target.value }
+  })
   $('thDoc').addEventListener('input', (e) => { const q = e.target.closest('.ask-q'); if (q) iqSync(q) })
   $('thDoc').addEventListener('click', (e) => {
     const r = e.target.closest('[data-iq-reset]'), c = e.target.closest('[data-iqc-add]')
@@ -2027,6 +2044,8 @@
     }
     const ask = act === 'ask' || act === 'final'
     const withNote = ['next', 'retry', 'queue'].includes(act) || ask || (act === 'resume' && note)
+    // Sent only when changed: an omitted model keeps the thread's own (server convention).
+    const picked = thPicked(t), cls = picked !== (t.model ?? 'default') ? { model: picked } : {}
     b.disabled = true
     try {
       if (act === 'pr' || act === 'push') {
@@ -2036,10 +2055,11 @@
         setText(err, res.filter((r) => !r.ok).map((r) => `${r.repo}: ${String(r.output || r.error || 'failed').trim().split('\n').slice(-2).join(' ')}`).join('\n'))
         $('thOut').innerHTML = res.filter((r) => r.ok).map((r) => `${esc(r.repo)}: ${thUrl(r.url)
           ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">PR opened ↗</a>` : act === 'pr' ? 'pushed' : 'update pushed'}`).join(' · ')
-      } else if (ask) await post('next', { prompt: note, answers: iqPayload(act === 'final'), ...(Object.keys(iqcMap()).length && { comments: iqcMap() }), ...(act === 'final' && { final: true }) })
-      else if (withNote && act !== 'queue') await post('next', { prompt: note, ...(b.dataset.stage && { stage: b.dataset.stage }) })
+      } else if (ask) await post('next', { prompt: note, ...cls, answers: iqPayload(act === 'final'), ...(Object.keys(iqcMap()).length && { comments: iqcMap() }), ...(act === 'final' && { final: true }) })
+      else if (withNote && act !== 'queue') await post('next', { prompt: note, ...cls, ...(b.dataset.stage && { stage: b.dataset.stage }) })
       else if (act === 'queue') await post('comments', { text: note })
-      else await post(act) // resume, stop, drop, done, restore
+      else await post(act, act === 'resume' || act === 'restore' ? cls : {}) // resume, stop, drop, done, restore
+      if (TURN_ACTS.includes(act) || act === 'restore') thPick = { id: null, model: null }
       if (withNote) { thNote.value = ''; localStorage.removeItem(thDraftKey()) }
       if (ask) localStorage.removeItem(iqKey)
       if (thDialog.open && !err.textContent) thDialog.close()

@@ -274,12 +274,13 @@ export class TaskStore {
   }
 
   // CONTINUE?: game-over and not archived only. A paused-limit thread gets one more token budget.
-  restore(id: string): TaskRecord {
+  restore(id: string, model?: string | null): TaskRecord {
     return this.db.transaction(() => {
       const t = this.get(id)
       if (!t) throw new Error(`no task ${id}`)
       if (t.bin !== 'game-over' || t.archivedAt) throw new Error('cannot restore')
       this.unbin(id)
+      if (model !== undefined) this.db.prepare('UPDATE tasks SET model = ? WHERE id = ?').run(model, id)
       // Else the next poll re-bins it, and the card never offers "Open the PR" again.
       for (const [repo, d] of Object.entries(t.delivery)) if (d.pr === 'closed') this.setDelivery(id, repo, NO_PR)
       if (t.state !== 'paused-limit') return this.get(id)!

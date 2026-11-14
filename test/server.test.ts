@@ -492,6 +492,18 @@ describe('API', () => {
     expect((await post('/api/tasks/nope/restore')).status).toBe(404)
   })
 
+  it('restore takes an optional model: switches it on CONTINUE?, keeps it when omitted, 400 on unknown', async () => {
+    const limit = mk('provisioning', 'running')
+    store.transition(limit, 'paused-limit')
+    expect((await post(`/api/tasks/${limit}/restore`, { model: 'gpt' })).status).toBe(400)
+    expect(await (await post(`/api/tasks/${limit}/restore`, { model: 'haiku' })).json()).toMatchObject({ state: 'queued', model: 'haiku' })
+
+    const gate = mk('provisioning', 'running', 'waiting-for-you')
+    await post(`/api/tasks/${gate}/drop`)
+    const before = store.get(gate)!.model
+    expect((await (await post(`/api/tasks/${gate}/restore`)).json()).model).toBe(before)
+  })
+
   it('rejects /next, /resume and /comments on binned threads with "restore first"', async () => {
     const id = mk('provisioning', 'running', 'waiting-for-you')
     store.bin(id, 'game-over', 'dropped by you')

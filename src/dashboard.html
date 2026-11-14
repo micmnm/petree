@@ -358,6 +358,9 @@
   .nq-sw > span:first-child { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .nq-sw b { font: 400 30px/.9 var(--px); }
   .nq-sw small { font-size: 14px; line-height: 1.4; color: var(--muted); }
+  .nq-sw:disabled { cursor: not-allowed; }
+  .nq-sw:disabled > * { opacity: .5; }
+  .nq-sw .why-off { display: block; margin-top: 2px; font-weight: 700; color: var(--label); }
   .sw { flex: none; display: inline-flex; align-items: center; gap: 10px; font: 20px/1 var(--px); color: var(--muted); }
   .sw-w { width: 32px; text-align: right; }
   .sw-t { display: flex; gap: 2px; padding: 2px; background: var(--inset); border: 2px solid var(--line-strong); }
@@ -477,6 +480,49 @@
   .th-quiet small { font-size: 13px; font-weight: 700; line-height: 1.2; }
   .th-btns .th-q { font-size: 14px; color: var(--muted); }
   [data-act]:disabled { opacity: .6; cursor: wait; }
+  .th-go[data-off]:disabled { opacity: .55; cursor: not-allowed; }
+  /* THE PARTY ASKS (interview spec §5.1b) */
+  .ask { display: flex; flex-direction: column; }
+  .ask-round { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background-color: var(--inset); background-image: var(--tex); border-left: 4px solid var(--need-frame); }
+  .ask-rh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .ask-rk { padding: 4px 9px 3px; background: var(--ink); color: var(--screen); font: 30px/.9 var(--px); letter-spacing: .5px; }
+  .ask-out { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 3px; border: 2px solid currentColor; font: 20px/1 var(--px); }
+  .ask-out.last { color: var(--go); }
+  .ask-out.more { color: var(--gold); }
+  .ask-out i { width: 8px; height: 8px; background: currentColor; }
+  .ask-cnt { margin-left: auto; font: 20px/1 var(--px); color: var(--label); }
+  .ask-intro { margin: 0; max-width: 720px; font-size: 16px; line-height: 1.5; overflow-wrap: anywhere; }
+  .ask-intro b { margin-right: 6px; font: 400 20px/1 var(--px); color: var(--need); }
+  .ask-drop { margin: 0; font-size: 14px; color: var(--muted); }
+  .ask-q { display: flex; flex-direction: column; gap: 10px; padding: 18px 4px 20px; border-top: 2px dotted var(--line); }
+  .ask-round + .ask-q { border-top: 0; }
+  .ask-qh { display: flex; align-items: flex-start; gap: 12px; }
+  .ask-n { flex: none; min-width: 40px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; background: var(--inset); border: 2px solid var(--line-strong); font: 20px/1 var(--px); color: var(--ink); }
+  .ask-qt { flex: 1 1 auto; min-width: 0; margin: 2px 0 0; font-size: 19px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+  .ask-tag { flex: none; padding: 4px 8px 3px; font: 20px/1 var(--px); white-space: nowrap; border: 2px dotted var(--line-strong); color: var(--label); }
+  .mine > .ask-qh .ask-tag { border: 2px solid var(--gold); background: var(--gold-fill); color: var(--on-fill); }
+  .needs > .ask-qh .ask-tag { border: 2px solid var(--need-frame); background: var(--need-tint); color: var(--need); }
+  .ask-why { margin: 0 0 0 52px; max-width: 680px; font-size: 14px; line-height: 1.45; color: var(--muted); overflow-wrap: anywhere; }
+  .ask-why b { margin-right: 6px; font: 400 20px/1 var(--px); color: var(--label); }
+  .ask-body { display: flex; flex-direction: column; gap: 8px; margin-left: 52px; }
+  .ask-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 10px; }
+  .ask-opts.two { grid-template-columns: repeat(2, minmax(0, 160px)); }
+  .ask .pk-in { gap: 10px; padding: 10px 12px; }
+  .ask .box { margin-top: 3px; }
+  .ask .pk-t { gap: 2px; }
+  .ask-ol { font-size: 16px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+  .ask-yn { font: 400 30px/.9 var(--px); }
+  .ask-was { margin-top: 4px; padding: 1px 6px; border: 2px dotted var(--line-strong); font: normal 20px/1 var(--px); color: var(--label); }
+  :checked + .pk-f .ask-was { border-color: var(--gold); color: var(--gold); }
+  .ask-other { display: none; width: 100%; min-height: 44px; padding: 8px 12px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 15px var(--sans); }
+  .ask-q:has(input[value="*"]:checked) .ask-other { display: block; }
+  .ask-num { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 15px; color: var(--muted); }
+  .ask-num input { width: 120px; min-height: 48px; padding: 8px 12px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 400 30px/1 var(--px); }
+  .ask-num .ask-was { margin: 0; }
+  .ask-text { display: block; width: 100%; max-width: 680px; min-height: 88px; padding: 10px 14px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 15px/1.5 var(--sans); resize: vertical; }
+  .ask-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; min-height: 24px; font-size: 13px; color: var(--muted); }
+  .ask-reset { min-height: 32px; font-size: 13px; }
+  .ask-q:not(.mine) .ask-reset { display: none; }
   .th-det { background: var(--screen); border: 2px solid var(--line); }
   .th-det > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-height: 56px; padding: 6px 18px; cursor: pointer; list-style: none; }
   .th-det > summary::-webkit-details-marker { display: none; }
@@ -658,6 +704,18 @@
     .th-quiet, .th-quiet.push { align-items: center; justify-content: center; min-height: 48px; margin: 0; padding: 4px; text-align: center; }
     .th-quiet b { font-size: 20px; line-height: 1; }
     .th-btns .th-link { order: 9; flex: 1 1 100%; justify-content: center; }
+    /* questionnaire on phone (interview spec §5.1c) */
+    .ask-round { padding: 12px; }
+    .ask-cnt { margin-left: 0; flex-basis: 100%; }
+    .ask-rk { font-size: 20px; }
+    .ask-q { padding: 14px 0 16px; }
+    .ask-qh { gap: 8px; flex-wrap: wrap; }
+    .ask-qt { flex-basis: calc(100% - 50px); font-size: 17px; }
+    .ask-qh .ask-tag { order: 3; margin-left: 48px; }
+    .ask-why { margin-left: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .ask-body { margin-left: 0; }
+    .ask-opts, .ask-opts.two { grid-template-columns: minmax(0, 1fr); }
+    .ask-num input, .ask-text { width: 100%; max-width: none; }
     .rd { width: 100%; height: 100%; max-height: none; margin: 0; padding: 0; clip-path: none; }
     .rd-in { height: 100%; max-height: none; clip-path: none; }
     .rd-head { gap: 8px 12px; padding: 10px 16px; }
@@ -1347,6 +1405,7 @@
     return `<div class="frame need"><div>
       <span class="ym-tag th-big">${PLAY}YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
       <p class="th-act">${esc(c.action?.label ?? c.line)}</p>${detail ? `<p class="th-say">${esc(detail)}</p>` : ''}
+      ${thInfo.questionsError ? `<p class="th-say">The party’s questions couldn’t be read: ${esc(thInfo.questionsError)}</p>` : ''}
       <div class="th-meta"><span>${who} · ${age(t.updatedAt)}</span>${pending ? `<span>${pending} note${pending === 1 ? '' : 's'} will be included</span>` : ''}
         ${open.map((p) => `<a class="th-link" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">Open PR #${esc(p.number ?? '?')} ↗</a>`).join('')}
         <button type="button" class="th-link desk" data-jump>Jump to your choices</button></div></div></div>`
@@ -1372,12 +1431,117 @@
     return [now, old]
   }
 
+  // ---- THE PARTY ASKS: the questionnaire form (interview spec §5.1b–c) ----
+  // iqDraft holds only answers that differ from their guess (mirrored to localStorage); the DOM holds the form.
+  // The form is rebuilt only when the draft key changes, so the 3 s poll never clobbers an edit.
+  let iqKey = '', iqDraft = {}, iqHtml = ''
+  const iqQs = () => thInfo.questions?.questions ?? []
+  const iqHas = (q) => Object.hasOwn(iqDraft, q.id)
+  const iqTag = (q) => iqHas(q) ? 'YOURS' : q.guess === null ? 'NEEDS AN ANSWER' : 'GUESS'
+  // An emptied field reads as undefined: the guess stands (or the question still needs an answer).
+  const iqSame = (q, a) => a === undefined || (Array.isArray(a) && Array.isArray(q.guess)
+    ? [...a].sort().join('\n') === [...q.guess].sort().join('\n') : a === q.guess)
+
+  function iqQuestion(q, i) {
+    const a = iqHas(q) ? iqDraft[q.id] : q.guess, name = 'iq-' + q.id, h = `iq-h-${esc(q.id)}`
+    const picks = Array.isArray(a) ? a : a?.picks ?? (typeof a === 'string' ? [a] : [])
+    const was = (on) => on ? '<em class="ask-was">GUESS</em>' : ''
+    const type = q.kind === 'multi' ? 'checkbox' : 'radio'
+    const range = q.min !== undefined && q.max !== undefined ? `${q.min} to ${q.max}` : ''
+    const body = q.kind === 'number'
+      ? `<div class="ask-num"><input type="number"${q.min !== undefined ? ` min="${q.min}"` : ''}${q.max !== undefined ? ` max="${q.max}"` : ''} step="${q.step ?? 'any'}" value="${a ?? ''}" data-key="${name}:n" aria-labelledby="${h}">
+          <span>${esc([q.unit, range].filter(Boolean).join(' · '))}</span>${q.guess !== null ? `<em class="ask-was">GUESS ${esc(q.guess)}</em>` : ''}</div>`
+      : q.kind === 'text' ? `<textarea class="ask-text" maxlength="2000" data-key="${name}:t" aria-labelledby="${h}">${esc(a ?? '')}</textarea>`
+      : q.kind === 'yesno' ? `<div class="ask-opts two">${[['yes', true], ['no', false]].map(([v, b]) =>
+        tile('radio', name, v, a === b, `<span class="ask-yn">${v.toUpperCase()}</span>${was(q.guess === b)}`)).join('')}</div>`
+      : `<div class="ask-opts">${q.options.map((o) => tile(type, name, o.id, picks.includes(o.id),
+        `<span class="ask-ol">${esc(o.label)}</span>${was([q.guess].flat().includes(o.id))}`)).join('')}${q.allowOther
+        ? tile(type, name, '*', !!a?.other, '<span class="ask-ol">Other…</span><small>say it in your own words</small>') : ''}</div>${q.allowOther
+        ? `<input class="ask-other" type="text" maxlength="500" value="${esc(a?.other ?? '')}" data-key="${name}:other" aria-label="Your own answer to Q${i + 1}" placeholder="your own answer">` : ''}`
+    return `<div class="ask-q${iqHas(q) ? ' mine' : q.guess === null ? ' needs' : ''}" role="group" aria-labelledby="${h}" data-q="${esc(q.id)}">
+      <div class="ask-qh"><span class="ask-n">Q${i + 1}</span><h3 class="ask-qt" id="${h}">${esc(q.q)}</h3><span class="ask-tag">${iqTag(q)}</span></div>
+      ${q.why ? `<p class="ask-why"><b>WHY</b>${esc(q.why)}</p>` : ''}
+      <div class="ask-body">${body}<div class="ask-foot">${q.kind === 'multi' ? '<span>pick any</span>' : ''}${q.guess !== null
+        ? `<button type="button" class="th-link ask-reset" data-iq-reset data-key="${name}:reset">reset to guess</button>` : ''}</div></div></div>`
+  }
+
+  function iqForm(a) {
+    const n = a.questions.length, s = n === 1 ? '' : 's', bad = a.dropped.filter((d) => /^q\d+:/.test(d)).length
+    return `<div class="th-doch"><h2 class="th-h" id="thDocH">THE PARTY ASKS</h2><code>_thread/questions.json · round ${a.round} · ${n} question${s}</code></div>
+      <div class="frame doc"><div><div class="ask" id="thAsk">
+        <div class="ask-round"><div class="ask-rh"><span class="ask-rk">ROUND ${a.round}</span>${a.outlook
+          ? `<span class="ask-out ${a.outlook}"><i></i>${a.outlook === 'last' ? 'LIKELY THE LAST ROUND' : 'EXPECT ANOTHER ROUND'}</span>` : ''}
+          <span class="ask-cnt">${n} QUESTION${s.toUpperCase()}${a.questions.some((q) => q.guess !== null) ? ' · GUESSES FILLED IN' : ''}</span></div>
+          ${a.round > 1 ? `<p class="ask-intro"><b>WHY MORE</b>${esc(a.whyMore)}</p>` : a.intro ? `<p class="ask-intro">${esc(a.intro)}</p>` : ''}
+          ${bad ? `<p class="ask-drop">${bad} question${bad === 1 ? '' : 's'} couldn’t be read; the reasons are in Details › Info.</p>` : ''}</div>
+        ${a.questions.map(iqQuestion).join('')}</div></div></div>`
+  }
+
+  // Draft key per thread and turn (spec §5.1b): a new round starts from the guesses.
+  function iqLoad(t) {
+    const key = `petree-ask:${t.id}:${t.startedAt}`
+    if (key === iqKey) return
+    iqKey = key
+    try { iqDraft = JSON.parse(localStorage.getItem(key)) ?? {} } catch { iqDraft = {} }
+    iqHtml = iqForm(thInfo.questions)
+  }
+
+  function iqRead(el, q) {
+    const on = [...el.querySelectorAll('input:checked')].map((i) => i.value), picks = on.filter((v) => v !== '*')
+    const other = on.includes('*') && el.querySelector('.ask-other').value.trim()
+    const field = el.querySelector('input[type=number], textarea')?.value
+    if (q.kind === 'number') return field ? Number(field) : undefined
+    if (q.kind === 'text') return field || undefined
+    if (q.kind === 'yesno') return on.length ? on[0] === 'yes' : undefined
+    if (q.kind === 'choice') return other ? { other } : picks[0]
+    return other ? { picks, other } : picks
+  }
+
+  function iqSync(el) {
+    const q = iqQs().find((x) => x.id === el.dataset.q)
+    if (!q || !thTask) return
+    const a = iqRead(el, q)
+    if (iqSame(q, a)) delete iqDraft[q.id]; else iqDraft[q.id] = a
+    localStorage.setItem(iqKey, JSON.stringify(iqDraft))
+    el.classList.toggle('mine', iqHas(q))
+    el.classList.toggle('needs', !iqHas(q) && q.guess === null)
+    el.querySelector('.ask-tag').textContent = iqTag(q)
+    thMove = thMoves(thTask, thTask.card)
+    paint($('thBtns'), thBtns(thMove, 0))
+  }
+
+  function iqReset(el) {
+    const q = iqQs().find((x) => x.id === el.dataset.q)
+    if (!q) return
+    const want = q.kind === 'yesno' ? [q.guess ? 'yes' : 'no'] : [q.guess].flat()
+    el.querySelectorAll('input[type=radio], input[type=checkbox]').forEach((i) => { i.checked = want.includes(i.value) })
+    el.querySelectorAll('.ask-other, input[type=number], textarea').forEach((f) => { f.value = f.matches('.ask-other') ? '' : q.guess })
+    iqSync(el)
+    el.querySelector('input, textarea')?.focus() // the reset link hides itself
+  }
+
+  // ACCEPT ALL GUESSES sends 'guesses'; otherwise only the answers that differ (the server fills in the guesses).
+  const iqPayload = (final) => {
+    const mine = iqQs().filter(iqHas)
+    return mine.length || final ? Object.fromEntries(mine.map((q) => [q.id, iqDraft[q.id]])) : 'guesses'
+  }
+
   // Spec §5.1(b) button table; rows follow cardFor's order so the panel and the buttons agree.
   function thMoves(t, c) {
     const B = (act, word, sub, more) => ({ act, word, sub, ...more })
     const retry = (sub) => B('retry', 'RETRY STAGE', sub)
     const over = B('drop', 'GAME OVER', 'drop to the bin')
     if (t.bin) return {}
+    // A waiting questionnaire (interview spec §5.1b): answer, WRITE IT NOW or GAME OVER only.
+    if (t.state === 'waiting-for-you' && thInfo.questions) {
+      const qs = iqQs(), changed = qs.filter(iqHas).length, need = qs.findIndex((q) => q.guess === null && !iqHas(q))
+      return {
+        primary: B('ask', `${changed ? 'SEND ANSWERS' : 'ACCEPT ALL GUESSES'}${PLAY}`,
+          need >= 0 ? `answer Q${need + 1} first` : `${changed ? `${changed} changed` : 'nothing changed'} · send`, { off: need >= 0 }),
+        quiet: [B('final', 'WRITE IT NOW', 'no more questions · use these answers'), over],
+        help: 'Optional. It goes under your answers, whichever button you press.',
+      }
+    }
     if (c.group === 'questing') return { primary: B('queue', 'QUEUE NOTE', 'sent with the next turn'), queue: true,
       help: "The running turn won't see it. It is sent with the next turn, together with any other queued notes." }
     if (t.state === 'waiting-for-you') {
@@ -1408,7 +1572,7 @@
   }
 
   const thBtn = (b, kind, i) => {
-    const data = `data-act="${b.act}"${b.stage ? ` data-stage="${b.stage}"` : ''} data-key="act:${b.act}"`
+    const data = `data-act="${b.act}"${b.stage ? ` data-stage="${b.stage}"` : ''} data-key="act:${b.act}"${b.off ? ' disabled data-off' : ''}`
     if (kind === 'go') return `<button type="button" class="btn-start th-go" ${data}><span class="stack"><b class="w30">${b.word}</b><span class="sub">${esc(b.sub)}</span></span></button>`
     if (kind === 'two') return `<button type="button" class="btn2" ${data}><span><b>${b.word}</b><small>${esc(b.sub)}</small></span></button>`
     return `<button type="button" class="th-quiet${i ? '' : ' push'}" ${data}><b>${b.word}</b><small>${esc(b.sub)}</small></button>`
@@ -1602,7 +1766,7 @@
 
   function thOpen(id) {
     selected = id; thTask = null; thInfo = { spec: '', findings: '', suggestions: [] }
-    thOldOpen.clear(); thLiveKey = null; thReplied = false
+    thOldOpen.clear(); thLiveKey = null; thReplied = false; iqKey = ''
     $('threadView').querySelectorAll('#thDetails details').forEach((d) => { d.open = false; d.querySelector('.th-det-body').innerHTML = '' })
     qsData = null; qsKey = ''; $('qsDet').open = $('qlDet').open = false
     paint($('qsBody'), ''); paint($('qlList'), '')
@@ -1635,8 +1799,9 @@
     paint($('thId'), `thread id <code>${esc(t.id)}</code><button type="button" class="copy" data-copy="${encodeURIComponent(t.id)}" data-key="copy-id" aria-label="Copy thread id">${thCopyIcon}</button>`)
     paint($('thHead'), thHeadHtml(t, c))
     paint($('thPanel'), thPanelHtml(t, c))
+    if (thInfo.questions) iqLoad(t)
     const [now, old] = thDocsHtml(t, c)
-    paint($('thDoc'), now); paint($('thOld'), old)
+    paint($('thDoc'), thInfo.questions ? iqHtml : now); paint($('thOld'), old)
     thMove = thMoves(t, c)
     setText($('thHelp'), (thMove.help ?? 'Optional. It goes with the button you press.') + ' Your draft is kept if you leave this page.')
     paint($('thBtns'), thBtns(thMove, t.comments.filter((x) => !x.consumed).length))
@@ -1671,6 +1836,8 @@
     if (thNote.value) localStorage.setItem(thDraftKey(), thNote.value)
     else localStorage.removeItem(thDraftKey())
   })
+  $('thDoc').addEventListener('input', (e) => { const q = e.target.closest('.ask-q'); if (q) iqSync(q) })
+  $('thDoc').addEventListener('click', (e) => { const r = e.target.closest('[data-iq-reset]'); if (r) iqReset(r.closest('.ask-q')) })
 
   async function thAct(b) {
     const t = thTask, act = b.dataset.act, note = thNote.value.trim()
@@ -1689,7 +1856,8 @@
       if (!r.ok) throw new Error(out.error === 'restore first' ? 'This quest is in the GAME OVER bin: CONTINUE? restores it first.' : out.error || `petree answered ${r.status}`)
       return out
     }
-    const withNote = ['next', 'retry', 'queue'].includes(act) || (act === 'resume' && note)
+    const ask = act === 'ask' || act === 'final'
+    const withNote = ['next', 'retry', 'queue'].includes(act) || ask || (act === 'resume' && note)
     b.disabled = true
     try {
       if (act === 'pr' || act === 'push') {
@@ -1699,10 +1867,12 @@
         setText(err, res.filter((r) => !r.ok).map((r) => `${r.repo}: ${String(r.output || r.error || 'failed').trim().split('\n').slice(-2).join(' ')}`).join('\n'))
         $('thOut').innerHTML = res.filter((r) => r.ok).map((r) => `${esc(r.repo)}: ${thUrl(r.url)
           ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">PR opened ↗</a>` : act === 'pr' ? 'pushed' : 'update pushed'}`).join(' · ')
-      } else if (withNote && act !== 'queue') await post('next', { prompt: note, ...(b.dataset.stage && { stage: b.dataset.stage }) })
+      } else if (ask) await post('next', { prompt: note, answers: iqPayload(act === 'final'), ...(act === 'final' && { final: true }) })
+      else if (withNote && act !== 'queue') await post('next', { prompt: note, ...(b.dataset.stage && { stage: b.dataset.stage }) })
       else if (act === 'queue') await post('comments', { text: note })
       else await post(act) // resume, stop, drop, done, restore
       if (withNote) { thNote.value = ''; localStorage.removeItem(thDraftKey()) }
+      if (ask) localStorage.removeItem(iqKey)
       if (thDialog.open && !err.textContent) thDialog.close()
     } catch (e) {
       setText(err, e instanceof TypeError ? 'petree not reachable — try again' : e.message)
@@ -1723,6 +1893,8 @@
         <div><dt>MODEL</dt><dd>${esc(t.model || 'default')}</dd></div>
         <div><dt>PARTY MODE</dt><dd>${t.party ? 'on' : 'off'}</dd></div>
         <div><dt>AUTO-PLAY</dt><dd>${t.autoPlay ? 'on' : 'off'}</dd></div>
+        <div><dt>INTERVIEW</dt><dd>${t.interview ? 'on' : 'off'}</dd></div>
+        ${thInfo.questions?.dropped.length ? `<div><dt>QUESTIONS</dt><dd>${esc(thInfo.questions.dropped.join(' · '))}</dd></div>` : ''}
         <div><dt>TOKENS</dt><dd>${thNum(t.tokensUsed)} / ${thNum(t.tokenBudget)}</dd></div>
         <div><dt>SESSION</dt><dd class="mono">${esc(t.sessionId || '—')} ${t.sessionId ? copyBtn(t.sessionId) : ''}</dd></div>
         <div><dt>CREATED</dt><dd>${esc(new Date(t.createdAt).toLocaleString())}</dd></div>
@@ -1880,7 +2052,7 @@
     + '<g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg>'
   const CROSS = '<svg aria-hidden="true" width="12" height="12" viewBox="0 0 6 6" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="2" height="1"/><rect x="4" y="0" width="2" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="4" y="1" width="1" height="1"/><rect x="2" y="2" width="2" height="2"/><rect x="1" y="4" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="0" y="5" width="2" height="1"/><rect x="4" y="5" width="2" height="1"/></svg>'
   const WARN = '<svg aria-hidden="true" width="21" height="18" viewBox="0 0 7 6" shape-rendering="crispEdges"><g style="fill:var(--gold)"><rect x="3" y="0" width="1" height="1"/><rect x="2" y="1" width="3" height="2"/><rect x="1" y="3" width="5" height="2"/><rect x="0" y="5" width="7" height="1"/></g><rect x="3" y="2" width="1" height="2" style="fill:var(--gold-tint)"/></svg>'
-  const nq = { repos: [], tag: '', open: false, active: 0, model: null, stage: 'investigate', party: true, autoPlay: false, yamlOpen: new Set(), err: {} }
+  const nq = { repos: [], tag: '', open: false, active: 0, model: null, stage: 'investigate', party: true, autoPlay: false, interview: true, yamlOpen: new Set(), err: {} }
   const nqPrompt = $('nqPrompt'), nqSearch = $('nqSearch')
   const repoOf = (name) => allRepos.find((r) => r.name === name)
   // Preselects the first repo's default_model like the server's resolveModel; anything else sends 'default'.
@@ -1951,15 +2123,20 @@
       `<span class="pk-h"><b>${c[0]}</b><strong>· ${c[1]}</strong></span><small>${c[3]}</small>${c === def ? `<em class="nq-def">default for ${esc(nq.repos[0])}</em>` : ''}`)).join(''))
     paint($('nqStage'), LEVELS.map(([n, v, line], i) => tile('radio', 'nq-stage', v, v === nq.stage,
       `<span class="pk-h"><b>${n}</b><span class="nq-lv">LV ${i + 1}</span></span><small>${line}</small>`)).join(''))
-    const sw = (k, name, line) => `<button type="button" class="nq-sw" role="switch" aria-checked="${nq[k]}" data-sw="${k}" data-key="sw:${k}">
+    const sw = (k, name, line, off) => `<button type="button" class="nq-sw" role="switch" aria-checked="${nq[k]}" data-sw="${k}" data-key="sw:${k}"${off ? ' disabled' : ''}>
       <span><b>${name}</b><small>${line}</small></span><span class="sw" aria-hidden="true"><span class="sw-w">${nq[k] ? 'ON' : 'OFF'}</span><span class="sw-t"><span></span><span></span></span></span></button>`
+    const craft = nq.stage === 'build', asks = nq.interview && !craft
     paint($('nqSwitches'), sw('party', 'PARTY MODE', 'let it spawn subagents for parallel work')
-      + sw('autoPlay', 'AUTO-PLAY', 'go all the way to an open PR without stopping at gates; you still merge'))
+      + sw('autoPlay', 'AUTO-PLAY', 'go all the way to an open PR without stopping at gates; you still merge')
+      + sw('interview', 'INTERVIEW', 'ask you a few questions before findings and spec; guesses filled in'
+        + (craft ? '<span class="why-off">only SCOUT and PLAN ask · this quest starts at CRAFT</span>' : ''), craft))
     const start = LEVELS.find((l) => l[1] === nq.stage)[0]
-    setText($('nqAuto'), nq.autoPlay ? `AUTO-PLAY is on, so the quest starts at ${start} and runs on to an open PR. It never merges; you do.`
+    setText($('nqAuto'), (nq.autoPlay ? `AUTO-PLAY is on, so the quest starts at ${start} and runs on to an open PR. It never merges; you do.`
       : `AUTO-PLAY is off, so the quest starts at ${start} and stops at every gate for your OK.`)
+      + (asks ? ` ${nq.stage === 'investigate' ? 'SCOUT and PLAN each start' : 'PLAN starts'} with a questionnaire for you.` : '')
+      + (asks && nq.autoPlay ? ' AUTO-PLAY still stops at every questionnaire; after you answer it runs on.' : ''))
     const n = chosen.length
-    setText($('nqSum'), `${n ? `${n} repo${n === 1 ? '' : 's'}` : 'no party yet'} · ${cls ? `${cls[0]} · ${cls[1]}` : 'default model'} · starts at ${start}`)
+    setText($('nqSum'), `${n ? `${n} repo${n === 1 ? '' : 's'}` : 'no party yet'} · ${cls ? `${cls[0]} · ${cls[1]}` : 'default model'} · starts at ${start}${asks ? ' · interview' : ''}`)
     setText($('nqPromptErr'), nq.err.prompt ?? '')
     setText($('nqRepoErr'), nq.err.repos ?? '')
     setText($('nqServerErr'), nq.err.server ?? '')
@@ -2046,12 +2223,12 @@
     try {
       const res = await fetch('/api/tasks', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt: nqPrompt.value, repos: nq.repos, model: pickedClass()?.[2] ?? 'default', stage: nq.stage, party: nq.party, autoPlay: nq.autoPlay }),
+        body: JSON.stringify({ prompt: nqPrompt.value, repos: nq.repos, model: pickedClass()?.[2] ?? 'default', stage: nq.stage, party: nq.party, autoPlay: nq.autoPlay, interview: nq.interview }),
       })
       const out = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(out.error || `petree answered ${res.status}`)
       localStorage.removeItem('petree-draft'); nqPrompt.value = ''; $('nqCountN').textContent = 0
-      Object.assign(nq, { repos: [], model: null, stage: 'investigate', party: true, autoPlay: false })
+      Object.assign(nq, { repos: [], model: null, stage: 'investigate', party: true, autoPlay: false, interview: true })
       location.hash = '#/t/' + encodeURIComponent(out.id)
     } catch (err) {
       nq.err.server = err instanceof TypeError ? 'petree not reachable — try again' : err.message

@@ -89,6 +89,7 @@ describe('cardFor progress', () => {
       { step: 'pr', mark: 'todo' }, { step: 'merged', mark: 'todo' },
     ])
     expect(cardFor(task({ state: 'running' }), null, cfg).progress[0].tone).toBe('running')
+    expect(cardFor(task({ bin: 'hall-of-fame', binReason: 'finished · findings kept' }), null, cfg).progress[0]).toEqual({ step: 'investigate', mark: 'current' })
   })
 
   it('earlier stages are done if a turn ran there, else skipped', () => {

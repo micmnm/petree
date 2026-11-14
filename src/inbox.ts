@@ -28,7 +28,8 @@ const ACTIVE = ['queued', 'provisioning', 'running', 'paused-rate-limit']
 function progressFor(task: TaskRecord): ProgressStep[] {
   const at = STAGES.indexOf(task.stage)
   const buildDone = task.stage === 'build' && task.state === 'done'
-  const tone: ProgressStep['tone'] = task.state === 'failed' ? 'failed'
+  // A binned quest is nobody's move, so its track carries no tone.
+  const tone: ProgressStep['tone'] = task.bin ? undefined : task.state === 'failed' ? 'failed'
     : task.state === 'waiting-for-you' || task.state === 'cancelled' || (task.state === 'done' && !buildDone) ? 'needs-you'
     : ACTIVE.includes(task.state) ? 'running' : undefined
   const steps: ProgressStep[] = STAGES.map((step, i) => {
@@ -47,7 +48,7 @@ function progressFor(task: TaskRecord): ProgressStep[] {
     }
   }
   const last = (step: Step, mark: ProgressStep['mark']): ProgressStep =>
-    ({ step, mark, ...(mark === 'current' && { tone: 'needs-you' as const }) })
+    ({ step, mark, ...(mark === 'current' && !task.bin && { tone: 'needs-you' as const }) })
   return [...steps, last('pr', ship), last('merged', merged)]
 }
 

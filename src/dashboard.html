@@ -465,10 +465,111 @@
   .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: calc(var(--sp)*1.5); }
   .modal-head h2 { margin: 0; font-size: 1rem; }
   .modal-close { border: none; background: none; font-size: 1.2rem; line-height: 1; padding: 2px 6px; color: var(--muted); }
-  .opt-sec { padding: calc(var(--sp)*2); }
-  .opt-sec + .opt-sec { border-top: 1px dashed var(--line); }
-  .opt-sec h3 { margin: 0 0 8px; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  #reposYamlText { min-height: 40vh; font-family: var(--mono); font-size: .82rem; resize: vertical; overflow: auto; white-space: pre; }
+
+  /* Options (spec §5.1g) */
+  #optionsView { gap: 32px; }
+  .o-top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
+  .o-top > .back { align-self: auto; }
+  .cart-in.o-panel { gap: 18px; padding: 22px 26px 12px; }
+  .o-panel h2 { margin: 0; display: inline-flex; align-items: center; gap: 12px; font: 400 40px/1 var(--px); }
+  .o-h3 { margin: 0; font: 400 30px/1 var(--px); }
+  .o-k { font: 400 20px/1 var(--px); color: var(--label); }
+  .o-help, .o-msg { font-size: 13px; line-height: 1.45; color: var(--muted); }
+  .o-sub { display: flex; flex-direction: column; gap: 12px; }
+  .o-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+  .o-tile { padding: 2px; background: var(--line); clip-path: var(--step); }
+  .o-tile > div { height: 100%; display: flex; flex-direction: column; gap: 2px; padding: 10px 14px 12px; background: var(--inset); clip-path: var(--step); }
+  .o-tile b { font: 400 40px/1 var(--px); }
+  .o-tile span { font-size: 14px; font-weight: 700; line-height: 1.25; }
+  .o-tile small { font-size: 13px; color: var(--muted); }
+  .o-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  .o-picks { display: flex; flex-wrap: wrap; gap: 8px; }
+  /* Selection tile (design §4.6): the real input sits hidden inside the label */
+  .o-pick { position: relative; display: inline-flex; max-width: 100%; padding: 2px; background: var(--line-strong); clip-path: var(--step); cursor: pointer; }
+  .o-pick input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; }
+  .o-pick > span { display: inline-flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; padding: 6px 16px 6px 12px; background: var(--screen); clip-path: var(--step); }
+  .o-pick:has(:checked) { background: var(--gold); }
+  .o-pick:has(:checked) > span { background: var(--gold-tint); }
+  .o-pick:has(:focus-visible), .o-save:focus-visible { clip-path: none; outline: 3px solid var(--gold); outline-offset: 3px; }
+  .o-box { flex: none; color: var(--line-strong); }
+  .o-pick :checked + span .o-box { color: var(--gold); }
+  .o-pick :not(:checked) + span .o-ck { display: none; }
+  .o-pw { display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+  .o-pw b { font: 400 30px/.8 var(--px); }
+  .o-pw i { font: normal 20px/1 var(--px); color: var(--label); }
+  .o-pw small { font-size: 14px; line-height: 1.2; color: var(--muted); }
+  .o-pick.sm .o-pw b { font-size: 20px; line-height: 1; }
+  /* Roster */
+  .o-repo { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 14px 20px; padding: 18px 0; border-top: 2px dotted var(--line); }
+  .o-main { flex: 1 1 520px; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+  .o-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .o-head h3 { margin: 0; min-width: 0; font-size: 19px; line-height: 1.3; overflow-wrap: anywhere; }
+  .o-hue { flex: none; width: 22px; height: 22px; }
+  .o-tag { padding: 1px 7px; border: 2px solid var(--line-strong); font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+  .o-badge { padding: 3px 9px; background: var(--inset); color: var(--muted); font-size: 13px; font-weight: 700; }
+  .o-badge.gold { background: var(--gold-tint); color: var(--gold); }
+  .o-badge.ink { padding: 3px 8px 2px; background: var(--ink); color: var(--screen); font: 20px/1 var(--px); }
+  .o-stats, .o-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; font-size: 14px; color: var(--muted); }
+  .o-meta { align-items: baseline; }
+  .o-meta > span { min-width: 0; overflow-wrap: anywhere; }
+  .o-stat { display: inline-flex; align-items: baseline; gap: 6px; }
+  .o-stat b { font: 400 20px/1 var(--px); color: var(--ink); }
+  .o-stat.big b { font-size: 30px; }
+  .o-stats strong { color: var(--ink); }
+  .o-spark { flex: none; margin-left: auto; }
+  .o-panel code { font: 13px/1.5 var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+  /* commands scroll inside instead of growing the card (design §4.8) */
+  .o-cmds { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 8px 16px; max-height: 260px; overflow: auto; padding: 10px 12px; background: var(--inset); }
+  .o-cmds div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .o-recruit { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; width: 100%; min-height: 72px; margin-top: 4px; padding: 12px 20px; border: 2px dashed var(--line-strong); background: none; color: var(--ink); text-align: left; }
+  .o-recruit b, .o-quiet b { font: 400 30px/.8 var(--px); }
+  .o-recruit b { color: var(--gold); }
+  .o-recruit small, .o-quiet small { font-size: 13px; font-weight: 700; line-height: 1.1; color: var(--muted); }
+  /* Edit form */
+  .o-edit { padding: 18px 0; border-top: 2px dotted var(--line); }
+  .o-edit > form { display: flex; padding: 2px; background: var(--ink); clip-path: var(--step); }
+  .o-edit > form > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 20px; padding: 18px 20px 20px; background: var(--screen); clip-path: var(--step); }
+  .o-usage { display: flex; flex-direction: column; gap: 14px; padding: 14px 16px; background: var(--inset); }
+  .o-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 18px 20px; }
+  .o-grid.cmds { grid-template-columns: repeat(auto-fit, minmax(min(100%, 380px), 1fr)); gap: 14px 20px; }
+  .o-wide { grid-column: 1 / -1; }
+  .o-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+  .o-field > .o-k, .o-field > legend { padding: 0 0 6px; color: var(--ink); }
+  .o-cl { font-size: 14px; font-weight: 700; }
+  .o-cl span { font-weight: 400; color: var(--muted); }
+  .o-form :where(input:not([type=radio], [type=checkbox]), textarea), #reposYamlText { width: 100%; min-height: 48px; padding: 10px 14px; border: 2px solid var(--line-strong); border-radius: 0; font: 14px/1.5 var(--mono); }
+  .o-form textarea { resize: none; overflow: auto; }
+  .o-form .o-ins { height: 112px; font: 15px/1.5 var(--sans); }
+  .o-form .o-cmd { height: 124px; padding: 10px 12px; font-size: 13px; line-height: 1.6; white-space: pre; }
+  .o-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; padding-top: 12px; border-top: 2px dotted var(--line); }
+  .o-acts .o-dismiss { margin-left: auto; }
+  .o-quiet { display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; max-width: 100%; min-height: 48px; padding: 4px 8px; overflow-wrap: anywhere; border: 0; background: none; color: var(--muted); text-align: left; text-decoration: none; }
+  .o-quiet.sure b { color: var(--need); }
+  .o-err { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 12px; background: var(--need-tint); border-left: 4px solid var(--need-frame); font-size: 15px; }
+  .o-err b { font: 400 20px/1 var(--px); color: var(--need); }
+  .o-err span { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .o-link { min-height: 44px; padding: 0; border: 0; background: none; color: var(--ink); font-weight: 700; text-decoration: underline; }
+  /* GAME RULES, footer, raw editor */
+  .o-rules { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 22px 24px; }
+  .o-num { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 15px; color: var(--muted); }
+  .o-form .o-num input { flex: none; width: 150px; }
+  .o-foot { display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: space-between; gap: 16px 24px; }
+  .o-foot > div { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+  .o-rawlink { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; text-decoration: underline; }
+  .o-save { display: inline-flex; align-items: center; gap: 12px; min-height: 60px; padding: 6px 24px 6px 18px; border: 0; background: var(--gold-fill); color: var(--on-fill); clip-path: var(--step); }
+  .o-save b { font: 400 40px/.8 var(--px); }
+  .o-save:disabled { opacity: .6; cursor: wait; }
+  #reposYamlText { height: 50vh; resize: vertical; overflow: auto; white-space: pre; font-size: 13px; }
+  @media (max-width: 600px) {
+    #optionsView { gap: 24px; }
+    .cart-in.o-panel { padding: 16px 14px 8px; }
+    .o-panel h2 { font-size: 30px; gap: 8px; }
+    .o-tile b { font-size: 30px; }
+    .o-cmds { max-height: 200px; }
+    .o-edit > form > div { padding: 14px 12px 16px; }
+    .o-acts .o-dismiss { margin-left: 0; }
+    .o-save b { font-size: 30px; }
+  }
 </style>
 
 <header class="hud">
@@ -587,38 +688,68 @@
 </main>
 
 <main class="page sub-page" id="optionsView" hidden>
-  <a class="btn2 back" href="#/"><span><b>BACK</b><small>to the inbox</small></span></a>
-  <h1 class="ptitle">OPTIONS</h1>
-  <div class="card">
-    <div class="opt-sec">
-      <h3>bins</h3>
-      <p class="muted small" style="margin:0 0 8px">Binned quests leave the inbox after these many days and stay reachable by link. Live quests are never cleared.</p>
-      <div class="field">
-        <label class="k" for="binDays">GAME OVER</label>
-        <input type="number" id="binDays" min="1" step="1" style="width:5rem">
-        <span class="muted">days</span>
-      </div>
-      <div class="field">
-        <label class="k" for="hallOfFameDays">HALL OF FAME</label>
-        <input type="number" id="hallOfFameDays" min="1" step="1" style="width:5rem">
-        <span class="muted">days</span>
-      </div>
-      <div class="field">
-        <button class="primary" type="button" id="saveSettings">Save</button>
-        <button type="button" id="clearNowBtn">Clear now</button>
-        <span class="muted small" id="settingsMsg"></span>
-      </div>
+  <div class="o-top">
+    <a class="btn2 back" href="#/"><span><b>BACK</b><small>to the inbox</small></span></a>
+    <h1 class="ptitle">OPTIONS</h1>
+  </div>
+
+  <section class="cart-frame" aria-labelledby="roster-h"><div class="cart-in o-panel">
+    <div class="sec-head"><h2 id="roster-h">PARTY ROSTER <span class="count none" id="rosterCount">0</span></h2><span class="hint">Every repo Claude can work in.</span></div>
+    <div class="o-sub">
+      <div class="sec-head"><h3 class="o-h3">SCOREBOARD</h3><span class="hint">All repos, all time; time played is this month. A quest in two repos counts in both.</span></div>
+      <div class="o-board" id="board"></div>
     </div>
-    <div class="opt-sec">
-      <h3>repos.yaml</h3>
-      <p class="muted small" style="margin:0 0 8px">Edits apply immediately to new threads — no restart required.</p>
-      <textarea id="reposYamlText" spellcheck="false"></textarea>
-      <div class="field" style="margin-top:8px">
-        <button class="primary" type="button" id="saveReposYaml">Save repos.yaml</button>
-        <span class="muted small" id="reposYamlMsg"></span>
-      </div>
+    <div class="o-sort"><span class="o-k" id="sort-h">SORT BY</span><div class="o-picks" id="sortBar" role="radiogroup" aria-labelledby="sort-h"></div></div>
+    <div id="roster"></div>
+    <div class="strip" aria-hidden="true"></div>
+  </div></section>
+
+  <section class="cart-frame" aria-labelledby="rules-h"><div class="cart-in o-panel">
+    <div class="sec-head"><h2 id="rules-h">GAME RULES</h2><span class="hint">Defaults for every quest and how long old ones stay around.</span></div>
+    <form class="o-rules o-form" id="rules">
+      <label class="o-field"><span class="o-k">CONCURRENCY</span><span class="o-num"><input type="number" name="concurrency" min="1" step="1" placeholder="3">quests at once</span>
+        <span class="o-help">How many quests run at the same time. Extra ones wait their turn. Takes effect after a restart.</span></label>
+      <label class="o-field"><span class="o-k">TOKEN BUDGET</span><span class="o-num"><input type="number" name="token_budget" min="1" step="1" placeholder="500000">tokens per quest</span>
+        <span class="o-help">A quest that runs out stops and lands in GAME OVER as “out of tokens”.</span></label>
+      <label class="o-field"><span class="o-k">TIMEOUT</span><span class="o-num"><input type="number" name="timeout_minutes" min="1" step="1" placeholder="30">minutes per turn</span>
+        <span class="o-help">A turn that runs longer is stopped.</span></label>
+      <label class="o-field"><span class="o-k">WINDOW BUDGET</span><span class="o-num"><input type="number" name="window_usd" min="0" step="any" placeholder="unset">USD per 5-hour window</span>
+        <span class="o-help">What one 5-hour window is worth in API dollars. Only feeds the ≈ window share in QUEST STATS.</span></label>
+      <label class="o-field"><span class="o-k">GAME OVER CLEAN-UP</span><span class="o-num"><input type="number" name="binDays" min="1" step="1">days</span>
+        <span class="o-help">Quests leave the GAME OVER bin after this. Until then CONTINUE? brings them back.</span></label>
+      <label class="o-field"><span class="o-k">HALL OF FAME CLEAN-UP</span><span class="o-num"><input type="number" name="hallOfFameDays" min="1" step="1">days</span>
+        <span class="o-help">Victories leave the inbox after this. They stay reachable by link.</span></label>
+    </form>
+    <div class="o-acts">
+      <button type="button" class="btn2" id="clearNowBtn"><span><b>SWEEP NOW</b><small>clear bins past these days</small></span></button>
+      <span class="o-msg" id="rulesMsg" role="status"></span>
+    </div>
+    <div class="strip" aria-hidden="true"></div>
+  </div></section>
+
+  <div class="o-foot">
+    <button type="button" class="o-rawlink" id="rawToggle" data-raw="toggle" aria-controls="raw" aria-expanded="false">
+      <svg aria-hidden="true" width="12" height="14" viewBox="0 0 6 7" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="4" height="1"/><rect x="0" y="1" width="1" height="6"/><rect x="5" y="2" width="1" height="5"/><rect x="4" y="1" width="1" height="1"/><rect x="1" y="6" width="4" height="1"/><rect x="2" y="3" width="2" height="1"/><rect x="2" y="4" width="2" height="1"/></svg>
+      <span>EDIT RAW <code>repos.yaml</code> · for power use</span>
+    </button>
+    <div>
+      <span class="o-msg" id="saveMsg" role="status"></span>
+      <a class="o-quiet" href="#/"><b>BACK</b><small>leave without saving</small></a>
+      <button type="button" class="o-save" id="saveAll">
+        <svg aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="7" height="1"/><rect x="0" y="1" width="1" height="7"/><rect x="7" y="1" width="1" height="7"/><rect x="1" y="7" width="6" height="1"/><rect x="2" y="1" width="4" height="2"/><rect x="2" y="5" width="4" height="2"/></svg>
+        <span class="stack"><b>SAVE</b><span class="sub">write repos.yaml and rules</span></span>
+      </button>
     </div>
   </div>
+
+  <section class="cart-frame" id="raw" aria-labelledby="raw-h" hidden><div class="cart-in o-panel">
+    <div class="sec-head"><h2 id="raw-h">RAW repos.yaml</h2><span class="hint">The whole file, comments and all. Applies to new quests right away; CONCURRENCY waits for a restart.</span></div>
+    <textarea id="reposYamlText" spellcheck="false" aria-labelledby="raw-h"></textarea>
+    <div class="o-acts">
+      <button type="button" class="btn2" id="saveReposYaml"><span><b>SAVE RAW</b><small>write repos.yaml as typed</small></span></button>
+      <span class="o-msg" id="reposYamlMsg" role="status"></span>
+    </div>
+  </div></section>
 </main>
 
 <div class="modal-overlay" id="viewerOverlay" hidden>
@@ -796,7 +927,8 @@
       $('threadHead').innerHTML = ''; $('tabs').innerHTML = ''; $('tabbody').innerHTML = '<p class="muted">loading…</p>'
       renderBody().catch(() => {})
     } else selected = null
-    if (view === 'options') { loadSettings(); loadReposYaml() }
+    // entering Options starts clean: BACK means "leave without saving"
+    if (view === 'options') { drafts = {}; $('saveMsg').textContent = ''; loadSettings(); loadReposYaml(); renderOptions(); loadRepos().then(() => renderOptions()) }
     if (view === 'new') renderNew()
     const anchor = h.length > 1 && !h.startsWith('#/') && document.getElementById(h.slice(1))
     if (anchor) anchor.scrollIntoView(); else window.scrollTo(0, 0)
@@ -1024,26 +1156,271 @@
   }).catch(() => {})
   renderNew(); loadRepos()
 
-  // options: bin retention plus a raw repos.yaml editor (see /api/repos-yaml — cfg is
-  // mutated in place server-side, so a save here applies to new tasks immediately)
-  const binDaysInput = $('binDays')
-  const hallOfFameDaysInput = $('hallOfFameDays')
-  const settingsMsg = $('settingsMsg')
-  const flashSettingsMsg = (text) => { settingsMsg.textContent = text; setTimeout(() => (settingsMsg.textContent = ''), 1500) }
+  // ---- options (#/options): roster, repo edit form, GAME RULES, raw repos.yaml ----
+  const NEW = '+' // drafts key of the repo being recruited; never a valid repo name
+  const DEFAULT_KEYS = ['concurrency', 'token_budget', 'timeout_minutes', 'window_usd']
+  const OCLASSES = { opus: ['SAGE', 'Opus', 'deep thinking, slower'], sonnet: ['KNIGHT', 'Sonnet', 'balanced, all-round'], haiku: ['ROGUE', 'Haiku', 'quick and cheap'] }
+  const IMAGES = { 'sandbox-node': 'NODE', 'sandbox-dotnet': 'DOTNET', 'sandbox-full': 'FULL' }
+  // build/test wording mirrors composePrompt (src/prompt.ts); petree itself never gates SHIP on them
+  const CMDS = [['setup', 'Claude runs these before changing anything'], ['build', 'must pass before the agent reports success'],
+    ['test', 'must pass before the agent reports success'], ['run', 'starts the app so you can try it']]
+  const SORTS = {
+    used: ['MOST USED', (a, b) => b.usage.quests - a.usage.quests || a.name.localeCompare(b.name)],
+    recent: ['RECENT', (a, b) => (b.usage.lastQuestAt ?? '').localeCompare(a.usage.lastQuestAt ?? '') || a.name.localeCompare(b.name)],
+    az: ['A–Z', (a, b) => a.name.localeCompare(b.name)],
+  }
+  let drafts = {}, sortBy = 'used'
+  // Our own writes, hash before → after, so a draft read earlier doesn't 409 on them.
+  const moved = {}
+  const fwd = (h) => { while (h && moved[h]) h = moved[h]; return h }
+  const send = (method, body) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
   const reposYamlText = $('reposYamlText')
   const reposYamlMsg = $('reposYamlMsg')
   const flashReposYamlMsg = (text) => { reposYamlMsg.textContent = text; setTimeout(() => (reposYamlMsg.textContent = ''), 2500) }
+  const rules = $('rules').elements
+
   async function loadSettings() {
     try { days = await (await fetch('/api/settings')).json() } catch { return }
-    binDaysInput.value = days.binDays
-    hallOfFameDaysInput.value = days.hallOfFameDays
+    rules.binDays.value = rules.binDays.defaultValue = days.binDays
+    rules.hallOfFameDays.value = rules.hallOfFameDays.defaultValue = days.hallOfFameDays
     renderInbox()
   }
   loadSettings()
   async function loadReposYaml() {
     const { content } = await (await fetch('/api/repos-yaml')).json()
     reposYamlText.value = content
+    // defaults: has no GET route; read the numbers from the file (defaultValue marks "unchanged")
+    const block = /^defaults:.*\n((?:[ \t]+.*\n?|[ \t]*\n)*)/m.exec(content)?.[1] ?? ''
+    for (const k of DEFAULT_KEYS) rules[k].value = rules[k].defaultValue = new RegExp(`^[ \\t]+${k}:[ \\t]*([\\d.]+)`, 'm').exec(block)?.[1] ?? ''
   }
+
+  // Form fields as repos.yaml wants them: lists split and trimmed, empties dropped, tags sorted.
+  const LISTS = ['setup', 'build', 'test', 'run', 'tags']
+  function norm(f) {
+    const out = {}
+    for (const k of Object.keys(f).sort()) {
+      let v = f[k]
+      if (LISTS.includes(k)) {
+        v = [].concat(v ?? []).flatMap((s) => k === 'tags' ? String(s).split(',') : [s]).map((s) => String(s).trim()).filter(Boolean)
+        if (k === 'tags') v = [...new Set(v)].sort()
+      } else if (typeof v === 'string') v = v.trim()
+      if (v != null && v !== '' && !(Array.isArray(v) && !v.length)) out[k] = v
+    }
+    return out
+  }
+  const dirty = (key) => key === NEW || JSON.stringify(norm(drafts[key].fields)) !== drafts[key].orig
+
+  // Reads every open form back into its draft, so a re-render never loses typing.
+  function sync() {
+    for (const form of $('optionsView').querySelectorAll('form[data-form]')) {
+      const d = drafts[form.dataset.form]
+      if (!d || d.editable === false) continue
+      const f = new FormData(form), text = (k) => String(f.get(k) ?? '')
+      d.fields = { ...d.fields, url: text('url'), default_branch: text('default_branch'), image: text('image'), path: text('path'),
+        instructions: text('instructions'), default_model: text('default_model'), tags: [...f.getAll('tag'), text('newtags')],
+        ...Object.fromEntries(CMDS.map(([k]) => [k, text(k).split('\n')])) }
+      if (form.dataset.form === NEW) d.name = text('name').trim()
+    }
+  }
+
+  const OBOX = '<svg class="o-box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor"><path d="M0 0h8v1H0zM0 7h8v1H0zM0 1h1v6H0zM7 1h1v6H7z"/><path class="o-ck" d="M1 4h1v1H1zM2 5h1v1H2zM3 4h1v1H3zM4 3h1v1H4zM5 2h1v1H5z"/></svg>'
+  // word, tag and line are HTML (callers escape)
+  const pick = ({ type = 'radio', name, value, on, word, tag = '', line = '', sm = false }) =>
+    `<label class="o-pick${sm ? ' sm' : ''}"><input type="${type}" name="${name}" value="${esc(value)}"${on ? ' checked' : ''}><span>${OBOX}<span class="o-pw"><b>${word}${tag ? ` <i>${tag}</i>` : ''}</b>${line ? `<small>${line}</small>` : ''}</span></span></label>`
+  $('sortBar').innerHTML = Object.entries(SORTS).map(([value, [word]]) => pick({ name: 'sort', value, on: value === sortBy, word, sm: true })).join('')
+
+  const played = (ms) => ms >= 3_600_000 ? `${Math.round(ms / 3_600_000)}h` : `${Math.round(ms / 60_000)}m`
+  const className = (m) => { const c = m && Object.entries(OCLASSES).find(([k]) => m.includes(k))?.[1]; return c ? `${c[0]} · ${c[1]}` : m || '—' }
+  const stat = (n, label, big = false) => `<span class="o-stat${big ? ' big' : ''}"><b>${n}</b>${label}</span>`
+  // 8 weekly bars, 4 px per quest up to 6; an empty week keeps a 2 px stub
+  const spark = (w) => `<svg class="o-spark" role="img" aria-label="Quests per week, last 8 weeks: ${w.join(', ')}" width="85" height="24" viewBox="0 0 85 24" shape-rendering="crispEdges">${
+    w.map((n, i) => { const h = n ? Math.min(n, 6) * 4 : 2; return `<rect x="${i * 11}" y="${24 - h}" width="8" height="${h}" style="fill:var(${n ? '--go-fill' : '--line'})"/>` }).join('')}</svg>`
+  const stats = (u) => stat(u.quests, 'quests') + stat(u.won, 'won') + stat(u.lost, 'game over')
+    + `<span>last quest <strong>${u.lastQuestAt ? age(u.lastQuestAt) : 'never'}</strong></span>` + stat(played(u.monthMs), 'played this month') + spark(u.weekly)
+  const idle = (u) => !u.lastQuestAt || Date.now() - Date.parse(u.lastQuestAt) > 30 * 86_400_000
+  const repoHead = (r, extra) => `<div class="o-head"><span class="o-hue" aria-hidden="true" style="background:${hue(r.name)}"></span><h3>${esc(r.name)}</h3>
+    ${r.tags.map((t) => `<span class="o-tag">${esc(t)}</span>`).join('')}${idle(r.usage) ? '<span class="o-badge">idle</span>' : ''}${extra}</div>`
+  const ocmds = (r) => {
+    const kinds = CMDS.filter(([k]) => r[k]?.length)
+    return kinds.length ? `<div class="o-cmds">${kinds.map(([k]) => `<div><span class="o-k">${k.toUpperCase()}</span>${r[k].map((c) => `<code>${esc(c)}</code>`).join('')}</div>`).join('')}</div>` : ''
+  }
+
+  const rosterRow = (r) => `<article class="o-repo"><div class="o-main">
+      ${repoHead(r, drafts[r.name] && dirty(r.name) ? '<span class="o-badge gold">EDITED · not saved</span>' : '')}
+      <div class="o-stats">${stats(r.usage)}</div>
+      <div class="o-meta"><span><span class="o-k">BRANCH</span> <code>${esc(r.defaultBranch)}</code></span><span><span class="o-k">IMAGE</span> <code>${esc(r.image)}</code></span>
+        ${r.path ? `<span><span class="o-k">LOCAL</span> <code>${esc(r.path)}</code></span>` : '<span>no local checkout set</span>'}</div>
+      ${ocmds(r)}</div>
+    <button type="button" class="btn2" data-edit="${esc(r.name)}" aria-label="Edit ${esc(r.name)}"><span><b>EDIT</b><small>change this repo</small></span></button></article>`
+
+  const errBox = (e) => e ? `<div class="o-err" role="alert"><b>${e.title}</b><span>${esc(e.msg)}</span>${
+    e.raw ? '<button type="button" class="o-link" data-raw>edit as raw</button>' : ''}${
+    e.reload ? '<button type="button" class="o-link" data-reload>reload this repo (drops these edits)</button>' : ''}</div>` : ''
+  const failure = (status, error, title = 'NOT SAVED') =>
+    ({ title, msg: error || `failed (HTTP ${status})`, raw: status === 422, reload: status === 409 && /changed on disk/.test(error ?? '') })
+  const field = (label, help, input, wide) => `<label class="o-field${wide ? ' o-wide' : ''}"><span class="o-k">${label}</span>${input}<span class="o-help">${help}</span></label>`
+  const group = (label, help, tiles, wide) => `<fieldset class="o-field${wide ? ' o-wide' : ''}"><legend class="o-k">${label}</legend><div class="o-picks">${tiles}</div><span class="o-help">${help}</span></fieldset>`
+
+  function editForm(key, d, r) {
+    const f = d.fields, on = norm(f), isNew = key === NEW
+    const text = (k) => esc([].concat(f[k] ?? []).join('\n'))
+    const input = (k, attrs = '') => `<input name="${k}" value="${esc(f[k] ?? '')}" autocomplete="off" ${attrs}>`
+    const tags = [...new Set([...allRepos.flatMap((x) => x.tags), ...(on.tags ?? [])])].sort()
+    const images = [...new Set([...Object.keys(IMAGES), ...(on.image ? [on.image] : [])])]
+    const models = [...Object.entries(OCLASSES), ...(on.default_model && !OCLASSES[on.default_model] ? [[on.default_model, [esc(on.default_model), '', 'from repos.yaml']]] : [])]
+    const head = isNew
+      ? `<div class="o-head"><span class="o-badge ink">NEW RECRUIT</span><span class="o-help">Written to repos.yaml when you SAVE.</span></div>`
+      : repoHead(r, '<span class="o-badge ink">EDITING</span><span class="o-help">Nothing is written until you SAVE.</span>')
+    const u = r?.usage
+    const usage = u ? `<div class="o-usage"><div class="o-stats"><span class="o-k">USAGE</span>${stats(u)}</div>
+      <div class="o-stats"><span>Where quests ended</span>${['SCOUT', 'PLAN', 'CRAFT'].map((w, i) => stat(u.ended[['investigate', 'spec', 'build'][i]], w.toLowerCase(), true)).join('')}
+        ${stat(u.avgTurns.toFixed(1), 'avg turns per quest', true)}<span>most used model <strong>${esc(className(u.topModel))}</strong></span></div></div>` : ''
+    const body = d.editable === false
+      ? errBox({ title: 'RAW ONLY', msg: 'This repo uses YAML anchors, so the form could break what it shares. Change it in the raw editor.', raw: true })
+      : `<div class="o-grid">
+          ${isNew ? field('NAME', 'Letters, digits, dot, dash or underscore. The key under repos: in repos.yaml.', `<input name="name" value="${esc(d.name ?? '')}" autocomplete="off" required>`, true) : ''}
+          ${field('URL', 'Where petree clones from. Every quest starts from this remote.', input('url', 'type="url" required'), true)}
+          ${field('DEFAULT BRANCH', 'Quests branch off this, and PRs target it.', input('default_branch', 'placeholder="main"'))}
+          ${group('IMAGE', 'The box Claude works in. sandbox-full has both Node and .NET.',
+            images.map((v) => pick({ name: 'image', value: v, on: on.image === v, word: esc(IMAGES[v] ?? v), line: esc(v) })).join(''))}
+          ${group('TAGS', 'Drive the tag filters in the header.', tags.map((t) => pick({ type: 'checkbox', name: 'tag', value: t, on: on.tags?.includes(t), word: esc(t.toUpperCase()), sm: true })).join('')
+            + '<input name="newtags" placeholder="new tags, comma separated" aria-label="New tags, comma separated" autocomplete="off">', true)}
+          ${group('DEFAULT MODEL', 'Picked for new quests in this repo; you can still change it per quest.',
+            models.map(([v, [w, t, l]]) => pick({ name: 'default_model', value: v, on: on.default_model === v, word: w, tag: t, line: l })).join('')
+            + pick({ name: 'default_model', value: '', on: !on.default_model, word: 'NONE', line: 'use petree’s default' }), true)}
+          ${field('LOCAL CHECKOUT PATH', 'Optional. Lets petree warn you about unpushed work. Only read on this machine, never sent to Claude.', input('path', 'placeholder="~/code/repo"'), true)}
+          ${field('INSTRUCTIONS', 'Notes Claude reads before every quest in this repo. Scrolls inside the box.', `<textarea name="instructions" class="o-ins">${text('instructions')}</textarea>`, true)}
+        </div>
+        <fieldset class="o-field"><legend class="o-k">COMMANDS</legend><span class="o-help">One command per line; Claude gets them in its prompt. Leave a box empty to skip it.</span>
+          <div class="o-grid cmds">${CMDS.map(([k, line]) => `<label class="o-field"><span class="o-cl">${k} <span>· ${line}</span></span><textarea name="${k}" class="o-cmd" spellcheck="false">${text(k)}</textarea></label>`).join('')}</div></fieldset>`
+    const acts = isNew
+      ? '<button type="button" class="o-quiet" data-cancel><b>CANCEL</b><small>forget this recruit</small></button>'
+      : `<button type="button" class="btn2" data-done><span><b>DONE</b><small>close, keep edits</small></span></button>
+        <button type="button" class="o-quiet" data-cancel><b>CANCEL</b><small>undo these edits</small></button>
+        ${d.editable === false ? '' : d.confirm
+          ? `<button type="button" class="o-quiet o-dismiss sure" data-dismiss><b>SURE?</b><small>click again to remove ${esc(key)} from repos.yaml</small></button>`
+          : '<button type="button" class="o-quiet o-dismiss" data-dismiss><b>DISMISS</b><small>remove from the roster</small></button>'}`
+    return `<article class="o-edit"><form class="o-form" data-form="${esc(key)}" aria-label="${isNew ? 'New repo' : `Editing ${esc(key)}`}"><div>
+      ${head}${errBox(d.err)}${usage}${body}<div class="o-acts">${acts}</div></div></form></article>`
+  }
+
+  function renderOptions(focus) {
+    if (view !== 'options') return
+    sync()
+    const sum = (k) => allRepos.reduce((n, r) => n + (r.usage?.[k] ?? 0), 0)
+    const quests = sum('quests'), won = sum('won')
+    const tile = (v, label, sub) => `<div class="o-tile"><div><b>${v}</b><span>${label}</span><small>${sub}</small></div></div>`
+    $('board').innerHTML = tile(quests, 'Quests started', `${sum('inPlay')} still in play`) + tile(won, 'Victories', 'merged, pushed or finished')
+      + tile(sum('lost'), 'Game overs', 'dropped, out of tokens or PR closed') + (quests ? tile(`${Math.round(won / quests * 100)}%`, 'Win rate', `${won} of ${quests} started`) : '')
+      + tile(played(sum('monthMs')), 'Time played', 'this month')
+    $('rosterCount').textContent = allRepos.length
+    const rows = [...allRepos].sort(SORTS[sortBy][1]).map((r) => drafts[r.name]?.open ? editForm(r.name, drafts[r.name], r) : rosterRow(r)).join('')
+    $('roster').innerHTML = (rows || '<div class="calm"><p>No repos yet. Recruit the first one.</p></div>')
+      + (drafts[NEW] ? editForm(NEW, drafts[NEW]) : '<button type="button" class="o-recruit" data-recruit><b>+ RECRUIT REPO</b><small>add a repo Claude can work in</small></button>')
+    if (focus) $('optionsView').querySelector(focus)?.focus()
+  }
+  const formSel = (key, inner) => inner.split(',').map((s) => `[data-form="${CSS.escape(key)}"] ${s}`).join(',')
+  const editSel = (key) => key === NEW ? '[data-recruit]' : `[data-edit="${CSS.escape(key)}"]`
+
+  // One repo open at a time; the recruit form stays open beside it.
+  async function openEdit(name) {
+    sync()
+    for (const [k, d] of Object.entries(drafts)) if (k !== NEW) d.open = false
+    if (!drafts[name]) {
+      const res = await fetch('/api/repos/' + encodeURIComponent(name))
+      if (!res.ok) { say(`Couldn't load ${name} (HTTP ${res.status}).`); return }
+      const { fields, hash, editable } = await res.json()
+      drafts[name] = { fields, hash, editable, orig: JSON.stringify(norm(fields)) }
+    }
+    drafts[name].open = true
+    renderOptions(formSel(name, '[name], button'))
+  }
+
+  async function dismiss(name) {
+    const d = drafts[name], sent = fwd(d.hash)
+    const res = await fetch(`/api/repos/${encodeURIComponent(name)}?hash=${sent}`, { method: 'DELETE' })
+    const body = await res.json().catch(() => ({}))
+    d.confirm = false
+    if (!res.ok) { d.err = failure(res.status, body.error, 'NOT DISMISSED'); renderOptions(formSel(name, '[data-cancel]')); return }
+    moved[sent] = body.hash
+    delete drafts[name]
+    await Promise.all([loadRepos(), loadReposYaml()]).catch(() => {})
+    say(`${name} left the party.`)
+    renderOptions('[data-recruit]')
+  }
+
+  const say = (text) => { $('saveMsg').textContent = text }
+
+  // Hashed repo writes first, then the unhashed POST and defaults, stopping at the first
+  // failure so a later write never moves the hash under a draft still waiting to be fixed.
+  async function saveAll() {
+    sync()
+    $('saveAll').disabled = true
+    let stop = null, wrote = 0, rulesErr = ''
+    for (const key of [...Object.keys(drafts).filter((k) => k !== NEW), ...(drafts[NEW] ? [NEW] : [])]) {
+      const d = drafts[key]
+      if (!dirty(key)) { delete drafts[key]; continue }
+      const sent = fwd(d.hash)
+      const res = key === NEW
+        ? await fetch('/api/repos', send('POST', { name: d.name, fields: norm(d.fields) }))
+        : await fetch('/api/repos/' + encodeURIComponent(key), send('PUT', { fields: norm(d.fields), hash: sent }))
+      const body = await res.json().catch(() => ({}))
+      if (!res.ok) { d.open = true; d.err = failure(res.status, body.error); stop = key; break }
+      if (sent) moved[sent] = body.hash
+      delete drafts[key]; wrote++
+    }
+    const changed = (el) => el.value !== el.defaultValue
+    // an emptied box means "leave as is": PUT /api/defaults can't unset a key
+    const patch = Object.fromEntries(DEFAULT_KEYS.filter((k) => changed(rules[k]) && rules[k].value !== '').map((k) => [k, Number(rules[k].value)]))
+    if (stop === null && Object.keys(patch).length) {
+      const res = await fetch('/api/defaults', send('PUT', patch))
+      if (res.ok) wrote++; else rulesErr = (await res.json().catch(() => ({}))).error || 'defaults not saved'
+    }
+    if (changed(rules.binDays) || changed(rules.hallOfFameDays)) {
+      const res = await fetch('/api/settings', send('PUT', { binDays: Number(rules.binDays.value), hallOfFameDays: Number(rules.hallOfFameDays.value) }))
+      if (res.ok) wrote++; else rulesErr ||= (await res.json().catch(() => ({}))).error || 'bin days not saved'
+    }
+    $('rulesMsg').textContent = rulesErr
+    await Promise.all([loadRepos(), ...(rulesErr ? [] : [loadReposYaml(), loadSettings()])]).catch(() => {})
+    $('saveAll').disabled = false
+    say(stop !== null ? `Stopped at ${stop === NEW ? 'the new repo' : stop}: fix it and SAVE again.` : rulesErr ? 'GAME RULES not saved: see above.' : wrote ? 'Saved.' : 'Nothing to save.')
+    renderOptions(stop !== null ? formSel(stop, '.o-err button, [name]') : null)
+    if (wrote) refresh()
+  }
+
+  function openRaw(toggle) {
+    const p = $('raw'), show = !toggle || p.hidden
+    p.hidden = !show
+    $('rawToggle').setAttribute('aria-expanded', String(show))
+    if (show) { p.scrollIntoView({ block: 'start' }); reposYamlText.focus({ preventScroll: true }) }
+  }
+
+  $('sortBar').addEventListener('change', (e) => { sortBy = e.target.value; renderOptions() })
+  $('optionsView').addEventListener('submit', (e) => e.preventDefault())
+  $('optionsView').addEventListener('click', async (e) => {
+    const b = e.target.closest('button'); if (!b) return
+    const key = b.closest('form[data-form]')?.dataset.form, d = drafts[key]
+    if (b.dataset.edit) openEdit(b.dataset.edit)
+    else if ('recruit' in b.dataset) { sync(); drafts[NEW] = { fields: { image: 'sandbox-node' }, name: '', open: true }; renderOptions(formSel(NEW, '[name=name]')) }
+    else if ('done' in b.dataset) { d.open = false; d.confirm = false; renderOptions(editSel(key)) }
+    else if ('cancel' in b.dataset) { delete drafts[key]; renderOptions(editSel(key)) }
+    else if ('dismiss' in b.dataset) { if (d.confirm) dismiss(key); else { d.confirm = true; renderOptions(formSel(key, '[data-dismiss]')) } }
+    else if ('reload' in b.dataset) { delete drafts[key]; openEdit(key) }
+    else if ('raw' in b.dataset) openRaw(b.dataset.raw === 'toggle')
+    else if (b.id === 'saveAll') saveAll()
+    else if (b.id === 'clearNowBtn') {
+      const { archived } = await (await fetch('/api/prune', { method: 'POST' })).json().catch(() => ({}))
+      $('rulesMsg').textContent = archived == null ? 'Sweep failed.' : `Swept ${archived} quest${archived === 1 ? '' : 's'}.`
+      refresh()
+    } else if (b.id === 'saveReposYaml') {
+      const res = await fetch('/api/repos-yaml', send('PUT', { content: reposYamlText.value }))
+      if (!res.ok) { reposYamlMsg.textContent = (await res.json().catch(() => ({}))).error || 'failed to save'; return }
+      flashReposYamlMsg('saved')
+      // repos may have been added, removed, renamed or retagged
+      await Promise.all([loadRepos(), loadReposYaml()])
+      renderOptions()
+    }
+  })
 
   // full-document viewer, opened from the Spec/Findings summaries. It lives outside
   // #tabbody, so the 3s poll re-render doesn't touch it.
@@ -1060,31 +1437,6 @@
   $('tabbody').addEventListener('click', (e) => {
     if (e.target.closest('[data-open-full]')) openViewer(tab, tab === 'Spec' ? threadInfo.spec : threadInfo.findings)
   })
-  $('saveSettings').addEventListener('click', async () => {
-    const res = await fetch('/api/settings', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ binDays: Number(binDaysInput.value), hallOfFameDays: Number(hallOfFameDaysInput.value) }),
-    })
-    if (!res.ok) { flashSettingsMsg((await res.json()).error || 'failed to save'); return }
-    flashSettingsMsg('saved')
-    loadSettings(); refresh()
-  })
-  $('clearNowBtn').addEventListener('click', async () => {
-    await fetch('/api/prune', { method: 'POST' })
-    flashSettingsMsg('cleared')
-    refresh()
-  })
-  $('saveReposYaml').addEventListener('click', async () => {
-    const res = await fetch('/api/repos-yaml', {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ content: reposYamlText.value }),
-    })
-    if (!res.ok) { flashReposYamlMsg((await res.json()).error || 'failed to save'); return }
-    flashReposYamlMsg('saved')
-    // repos may have been added/removed/renamed or retagged
-    loadRepos()
-  })
-
   function renderTabs() {
     $('tabs').innerHTML = selected
       ? tabsFor().map((n) => `<button class="${n === tab ? 'active' : ''}" data-tab="${n}">${n}</button>`).join('') : ''

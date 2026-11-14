@@ -1,12 +1,14 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
-import { taskBranch, createTaskBranch, commitChanges, repoStatus, diffBranch, pushBranch } from '../src/gitops.js'
+import {
+  taskBranch, createTaskBranch, commitChanges, commitStat, repoStatus, diffBranch, pushBranch, saveGitConfig,
+} from '../src/gitops.js'
 
-// a clone-shaped fixture: a bare "origin" + a working clone on branch main
-function fixture(): { repoDir: string; bare: string } {
+// a clone-shaped fixture in the work layout (<root>/work/<id>/<repo>): a bare "origin" + a clone on main
+function fixture(): { repoDir: string; bare: string; root: string } {
   const root = mkdtempSync(join(tmpdir(), 'petree-gitops-'))
   const bare = join(root, 'origin.git')
   execFileSync('git', ['init', '--bare', '-b', 'main', bare])
@@ -16,10 +18,64 @@ function fixture(): { repoDir: string; bare: string } {
   execFileSync('git', ['-C', seed, 'add', '.'])
   execFileSync('git', ['-C', seed, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'base'])
   execFileSync('git', ['-C', seed, 'push', 'origin', 'main'])
-  const repoDir = join(root, 'work')
+  const repoDir = join(root, 'work', 'abc123', 'demo')
+  mkdirSync(join(root, 'work', 'abc123'), { recursive: true })
   execFileSync('git', ['clone', '--branch', 'main', bare, repoDir])
-  return { repoDir, bare }
+  saveGitConfig(repoDir)
+  return { repoDir, bare, root }
 }
+
+describe('an agent-written .git', () => {
+  // Each payload touches its own marker; none may exist after the host's git calls.
+  function arm(root: string, repoDir: string, bare: string) {
+    const markers: Record<string, string> = {}
+    const script = (name: string, body = '') => {
+      markers[name] = join(root, `${name}-ran`)
+      const p = join(root, `${name}.sh`)
+      writeFileSync(p, `#!/bin/sh\ntouch "${markers[name]}"\n${body}`)
+      chmodSync(p, 0o755)
+      return p
+    }
+    const ext = `ext::sh -c touch% ${join(root, 'insteadof-ran')}`
+    markers.insteadOf = join(root, 'insteadof-ran')
+    appendFileSync(join(repoDir, '.git', 'config'), [
+      '[core]', `\tfsmonitor = ${script('fsmonitor')}`, `\tsshCommand = ${script('ssh')}`,
+      '[filter "evil"]', `\tclean = ${script('filter', 'cat\n')}`, '[diff "evil"]', `\ttextconv = ${script('textconv', 'cat "$1"\n')}`,
+      '[diff]', `\texternal = ${script('extdiff')}`,
+      '[gpg]', `\tprogram = ${script('gpg')}`, '[commit]', '\tgpgSign = true',
+      '[protocol "ext"]', '\tallow = always', `[url "${ext}"]`, `\tinsteadOf = ${bare}`, `\tpushInsteadOf = ${bare}`,
+      '',
+    ].join('\n'))
+    mkdirSync(join(repoDir, '.git', 'info'), { recursive: true })
+    writeFileSync(join(repoDir, '.git', 'info', 'attributes'), '* filter=evil diff=evil\n')
+    writeFileSync(join(repoDir, '.gitattributes'), '* filter=evil diff=evil\n')
+    return markers
+  }
+
+  it('runs no agent-configured command during commit, stat, diff or push', () => {
+    const { repoDir, bare, root } = fixture()
+    createTaskBranch(repoDir, 'abc123')
+    const markers = arm(root, repoDir, bare)
+    writeFileSync(join(repoDir, 'README.md'), 'base\nchanged\n')
+    expect(commitChanges(repoDir, 'abc123', 'petree abc123: x')).toBe(true)
+    commitStat(repoDir)
+    expect(diffBranch(repoDir, 'main').patch).toContain('+changed')
+    expect(pushBranch(repoDir, 'abc123', 'petree/abc123', bare).ok).toBe(true)
+    expect(pushBranch(repoDir, 'abc123', 'petree/abc123', 'ssh://127.0.0.1:9/x.git').ok).toBe(false)
+    expect(Object.entries(markers).filter(([, m]) => existsSync(m)).map(([k]) => k)).toEqual([])
+    expect(execFileSync('git', ['-C', bare, 'branch', '--list', 'petree/abc123'], { encoding: 'utf8' })).toContain('petree/abc123')
+  })
+
+  it('refuses a .git that points elsewhere or a work repo without a host copy of its config', () => {
+    const { repoDir } = fixture()
+    const other = fixture().repoDir
+    rmSync(join(repoDir, '.git'), { recursive: true })
+    writeFileSync(join(repoDir, '.git'), `gitdir: ${join(other, '.git')}\n`)
+    expect(() => commitChanges(repoDir, 'abc123', 'x')).toThrow(/not a directory/)
+    rmSync(join(other, '..', '..', '..', 'gitconfig'), { recursive: true })
+    expect(() => commitChanges(other, 'abc123', 'x')).toThrow()
+  })
+})
 
 describe('gitops', () => {
   it('creates the task branch', () => {
@@ -66,11 +122,11 @@ describe('gitops', () => {
   })
 
   it('pushes the branch to a target and refuses git errors gracefully', () => {
-    const { repoDir } = fixture()
+    const { repoDir, bare } = fixture()
     createTaskBranch(repoDir, 'abc123')
     writeFileSync(join(repoDir, 'f.txt'), 'x\n')
     commitChanges(repoDir, 'abc123', 'petree abc123: f')
-    const ok = pushBranch(repoDir, 'abc123', 'petree/abc123')
+    const ok = pushBranch(repoDir, 'abc123', 'petree/abc123', bare)
     expect(ok.ok).toBe(true)
     // the branch now exists on origin
     const refs = execFileSync('git', ['-C', repoDir, 'ls-remote', 'origin', 'petree/abc123'], { encoding: 'utf8' })
@@ -78,11 +134,9 @@ describe('gitops', () => {
   })
 
   it('returns ok:false with output on a push error', () => {
-    const { repoDir } = fixture()
+    const { repoDir, root } = fixture()
     createTaskBranch(repoDir, 'abc123')
-    // remove origin so push fails
-    execFileSync('git', ['-C', repoDir, 'remote', 'remove', 'origin'])
-    const res = pushBranch(repoDir, 'abc123', 'petree/abc123')
+    const res = pushBranch(repoDir, 'abc123', 'petree/abc123', join(root, 'missing.git'))
     expect(res.ok).toBe(false)
     expect(res.output.length).toBeGreaterThan(0)
   })
@@ -92,9 +146,8 @@ describe('gitops', () => {
     createTaskBranch(repoDir, 'abc123')
     writeFileSync(join(repoDir, 'f.txt'), 'x\n')
     commitChanges(repoDir, 'abc123', 'petree abc123: f')
-    // point origin at a URL carrying embedded credentials, like a token-authed remote
-    execFileSync('git', ['-C', repoDir, 'remote', 'set-url', 'origin', 'https://x-access-token:s3cr3t@example.com/org/repo.git'])
-    const res = pushBranch(repoDir, 'abc123', 'petree/abc123')
+    // a configured URL carrying embedded credentials, like a token-authed remote
+    const res = pushBranch(repoDir, 'abc123', 'petree/abc123', 'https://x-access-token:s3cr3t@example.invalid/org/repo.git')
     expect(res.output).not.toContain('s3cr3t')
     expect(res.output).not.toContain('https://')
   })

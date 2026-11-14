@@ -1,4 +1,6 @@
 import { execFile, execFileSync } from 'node:child_process'
+import { copyFileSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
@@ -20,9 +22,36 @@ export async function localCheckout(path: string): Promise<{ unpushed: number; d
   }
 }
 
+// Work repos live at <home>/work/<id>/<repo>; the host keeps each one's clone-time .git/config at
+// <home>/gitconfig/<id>/<repo>, outside the agent's mount.
+const hostConfig = (repoDir: string) =>
+  join(repoDir, '..', '..', '..', 'gitconfig', basename(dirname(repoDir)), basename(repoDir))
+
+export function saveGitConfig(repoDir: string): void {
+  const dest = hostConfig(repoDir)
+  mkdirSync(dirname(dest), { recursive: true })
+  copyFileSync(join(repoDir, '.git', 'config'), dest)
+}
+
+// The agent owns the work repo, .git included, and git config can run commands (filters, gpg, ssh, credential
+// helpers, insteadOf to ext::). So before each call: refuse a symlinked repo or a `.git` file pointing elsewhere,
+// put back the clone-time config, and drop the git-dir files that extend or redirect it.
+function seal(repoDir: string): void {
+  const dotGit = join(repoDir, '.git')
+  for (const p of [repoDir, dotGit]) if (!lstatSync(p).isDirectory()) throw new Error(`${p} is not a directory`)
+  const config = readFileSync(hostConfig(repoDir))
+  for (const p of ['config', 'config.worktree', 'commondir', 'info']) rmSync(join(dotGit, p), { recursive: true, force: true })
+  writeFileSync(join(dotGit, 'config'), config, { flag: 'wx' })
+}
+
+// Belt and braces for what the restored config already drops; no override for ssh/credential settings,
+// which would clobber the user's own global ones.
+const SAFE = ['-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', '-c', 'core.attributesFile=/dev/null',
+  '-c', 'commit.gpgSign=false', '-c', 'protocol.ext.allow=never']
+
 function git(repoDir: string, args: string[], opts: { ident?: boolean } = {}): string {
-  // The agent can write the repo's .git, so neutralise hooks and fsmonitor (both run host commands).
-  const full = ['-C', repoDir, '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', ...(opts.ident ? IDENT : []), ...args]
+  seal(repoDir)
+  const full = ['-C', repoDir, ...SAFE, ...(opts.ident ? IDENT : []), ...args]
   // Node's default maxBuffer (1 MiB) would otherwise throw ENOBUFS on a large diff/patch.
   return execFileSync('git', full, {
     encoding: 'utf8',
@@ -40,7 +69,8 @@ export function createTaskBranch(repoDir: string, taskId: string): void {
 }
 
 export function commitChanges(repoDir: string, taskId: string, message: string): boolean {
-  const status = git(repoDir, ['status', '--porcelain'])
+  // A nested repo would make status spawn git inside it, under that repo's own agent-written config.
+  const status = git(repoDir, ['status', '--porcelain', '--ignore-submodules=all'])
   if (!status.trim()) return false
   git(repoDir, ['add', '-A'])
   git(repoDir, ['commit', '-m', message], { ident: true })
@@ -49,7 +79,7 @@ export function commitChanges(repoDir: string, taskId: string, message: string):
 
 // Files/insertions/deletions of HEAD, from `git show --shortstat`.
 export function commitStat(repoDir: string): { files: number; add: number; del: number } {
-  const out = git(repoDir, ['show', '--shortstat', '--format=', 'HEAD'])
+  const out = git(repoDir, ['show', '--no-ext-diff', '--no-textconv', '--shortstat', '--format=', 'HEAD'])
   const n = (re: RegExp) => Number(re.exec(out)?.[1] ?? 0)
   return { files: n(/(\d+) files? changed/), add: n(/(\d+) insertions?\(\+\)/), del: n(/(\d+) deletions?\(-\)/) }
 }
@@ -82,8 +112,8 @@ export function headSha(repoDir: string): string {
 export function diffBranch(repoDir: string, baseBranch: string): { stat: string; patch: string } {
   const base = `origin/${baseBranch}`
   try {
-    const stat = git(repoDir, ['diff', '--stat', `${base}...HEAD`])
-    const patch = git(repoDir, ['diff', `${base}...HEAD`])
+    const stat = git(repoDir, ['diff', '--no-ext-diff', '--no-textconv', '--stat', `${base}...HEAD`])
+    const patch = git(repoDir, ['diff', '--no-ext-diff', '--no-textconv', `${base}...HEAD`])
     return { stat, patch }
   } catch {
     return { stat: '', patch: '' }
@@ -96,9 +126,10 @@ export function scrubUrls(text: string): string {
   return text.replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, '[url redacted]').replace(/\bgit@\S+/gi, '[url redacted]')
 }
 
-export function pushBranch(repoDir: string, taskId: string, target: string): { ok: boolean; output: string } {
+// Pushes to the configured URL, never to `origin`, whose url/pushurl live in the agent-writable config.
+export function pushBranch(repoDir: string, taskId: string, target: string, url: string): { ok: boolean; output: string } {
   try {
-    const output = git(repoDir, ['push', 'origin', `${taskBranch(taskId)}:${target}`], { ident: true })
+    const output = git(repoDir, ['push', url, `${taskBranch(taskId)}:${target}`], { ident: true })
     return { ok: true, output: scrubUrls(output || `pushed ${taskBranch(taskId)} -> ${target}`) }
   } catch (err) {
     const e = err as { stderr?: Buffer | string; stdout?: Buffer | string; message?: string }

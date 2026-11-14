@@ -124,7 +124,7 @@ export async function openPr(
   create: typeof createPullRequest = createPullRequest,
 ): Promise<{ ok: boolean; output: string; url?: string }> {
   const repoDir = join(cfg.home, 'work', t.id, repo)
-  const pushed = pushBranch(repoDir, t.id, target)
+  const pushed = pushBranch(repoDir, t.id, target, cfg.repos[repo]?.url ?? '')
   if (!pushed.ok) return pushed
   // The branch is on the remote now, whether or not the PR gets created.
   store.setDelivery(t.id, repo, { target, prHead: headSha(repoDir) })

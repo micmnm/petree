@@ -3,7 +3,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { PetreeConfig } from './config.js'
-import { createTaskBranch } from './gitops.js'
+import { createTaskBranch, saveGitConfig } from './gitops.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -26,6 +26,8 @@ export async function prepareWorkspace(cfg: PetreeConfig, repoNames: string[], w
       'git',
       ['clone', '--branch', repo.defaultBranch, repo.url, join(workDir, name)],
     )
+    // Before the agent ever runs: every later host git call restores this copy.
+    saveGitConfig(join(workDir, name))
     createTaskBranch(join(workDir, name), taskId)
   }
 }

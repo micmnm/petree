@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
@@ -27,7 +27,7 @@ function cfgWith(url: string): PetreeConfig {
 describe('prepareWorkspace', () => {
   it('clones named repos into workDir/<name> on a petree task branch', async () => {
     const fixture = makeFixtureRepo()
-    const workDir = join(mkdtempSync(join(tmpdir(), 'petree-work-')), 'w')
+    const workDir = join(mkdtempSync(join(tmpdir(), 'petree-work-')), 'work', 'abc123')
     await prepareWorkspace(cfgWith(`file://${fixture}`), ['demo'], workDir, 'abc123')
     expect(existsSync(join(workDir, 'demo', 'README.md'))).toBe(true)
     const branch = execFileSync('git', ['-C', join(workDir, 'demo'), 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf8' }).trim()
@@ -39,10 +39,18 @@ describe('prepareWorkspace', () => {
     writeFileSync(join(fixture, 'b.txt'), 'b')
     execFileSync('git', ['-C', fixture, 'add', '.'])
     execFileSync('git', ['-C', fixture, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-m', 'second'])
-    const workDir = join(mkdtempSync(join(tmpdir(), 'petree-work-')), 'w')
+    const workDir = join(mkdtempSync(join(tmpdir(), 'petree-work-')), 'work', 'abc123')
     await prepareWorkspace(cfgWith(`file://${fixture}`), ['demo'], workDir, 'abc123')
     const count = execFileSync('git', ['-C', join(workDir, 'demo'), 'rev-list', '--count', 'HEAD'], { encoding: 'utf8' }).trim()
     expect(count).toBe('2')
+  })
+
+  it('keeps a host copy of each clone-time .git/config outside the work dir', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'petree-work-'))
+    const workDir = join(root, 'work', 'abc123')
+    await prepareWorkspace(cfgWith(`file://${makeFixtureRepo()}`), ['demo'], workDir, 'abc123')
+    expect(readFileSync(join(root, 'gitconfig', 'abc123', 'demo'), 'utf8'))
+      .toBe(readFileSync(join(workDir, 'demo', '.git', 'config'), 'utf8'))
   })
 
   it('throws on unknown repo names', async () => {
@@ -51,7 +59,7 @@ describe('prepareWorkspace', () => {
 
   it('skips repos already cloned, preserving branch and commits (requeue)', async () => {
     const fixture = makeFixtureRepo()
-    const workDir = join(mkdtempSync(join(tmpdir(), 'petree-work-')), 'w')
+    const workDir = join(mkdtempSync(join(tmpdir(), 'petree-work-')), 'work', 'abc123')
     const cfg = cfgWith(`file://${fixture}`)
     await prepareWorkspace(cfg, ['demo'], workDir, 'abc123')
     // simulate a first turn: a commit lands on the task branch

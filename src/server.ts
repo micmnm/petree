@@ -36,6 +36,11 @@ function targetOrError(
     res.status(400).json({ error: `unknown repo: ${repo}` })
     return null
   }
+  // A live agent could rewrite .git between the host restoring its config and git reading it.
+  if (t.state === 'running' || t.state === 'provisioning') {
+    res.status(409).json({ error: `cannot ship while ${t.state}` })
+    return null
+  }
   const base = cfg.repos[repo]?.defaultBranch ?? 'main'
   const norm = String(target ?? '').trim().replace(/^refs\/heads\//, '')
   const valid = /^[\w.\-/]+$/.test(norm) && !norm.startsWith('refs/') && norm.toUpperCase() !== 'HEAD' && norm !== base
@@ -321,7 +326,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (!norm) return
     const repoDir = join(cfg.home, 'work', t.id, repo as string)
     if (!existsSync(repoDir)) { res.status(400).json({ error: 'no work dir for task' }); return }
-    const pushed = pushBranch(repoDir, t.id, norm)
+    const pushed = pushBranch(repoDir, t.id, norm, cfg.repos[repo as string]?.url ?? '')
     if (pushed.ok) {
       store.setDelivery(t.id, repo as string, { target: norm, prHead: headSha(repoDir) })
       await pollPrs(store, cfg, t.id)

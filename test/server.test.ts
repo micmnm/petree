@@ -10,6 +10,7 @@ import type { Launcher } from '../src/launcher.js'
 import { TaskStore } from '../src/store.js'
 import { Scheduler } from '../src/scheduler.js'
 import { makeApp } from '../src/server.js'
+import { saveGitConfig } from '../src/gitops.js'
 
 function seedWorkRepo(home: string, taskId: string, repo: string): string {
   const root = mkdtempSync(join(tmpdir(), 'petree-remote-'))
@@ -24,6 +25,8 @@ function seedWorkRepo(home: string, taskId: string, repo: string): string {
   const workDir = join(home, 'work', taskId, repo)
   mkdirSync(join(home, 'work', taskId), { recursive: true })
   execFileSync('git', ['clone', '--branch', 'main', bare, workDir])
+  saveGitConfig(workDir)
+  cfgRepos[repo].url = bare
   execFileSync('git', ['-C', workDir, 'checkout', '-b', `petree/${taskId}`])
   writeFileSync(join(workDir, 'change.txt'), 'x\n')
   execFileSync('git', ['-C', workDir, 'add', '-A'])
@@ -324,6 +327,15 @@ describe('API', () => {
     const res = await post(`/api/tasks/${t.id}/push`, { repo: 'demo', target: `petree/${t.id}` })
     expect((await res.json()).ok).toBe(true)
     expect(store.get(t.id)).toMatchObject({ bin: 'hall-of-fame', binReason: 'pushed · merge not tracked' })
+  })
+
+  it('refuses to push or open a PR while the agent is live', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    seedWorkRepo(home, t.id, 'demo')
+    store.transition(t.id, 'provisioning')
+    for (const route of ['push', 'pr']) {
+      expect((await post(`/api/tasks/${t.id}/${route}`, { repo: 'demo', target: `petree/${t.id}` })).status).toBe(409)
+    }
   })
 
   it('rejects refspec and HEAD tricks that would target the base branch', async () => {

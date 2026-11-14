@@ -481,6 +481,17 @@
   .th-btns .th-q { font-size: 14px; color: var(--muted); }
   [data-act]:disabled { opacity: .6; cursor: wait; }
   .th-go[data-off]:disabled { opacity: .55; cursor: not-allowed; }
+  /* answered recap (interview spec §5.6) */
+  .rc { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .rc li { display: flex; gap: 12px; padding: 12px 0; border-top: 2px dotted var(--line); }
+  .rc li > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .rc-q { margin: 0; font-size: 15px; color: var(--muted); }
+  .rc-a { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.35; }
+  .rc-s { align-self: flex-start; text-transform: uppercase; padding: 2px 7px 1px; font: 20px/1 var(--px); color: var(--label); border: 2px dotted var(--line-strong); }
+  .rc-s.mine { border: 2px solid var(--gold); background: var(--gold-tint); color: var(--gold); }
+  .rc-s.none { border-style: solid; color: var(--need); border-color: var(--need-frame); }
+  .rc-end { margin: 0; padding: 10px 12px; background: var(--inset); font-size: 14px; color: var(--muted); }
+  .rc-end b { font: 400 20px/1 var(--px); color: var(--ink); margin-right: 6px; }
   /* THE PARTY ASKS (interview spec §5.1b) */
   .ask { display: flex; flex-direction: column; }
   .ask-round { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background-color: var(--inset); background-image: var(--tex); border-left: 4px solid var(--need-frame); }
@@ -1427,10 +1438,23 @@
       ? `<code>${esc(shown.path)}${shown.stage !== t.stage ? ` · from ${thLv[shown.stage]}` : ''} · ${thNum(thWords(shown.md))} words</code>` : ''}</div>
       <div class="frame doc"><div>${banner}${shown?.md ? thBlock('doc:' + shown.stage, shown.name, shown.path, shown.md)
         : questing ? '' : `<p class="th-none">No ${head.name.toLowerCase()} for this turn.</p>`}</div></div>`
-    const old = docs.slice(0, shown?.md ? docs.indexOf(shown) : at).filter((d) => d.md).map((d) =>
-      `<details class="th-det" data-old="${d.stage}"${thOldOpen.has(d.stage) ? ' open' : ''}><summary><b>${d.name} · ${thLv[d.stage]}</b><small>${esc(thFirst(d.md))}</small></summary>
-        <div class="th-det-body">${thBlock('doc:' + d.stage, d.name, d.path, d.md)}</div></details>`).join('')
+    const rec = (stage) => (thInfo.interview ?? []).filter((r) => r.stage === stage).map(irHtml).join('')
+    const old = rec(head.stage) + docs.slice(0, shown?.md ? docs.indexOf(shown) : at).map((d) => (d.md
+      ? `<details class="th-det" data-old="${d.stage}"${thOldOpen.has(d.stage) ? ' open' : ''}><summary><b>${d.name} · ${thLv[d.stage]}</b><small>${esc(thFirst(d.md))}</small></summary>
+        <div class="th-det-body">${thBlock('doc:' + d.stage, d.name, d.path, d.md)}</div></details>` : '') + rec(d.stage)).join('')
     return [now, old]
+  }
+
+  // ---- answered recap (interview spec §5.6): one collapsed block per answered round ----
+  function irHtml(r) {
+    const key = `ir:${r.stage}:${r.round}`, n = r.recap.filter((x) => x.answer !== null).length
+    const how = [r.how === 'guesses' && 'accepted the guesses', r.final && 'written now'].filter(Boolean).join(' · ')
+    const tag = (x) => x.answer === null ? '<span class="rc-s none">you left it to the agent</span>'
+      : x.kept ? '<span class="rc-s">guess kept</span>'
+      : `<span class="rc-s mine">${x.guess === null ? 'answered' : `changed · your guess: ${esc(x.guess)}`}</span>`
+    return `<details class="th-det" data-old="${key}"${thOldOpen.has(key) ? ' open' : ''}><summary><b>${thLv[r.stage]} · ROUND ${r.round}</b><span class="th-k">${n} ANSWER${n === 1 ? '' : 'S'} · ${r.changed} CHANGED</span>${how ? `<small>${how}</small>` : ''}</summary>
+      <div class="th-det-body">${r.round > 1 && r.whyMore ? `<p class="rc-end"><b>WHY MORE</b>${esc(r.whyMore)}</p>` : ''}<ol class="rc">${r.questions.map((q, i) => `
+        <li><span class="ask-n">Q${i + 1}</span><div><p class="rc-q">${esc(q.q)}</p><p class="rc-a">${esc(r.recap[i].answer ?? 'no answer')}</p>${tag(r.recap[i])}</div></li>`).join('')}</ol></div></details>`
   }
 
   // ---- THE PARTY ASKS: the questionnaire form (interview spec §5.1b–c) ----
@@ -1678,6 +1702,14 @@
     t.turns.forEach((r, i) => {
       const n = all[i + 1], note = n.prompt.trim()
       notes(r.endedAt, r.stage)
+      const iv = r.interview
+      if (iv) {
+        const got = Object.values(iv.answers).filter((a) => a !== null).length
+        add('agent', thLv[r.stage], `Questions asked · round ${iv.round}`, 'agent', `${iv.questions.length} question${iv.questions.length === 1 ? '' : 's'}.`)
+        add('you', thLv[r.stage], iv.final ? 'Wrote it now' : iv.how === 'guesses' ? 'Accepted the guesses' : `Answered · ${got} answer${got === 1 ? '' : 's'}, ${iv.changed} changed`,
+          'by you', note.split('## Note from the user\n\n')[1] ?? '', r.endedAt)
+        return
+      }
       add('agent', thLv[r.stage], r.result ? qsReady[r.stage] : 'Turn ended', 'agent', r.result ?? 'No result recorded.', null, r.result && `TURN ${i + 1} RESULT`)
       add('you', thLv[n.stage], n.stage !== r.stage ? `Approved, on to ${thLv[n.stage]}` : `Sent back to ${thLv[n.stage]}`,
         t.autoPlay && !note ? 'AUTO-PLAY' : 'by you', note || 'No note.', r.endedAt, note && `TURN ${i + 2} PROMPT`)

@@ -838,7 +838,9 @@ describe('questionnaire API (interview spec §5.5)', () => {
     expect(body.prompt).toContain('## Note from the user\n\ncap it at 2 minutes')
     expect(body.prompt).toContain('queued note')
     expect(body.turns[0].interview).toMatchObject({ stage: 'spec', round: 1, how: 'answered', final: false, changed: 2, answers: { scope: 'all', owner: true } })
-    expect((await thread(t.id)).interview).toHaveLength(1)
+    const sent = (await thread(t.id)).interview
+    expect(sent).toHaveLength(1)
+    expect(sent[0].recap[0]).toEqual({ answer: 'All', kept: false, guess: 'Idempotent only' })
     expect((await post(`/api/tasks/${t.id}/next`, { answers: { scope: 'all', owner: true } })).status).toBe(409)
   })
 
@@ -851,6 +853,7 @@ describe('questionnaire API (interview spec §5.5)', () => {
     const body = await res.json()
     expect(body.turns[0].interview).toMatchObject({ final: true, answers: { scope: 'idem', owner: null } })
     expect(body.prompt).toContain('The user pressed WRITE IT NOW')
+    expect((await thread(t.id)).interview[0].recap[1]).toMatchObject({ answer: null, kept: false })
   })
 
   it('400s an invalid answer or a stage move, 409s without a questionnaire', async () => {

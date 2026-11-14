@@ -214,6 +214,21 @@ export function answerText(q: Question, a: Answer): string {
   return 'picks' in a ? [...a.picks.map(label), other(a.other)].join(', ') : other(a.other)
 }
 
+// The record plus its answers as the thread page's recap shows them; a null answer is "left to the agent".
+export function recap(r: InterviewRecord) {
+  return {
+    ...r,
+    recap: r.questions.map((q) => {
+      const a = r.answers[q.id]
+      return {
+        answer: a === null ? null : answerText(q, a),
+        kept: a !== null && sameAnswer(a, q.guess),
+        guess: q.guess === null ? null : answerText(q, q.guess),
+      }
+    }),
+  }
+}
+
 const DOC: Record<Stage, string> = { investigate: 'findings', spec: 'spec', build: 'build' }
 
 // The structured note the next turn starts with (spec §5.5).

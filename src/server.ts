@@ -9,7 +9,7 @@ import { openPr, pollPrs } from './prs.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
-import { answerRecord, renderAnswers, waitingQuestions } from './interview.js'
+import { answerRecord, recap, renderAnswers, waitingQuestions } from './interview.js'
 import { acceptNote, dropSuggestion, listSuggestions, NoteInputError, readThreadFile, readThreadStatus } from './notes.js'
 import { pickImage } from './sandbox.js'
 import { nowPlaying, questStats, readSlice, sliceStats } from './stats.js'
@@ -471,7 +471,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       suggestions: listSuggestions(join(cfg.home, 'notes'), workDir, t.repos),
       questions: waiting.asked,
       questionsError: waiting.error,
-      interview: t.turns.flatMap((x) => x.interview ?? []),
+      interview: t.turns.flatMap((x) => x.interview ?? []).map(recap),
     })
   })
 

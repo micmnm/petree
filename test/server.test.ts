@@ -48,6 +48,11 @@ beforeEach(async () => {
     repos: {
       demo: { url: 'x', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: ['npm start'], skills: [], tags: [], defaultModel: null },
       odd: { url: 'x', defaultBranch: 'main', image: 'custom-img', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null },
+      github1: { url: 'git@github.com:org/repo1.git', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null },
+      github2: { url: 'https://github.com/org/repo2', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null },
+      azure1: { url: 'https://dev.azure.com/org/project/_git/repo1', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null },
+      azure2: { url: 'https://org.visualstudio.com/project/_git/repo2', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null },
+      unknown: { url: 'file:///tmp/repo', defaultBranch: 'main', image: 'sandbox-node', instructions: '', setup: [], build: [], test: [], run: [], skills: [], tags: [], defaultModel: null },
     },
     allowClone: [],
   }
@@ -86,6 +91,83 @@ describe('API', () => {
       body: JSON.stringify({ prompt: 'x', repos: ['nope'] }),
     })
     expect(res.status).toBe(400)
+  })
+
+  it('accepts single-host thread with GitHub repos only', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'test', repos: ['github1'] }),
+    })
+    expect(res.status).toBe(201)
+    const task = await res.json()
+    expect(task.repos).toEqual(['github1'])
+  })
+
+  it('accepts single-host thread with Azure repos only', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'test', repos: ['azure1'] }),
+    })
+    expect(res.status).toBe(201)
+    const task = await res.json()
+    expect(task.repos).toEqual(['azure1'])
+  })
+
+  it('rejects thread mixing GitHub and Azure repos', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'test', repos: ['github1', 'azure1'] }),
+    })
+    expect(res.status).toBe(400)
+    const error = await res.json()
+    expect(error.error).toBe('cannot mix GitHub and Azure repos in one thread')
+  })
+
+  it('accepts thread with multiple GitHub repos', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'test', repos: ['github1', 'github2'] }),
+    })
+    expect(res.status).toBe(201)
+    const task = await res.json()
+    expect(task.repos).toEqual(['github1', 'github2'])
+  })
+
+  it('accepts thread with multiple Azure repos', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'test', repos: ['azure1', 'azure2'] }),
+    })
+    expect(res.status).toBe(201)
+    const task = await res.json()
+    expect(task.repos).toEqual(['azure1', 'azure2'])
+  })
+
+  it('accepts thread with unknown-host repos (backward compatibility)', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'test', repos: ['unknown'] }),
+    })
+    expect(res.status).toBe(201)
+    const task = await res.json()
+    expect(task.repos).toEqual(['unknown'])
+  })
+
+  it('accepts thread with GitHub and unknown-host repos', async () => {
+    const res = await fetch(`${base}/api/tasks`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ prompt: 'test', repos: ['github1', 'unknown'] }),
+    })
+    expect(res.status).toBe(201)
+    const task = await res.json()
+    expect(task.repos).toEqual(['github1', 'unknown'])
   })
 
   it('serves task logs as text', async () => {

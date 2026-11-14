@@ -184,3 +184,66 @@ describe('cardFor progress', () => {
       .toEqual(['done', 'current', 'todo', 'todo', 'todo'])
   })
 })
+
+describe('prLabel with multi-host repos', () => {
+  const cfgMultiHost = {
+    home: '/h',
+    defaults: { timeoutMinutes: 30, tokenBudget: 1, concurrency: 1, defaultModel: null, instructions: '' },
+    repos: {
+      github: { tags: [], url: 'https://github.com/org/repo.git' },
+      azure: { tags: [], url: 'https://dev.azure.com/org/project/_git/repo' },
+      github2: { tags: [], url: 'https://github.com/org/repo2.git' },
+    },
+    allowClone: [],
+  } as unknown as PetreeConfig
+
+  const built = (delivery: TaskRecord['delivery']) => task({ stage: 'build', state: 'done', delivery, repos: Object.keys(delivery) as any })
+
+  it('single-host task shows label unchanged', () => {
+    const d = { github: { ahead: 1, head: 'a' } }
+    const c = cardFor(built(d), null, cfgMultiHost)
+    expect(c.action?.label).toBe('Open the PR')
+  })
+
+  it('multi-host task with different hosts shows combined hosts in label', () => {
+    const d = {
+      github: { ahead: 1, head: 'a' },
+      azure: { ahead: 1, head: 'b' },
+    }
+    const c = cardFor(built(d), null, cfgMultiHost)
+    expect(c.action?.label).toBe('Open the PR (azure+github)')
+  })
+
+  it('multi-host task with all GitHub repos shows label unchanged', () => {
+    const d = {
+      github: { ahead: 1, head: 'a' },
+      github2: { ahead: 1, head: 'b' },
+    }
+    const c = cardFor(built(d), null, cfgMultiHost)
+    expect(c.action?.label).toBe('Open the PR')
+  })
+
+  it('multi-host for "Merge PR" label appends combined hosts', () => {
+    const gh = 'https://github.com/org/repo/pull/1'
+    const az = 'https://dev.azure.com/org/project/_git/repo/pullrequest/2'
+    const d = {
+      github: { ahead: 1, head: 'a', url: gh, number: 1, pr: 'open' as const, prHead: 'a' },
+      azure: { ahead: 1, head: 'b', url: az, number: 2, pr: 'open' as const, prHead: 'b' },
+    }
+    const c = cardFor(built(d), null, cfgMultiHost)
+    expect(c.action?.label).toBe('Merge PR #1 on (azure+github)')
+  })
+
+  it('multi-host for "Push the update" label appends combined hosts', () => {
+    const gh = 'https://github.com/org/repo/pull/1'
+    const az = 'https://dev.azure.com/org/project/_git/repo/pullrequest/2'
+    const d = {
+      github: { ahead: 1, head: 'a', url: gh, number: 1, pr: 'open' as const, prHead: 'a', target: 'feat' },
+      azure: { ahead: 1, head: 'b', url: az, number: 2, pr: 'open' as const, prHead: 'b', target: 'feat' },
+    }
+    const c = cardFor(built(d), null, cfgMultiHost)
+    // When there's a stale PR (prHead !== head), it uses "Push the update" label
+    const c2 = cardFor(built({ ...d, github: { ...d.github, head: 'c' } } as any), null, cfgMultiHost)
+    expect(c2.action?.label).toBe('Push the update to PR #1 (azure+github)')
+  })
+})

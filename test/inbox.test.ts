@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { PetreeConfig } from '../src/config.js'
 import { cardFor } from '../src/inbox.js'
+import type { Questionnaire } from '../src/interview.js'
 import type { ThreadStatus } from '../src/notes.js'
 import type { TaskRecord } from '../src/store.js'
 
@@ -70,6 +71,31 @@ describe('cardFor', () => {
     expect(cardFor(binned, status, cfg)).toMatchObject({ q: 21, group: 'game-over', reason: 'out of tokens', line: 'out of tokens', action: null })
     const hof = task({ state: 'done', stage: 'build', bin: 'hall-of-fame', binReason: 'merged · PR #7' })
     expect(cardFor(hof, null, cfg)).toMatchObject({ group: 'hall-of-fame', reason: 'merged · PR #7', action: null })
+  })
+
+  it('says Preparing questions while an ask-phase turn runs', () => {
+    const now = new Date('2026-01-01T00:03:00Z')
+    const t = task({ state: 'running', stage: 'spec', interview: true, startedAt: '2026-01-01T00:00:00Z' })
+    expect(cardFor(t, null, cfg, now)).toMatchObject({ line: 'Preparing questions · PLAN · 3m', group: 'questing' })
+    expect(cardFor({ ...t, interview: false }, null, cfg, now).line).toBe('Running PLAN · 3m')
+    expect(cardFor({ ...t, stage: 'build' }, null, cfg, now).line).toBe('Running CRAFT · 3m')
+  })
+
+  it('carries the first question, its guess and allGuessed in card.ask', () => {
+    const asked: Questionnaire = {
+      round: 2, intro: '', whyMore: '', outlook: null, dropped: [],
+      questions: [
+        { id: 'a', kind: 'choice', q: 'Which?', why: '', options: [{ id: 'x', label: 'Ex' }, { id: 'y', label: 'Why' }], guess: 'y' },
+        { id: 'b', kind: 'yesno', q: 'Sure?', why: '', guess: null },
+      ],
+    }
+    const w = task({ stage: 'spec' })
+    expect(cardFor(w, null, cfg, undefined, asked).ask).toEqual({ round: 2, count: 2, first: { q: 'Which?', guess: 'Why' }, allGuessed: false })
+    const all = { ...asked, questions: [asked.questions[0]] }
+    expect(cardFor(w, null, cfg, undefined, all).ask).toMatchObject({ count: 1, allGuessed: true })
+    expect(cardFor(w, null, cfg, undefined, { ...all, questions: [{ ...all.questions[0], guess: null }] }).ask?.first.guess).toBeNull()
+    expect(cardFor(w, null, cfg).ask).toBeNull()
+    expect(cardFor({ ...w, bin: 'game-over' }, null, cfg, undefined, asked).ask).toBeNull()
   })
 
   it('finished build: Reply only when the agent asks something', () => {

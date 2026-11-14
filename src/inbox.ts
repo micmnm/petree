@@ -1,4 +1,5 @@
 import type { PetreeConfig } from './config.js'
+import { answerText, interviewPhase } from './interview.js'
 import type { Questionnaire } from './interview.js'
 import type { ThreadStatus } from './notes.js'
 import { prHost } from './prs.js'
@@ -17,6 +18,8 @@ export interface Card {
   group: Group
   action: { label: string; detail: string | null } | null
   reason?: string
+  // The waiting questionnaire's first question; allGuessed gates ACCEPT GUESSES (the server 400s on a null guess).
+  ask: { round: number; count: number; first: { q: string; guess: string | null }; allGuessed: boolean } | null
   progress: ProgressStep[]
   repos: { name: string; tags: string[] }[]
   prs: { repo: string; url: string; pr: Delivery['pr']; number?: number }[]
@@ -75,6 +78,7 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
   let group: Group = 'questing'
   let action: Card['action'] = null
   let reason: string | undefined
+  let ask: Card['ask'] = null
   const detail = status?.needsYou ?? null
   const deliveries = Object.values(task.delivery)
   const openPr = deliveries.find((d) => d.pr === 'open')
@@ -82,7 +86,7 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
   switch (task.state) {
     case 'queued': line = 'Queued'; break
     case 'provisioning': line = 'Preparing workspace'; break
-    case 'running': line = `Running ${level} · ${mins}m`; break
+    case 'running': line = interviewPhase(task).kind === 'ask' ? `Preparing questions · ${level} · ${mins}m` : `Running ${level} · ${mins}m`; break
     case 'paused-rate-limit': line = 'Waiting out a rate limit'; break
     case 'paused-limit': line = 'Out of tokens'; break
     case 'cancelled':
@@ -103,6 +107,9 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
         const n = asked.questions.length, what = `${n} question${n === 1 ? '' : 's'} before the ${task.stage === 'spec' ? 'spec' : 'findings'}`
         line = `${what}${asked.round > 1 ? ` · round ${asked.round}` : ''}`
         action = { label: `Answer ${what}`, detail }
+        const [first] = asked.questions
+        ask = { round: asked.round, count: n, first: { q: first.q, guess: first.guess === null ? null : answerText(first, first.guess) },
+          allGuessed: asked.questions.every((q) => q.guess !== null) }
       } else if (task.state === 'waiting-for-you') {
         action = { label: `Read the ${task.stage === 'spec' ? 'spec' : 'findings'}, then approve or comment`, detail }
       } else if (prLabel(task, cfg)) {
@@ -118,6 +125,7 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
   if (task.bin) {
     group = task.bin
     action = null
+    ask = null
     reason = task.binReason ?? undefined
     line = reason ?? line
   }
@@ -129,6 +137,7 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
     line,
     group,
     action,
+    ask,
     ...(reason && { reason }),
     progress: progressFor(task),
     repos: task.repos.map((name) => ({ name, tags: cfg.repos[name]?.tags ?? [] })),

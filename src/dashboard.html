@@ -140,6 +140,30 @@
   .np { display: flex; align-items: baseline; gap: 10px; min-width: 0; margin: 0; }
   .np b { flex: none; font: 400 20px/1 var(--px); color: var(--go); }
   .np span { min-width: 0; font: 14px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* The link lives inside .cart-in: clip-path makes .cart-frame and .cart-in stacking contexts,
+     so a link outside them would sit above every button in the card. */
+  .cart.need .cart-in { position: relative; }
+  .cart-link { position: absolute; inset: 0; z-index: 1; }
+  .cart-link:focus-visible { outline-offset: -3px; }
+  .ask-c { align-self: stretch; display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 2px dotted var(--need-frame); }
+  .ask-cq { margin: 0; display: flex; align-items: flex-start; gap: 8px; font-size: 15px; font-weight: 700; line-height: 1.35; }
+  .ask-cq span:last-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ask-cq .ask-n { min-width: 32px; height: 24px; background: var(--screen); font-size: 20px; }
+  .ask-cq .ask-r { flex: none; padding: 2px 6px 1px; background: var(--ink); color: var(--screen); font: 400 20px/1 var(--px); }
+  .ask-cg { margin: 0; font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ask-cg b { font: 400 20px/1 var(--px); color: var(--need); }
+  .ask-cf { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+  .ask-more { font: 20px/1 var(--px); color: var(--label); }
+  .ask-acc { position: relative; z-index: 2; }
+  .ask-acc > span { min-height: 44px; padding: 5px 12px 5px 10px; }
+  .ask-acc b { font-size: 20px; line-height: 1; }
+  .ask-acc.armed { background: var(--need-frame); }
+  .ask-acc.armed > span { position: relative; overflow: hidden; background: var(--need); color: var(--screen); }
+  .ask-tick { position: absolute; left: 0; bottom: 0; height: 4px; width: 100%; background: var(--screen); transform-origin: left; transform: scaleX(0); }
+  .ask-acc.armed.counting .ask-tick { animation: tick 4s linear forwards; }
+  @keyframes tick { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  .ask-acc.sent { background: var(--go-fill); }
+  .ask-acc.sent > span { background: var(--go-tint); color: var(--go); }
 
   /* Level track (§4.3) */
   .prog { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
@@ -1222,18 +1246,71 @@
 
   function card(t) {
     const c = t.card, need = c.group === 'your-move'
+    const ask = need && c.ask
     const move = need
       ? `<div class="ym"><span class="ym-tag">${PLAY}YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
-          <span class="ym-act">${esc(c.action?.label ?? c.line)}</span>${c.action?.detail ? `<span class="ym-det">${esc(c.action.detail)}</span>` : ''}</div>`
+          <span class="ym-act">${esc(c.action?.label ?? c.line)}</span>${c.action?.detail ? `<span class="ym-det">${esc(c.action.detail)}</span>` : ''}${ask ? icAsk(t, ask) : ''}</div>`
       : `<div class="qs"><span class="qs-tag">QUESTING…<span class="cursor hollow" aria-hidden="true"></span></span>${t.state === 'running' ? npTrail : ''}
           <span class="qs-time">${t.state === 'running' && t.startedAt ? elapsed(t.startedAt) : esc(c.line.toUpperCase())}</span></div>`
-    return `<a class="cart ${need ? 'need' : 'run'}" href="#/t/${encodeURIComponent(t.id)}" data-key="${esc(t.id)}"><div class="cart-frame"><div class="cart-in">
+    // A card holding a button is a div around a stretched link: a button inside an anchor is invalid.
+    const tag = ask ? 'div' : 'a', href = `#/t/${encodeURIComponent(t.id)}`
+    return `<${tag} class="cart ${need ? 'need' : 'run'}"${ask ? '' : ` href="${href}" data-key="${esc(t.id)}"`}><div class="cart-frame"><div class="cart-in">
+      ${ask ? `<a class="cart-link" href="${href}" data-key="${esc(t.id)}" aria-label="${esc(`${qnum(c.q)}, ${c.topic}: open the questionnaire`)}"></a>` : ''}
       <div class="c-top">${emblemHtml(t)}<span class="c-id"><span class="q">${qnum(c.q)}</span><span class="c-meta">${esc(t.repos.join(', '))} · ${age(t.updatedAt)}</span></span>
         <h3 class="c-title">${esc(c.topic)}</h3><p class="c-sum">${esc(c.summary)}</p></div>
       ${move}${progress(c)}
       <div class="c-foot">${chips(c.repos)}<span class="age">${age(t.updatedAt)}</span></div>
-      <div class="strip" aria-hidden="true"></div></div></div></a>`
+      <div class="strip" aria-hidden="true"></div></div></div></${tag}>`
   }
+
+  // First question, its guess and the two-tap ACCEPT GUESSES; the button needs every question guessed.
+  const icAsk = (t, a) => `<div class="ask-c">
+    <p class="ask-cq">${a.round > 1 ? `<span class="ask-r">R${a.round}</span>` : ''}<span class="ask-n">Q1</span><span>${esc(a.first.q)}</span></p>
+    <p class="ask-cg">${a.first.guess === null ? '<b>NEEDS YOUR ANSWER</b>' : `<b>GUESS ▸</b> ${esc(a.first.guess)}`}</p>
+    <div class="ask-cf"><span class="ask-more">${a.count > 1 ? `+${a.count - 1} MORE` : ''}</span>${a.allGuessed
+      ? `<button type="button" class="btn2 ask-acc" data-ic-accept="${esc(t.id)}" data-n="${a.count}" data-key="ic:${esc(t.id)}"><span><b>ACCEPT GUESSES</b><small>${icIdle(a.count)}</small><i class="ask-tick" aria-hidden="true"></i></span></button>` : ''}</div>
+    <p class="nq-err" role="alert"></p></div>`
+  const icIdle = (n) => `sends all ${n} · two taps`
+  let icArm = null // the armed button; the 3 s poll leaves the inbox alone while it is set
+
+  function icDisarm() {
+    if (!icArm) return
+    const { b, timer } = icArm
+    clearTimeout(timer); icArm = null
+    icSet(b, 'ACCEPT GUESSES', icIdle(b.dataset.n), '')
+  }
+  function icSet(b, word, small, cls) {
+    b.classList.remove('armed', 'counting', 'sent')
+    if (cls) b.classList.add(...cls.split(' '))
+    b.querySelector('b').textContent = word; b.querySelector('small').textContent = small
+  }
+  $('inbox').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-ic-accept]'); if (!b) return
+    if (icArm?.b !== b) {
+      icDisarm()
+      icSet(b, `SURE? ${b.dataset.n} GUESSES ▶`, 'tap again within 4 s', 'armed')
+      void b.offsetWidth // restart the countdown bar
+      b.classList.add('counting')
+      icArm = { b, timer: setTimeout(icDisarm, 4000) }
+      return
+    }
+    clearTimeout(icArm.timer); icArm = null
+    const err = b.closest('.ask-c').querySelector('.nq-err')
+    err.textContent = ''
+    icSet(b, 'SENT', 'card moves to QUESTING', 'sent'); b.disabled = true
+    try {
+      const res = await fetch('/api/tasks/' + encodeURIComponent(b.dataset.icAccept) + '/next', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ answers: 'guesses' }),
+      })
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `failed (${res.status})`)
+      refresh()
+    } catch (x) {
+      err.textContent = x.message; b.disabled = false
+      icSet(b, 'ACCEPT GUESSES', icIdle(b.dataset.n), '')
+    }
+  })
+  $('inbox').addEventListener('focusout', (e) => { if (icArm?.b === e.target) icDisarm() })
+  $('inbox').addEventListener('keydown', (e) => { if (e.key === 'Escape') icDisarm() })
 
   const trophy = (t) => `<a class="trophy" href="#/t/${encodeURIComponent(t.id)}" data-key="${esc(t.id)}">${TROPHY}${emblemHtml(t)}
     <span class="tr-txt"><span class="tr-top"><span class="victory">VICTORY!</span>${qnum(t.card.q)}</span>
@@ -1268,7 +1345,7 @@
   }
 
   function renderInbox() {
-    if (!tasks) return
+    if (!tasks || icArm) return
     const tags = [...new Set(allRepos.flatMap((r) => r.tags || []))].sort()
     if (reposLoaded && filter && !tags.includes(filter)) filter = ''
     $('tagBar').hidden = !tags.length

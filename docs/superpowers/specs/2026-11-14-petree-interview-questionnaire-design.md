@@ -355,6 +355,14 @@ If nothing is worth asking, do not write questions.json: write the spec now, fol
 the normal instructions: <today's STAGE_INSTRUCTIONS[stage]>
 ```
 
+**PLAN after a SCOUT interview** (decided 2026-11-14): the SCOUT questionnaire is the main
+interview. When this thread already has answered SCOUT rounds, PLAN's round-1 prompt adds
+"The SCOUT answers above already settled the scope. Ask only what writing the plan newly
+raised; if nothing did, write the spec now." So the usual path is SCOUT questions → findings
+→ PLAN writes the spec straight away → you review the plan at the normal spec gate. PLAN
+still interviews in full when SCOUT was skipped (the quest started at PLAN) or SCOUT had no
+questionnaire.
+
 For SCOUT, step 1 reads "Explore the repos and the question first; do not modify any repo
 files", and the document is the findings.
 
@@ -836,7 +844,11 @@ New: `GET /api/claude-home`. Unchanged: everything else.
 | N5 | Cost of many rounds | **No cap** beyond the round header for now. |
 | N6 | Unresolved `@imports` | **Accept, with a hint** in GAME RULES. |
 
-### 11.3 Open
+### 11.3 Decided (2026-11-14, last round)
+
+- **PLAN after SCOUT**: PLAN asks only what writing the plan newly raised; usually it writes the
+  spec straight away for review (§5.4).
+- **S1 → (a), no strict.** The user keeps the MCP allowlist restrictive.
 
 - **S1. Pass `--strict-mcp-config` too?** It would make `claude.mcp.json` the only MCP source.
   It would also drop the MCP servers of allowlisted plugins (and claude.ai connectors), which
@@ -856,9 +868,12 @@ New: `GET /api/claude-home`. Unchanged: everything else.
   for part of that.
 - **No hard cap on rounds**: an over-eager agent can keep asking. Each round costs a resumed
   turn, and only the user's WRITE IT NOW stops it (decision N5).
-- **INTERVIEW on by default + AUTO-PLAY stops at questionnaires**: every AUTO-PLAY quest now
-  stops at least twice (SCOUT and PLAN) before CRAFT, unless INTERVIEW is switched off. That
-  breaks "no stops until the PR" for anyone who forgets to switch it off.
+- **INTERVIEW on by default + AUTO-PLAY stops at questionnaires**: every AUTO-PLAY quest stops
+  at the SCOUT questionnaire. PLAN usually doesn't ask again after an answered SCOUT round
+  (§5.4), so one stop is the common case; PLAN still stops if writing the plan raises new
+  questions.
+- **MCP secrets readable by the agent**: accepted; the user keeps the MCP allowlist
+  restrictive. No `--strict-mcp-config` (§11.3 S1 decided: off).
 - **Whole plugins**: their hooks run in every turn of the thread. A persona hook changes the
   agent's style; a Stop hook can loop until the timeout (decision N3). MCP servers may try the
   network. With N2, `superpowers` is on by default, and its SessionStart hook comes with it.

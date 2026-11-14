@@ -138,6 +138,8 @@ describe('buildSandboxCommands — LM Studio', () => {
     const cmd = cmds.create
     expect(cmd.join(' ')).toContain('ANTHROPIC_BASE_URL=http://host.docker.internal:1234')
     expect(cmd.join(' ')).toContain('ANTHROPIC_AUTH_TOKEN=lm-studio')
+    expect(cmd.join(' ')).toContain('CLAUDE_CODE_MAX_CONTEXT_TOKENS=65536')
+    expect(cmd.join(' ')).toContain('CLAUDE_CODE_EFFORT_LEVEL=unset')
     expect(cmd.join(' ')).not.toContain('CLAUDE_CODE_OAUTH_TOKEN')
     expect(cmd).toContain('--model')
     expect(cmd[cmd.indexOf('--model') + 1]).toBe('qwen2.5-coder-7b')

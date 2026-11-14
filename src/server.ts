@@ -228,8 +228,9 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     try {
       const r = await fetch(`${lmStudioBaseUrl}/api/v1/models`, { signal: AbortSignal.timeout(5000) })
       if (!r.ok) throw new Error(`status ${r.status}`)
-      const body = (await r.json()) as { data?: Array<{ id: string }> }
-      res.json({ reachable: true, models: body.data ?? [] })
+      // LM Studio's native list, not the OpenAI /v1/models shape; embedding models can't drive a quest.
+      const body = (await r.json()) as { models?: Array<{ key: string; type: string }> }
+      res.json({ reachable: true, models: (body.models ?? []).filter((m) => m.type === 'llm').map((m) => ({ id: m.key })) })
     } catch {
       res.json({ reachable: false, models: [] })
     }

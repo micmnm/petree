@@ -8,7 +8,7 @@ import { waitingQuestions } from './interview.js'
 import { readThreadStatus } from './notes.js'
 import { openPr } from './prs.js'
 import { CliRunner } from './runner.js'
-import { buildSandboxCommands, readToken, type SandboxCommands } from './sandbox.js'
+import { buildSandboxCommands, LM_CONTEXT, readToken, type SandboxCommands } from './sandbox.js'
 import { readSlice, sliceStats, type TurnStats } from './stats.js'
 import { isLmStudioModel, lmStudioModelId, threadTitle, type TaskRecord, type TaskStore } from './store.js'
 
@@ -29,36 +29,41 @@ export function defaultBuildCommands(task: TaskRecord, cfg: PetreeConfig, store:
   return buildSandboxCommands(task, cfg, workDir, readToken(cfg.home))
 }
 
-// LM Studio's REST docs don't expose a separate "is it actually loaded yet"
-// status field, so the load POST itself is treated as blocking-until-ready —
-// a deliberate simplification to revisit against a real server later.
+type LmModel = { key: string; loaded_instances?: Array<{ id: string; config?: { context_length?: number } }> }
+
+// Every load POST adds another instance, and requests by key go to the instance whose id is the bare key.
+// So: reuse that instance when its context is big enough; otherwise evict the key's instances and load one at LM_CONTEXT.
+// The load POST blocks until the model is ready.
 export async function defaultLoadLmStudioModel(baseUrl: string, modelId: string): Promise<void> {
   const signal = AbortSignal.timeout(120_000)
-  try {
-    const res = await fetch(`${baseUrl}/api/v1/models`, { signal })
-    if (!res.ok) throw new Error(`status ${res.status}`)
-  } catch (err) {
-    throw new Error(`LM Studio unreachable at ${baseUrl}: ${err instanceof Error ? err.message : String(err)}`)
+  const call = async (path: string, body?: object) => {
+    const res = await fetch(`${baseUrl}${path}`, body
+      ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal }
+      : { signal })
+    const text = await res.text()
+    if (!res.ok) throw new Error(lmError(text) ?? `status ${res.status} ${text}`.trim())
+    return text
   }
+  let models: LmModel[]
+  try {
+    models = (JSON.parse(await call('/api/v1/models')) as { models?: LmModel[] }).models ?? []
+  } catch (err) {
+    throw new Error(`LM Studio unreachable at ${baseUrl}: ${msg(err)}`)
+  }
+  const instances = models.find((m) => m.key === modelId)?.loaded_instances ?? []
+  if ((instances.find((i) => i.id === modelId)?.config?.context_length ?? 0) >= LM_CONTEXT) return
+  try {
+    for (const i of instances) await call('/api/v1/models/unload', { instance_id: i.id })
+    await call('/api/v1/models/load', { model: modelId, context_length: LM_CONTEXT })
+  } catch (err) {
+    throw new Error(`loading model "${modelId}" in LM Studio failed: ${msg(err)}`)
+  }
+}
 
-  let res: Response
-  try {
-    res = await fetch(`${baseUrl}/api/v1/models/load`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ model: modelId }),
-      signal,
-    })
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error(`loading model "${modelId}" in LM Studio timed out after 120s`)
-    }
-    throw new Error(`loading model "${modelId}" in LM Studio failed: ${err instanceof Error ? err.message : String(err)}`)
-  }
-  if (!res.ok) {
-    const body = await res.text().catch(() => '')
-    throw new Error(`loading model "${modelId}" in LM Studio failed: status ${res.status} ${body}`.trim())
-  }
+const msg = (err: unknown) => (err instanceof Error ? err.message : String(err))
+// LM Studio errors arrive as {"error":{"message":…}}; the message is the useful part.
+const lmError = (text: string): string | undefined => {
+  try { return (JSON.parse(text) as { error?: { message?: string } }).error?.message } catch { return undefined }
 }
 
 export interface Launcher {

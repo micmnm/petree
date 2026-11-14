@@ -2,7 +2,8 @@ import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { Server } from 'node:http'
+import { createServer, type Server } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import Database from 'better-sqlite3'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { PetreeConfig } from '../src/config.js'
@@ -383,6 +384,21 @@ describe('API', () => {
     expect(models).toEqual({ reachable: false, models: [] })
     const health = await (await fetch(`${base}/api/lmstudio/health`)).json()
     expect(health).toEqual({ reachable: false })
+  })
+
+  it('GET /api/lmstudio/models lists LM Studio chat models by key', async () => {
+    const lm = createServer((_req, res) => {
+      res.setHeader('content-type', 'application/json')
+      res.end(JSON.stringify({ models: [{ type: 'llm', key: 'qwen/qwen3.8-27b' }, { type: 'embedding', key: 'nomic' }] }))
+    })
+    await new Promise<void>((r) => lm.listen(0, '127.0.0.1', r))
+    const url = `http://127.0.0.1:${(lm.address() as AddressInfo).port}`
+    try {
+      const models = await (await fetch(`${base}/api/lmstudio/models?baseUrl=${encodeURIComponent(url)}`)).json()
+      expect(models).toEqual({ reachable: true, models: [{ id: 'qwen/qwen3.8-27b' }] })
+    } finally {
+      lm.close()
+    }
   })
 
   it('returns a per-repo diff with a review command', async () => {

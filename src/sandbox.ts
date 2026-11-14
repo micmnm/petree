@@ -43,6 +43,9 @@ export interface SandboxCommands {
   inspect: string[]
 }
 
+// The context petree loads LM Studio models with; Claude Code's system prompt and tools alone run ~25k tokens.
+export const LM_CONTEXT = 65_536
+
 // Rewrites a host-facing LM Studio base URL so a container can reach it on
 // macOS + Docker Desktop, where host.docker.internal always resolves without
 // any extra `docker run` flag (e.g. --add-host is not needed here).
@@ -69,8 +72,13 @@ export function buildSandboxCommands(
   if (useLmStudio && !lmStudioBaseUrl) {
     throw new Error(`task model "${task.model}" needs an LM Studio base URL, but none is configured`)
   }
+  // Claude Code assumes 200k for a model id it doesn't know and never compacts before LM Studio's
+  // smaller window fills; past it LM Studio silently truncates the prompt and the model emits junk.
   const authEnv = useLmStudio
-    ? ['-e', `ANTHROPIC_BASE_URL=${hostDockerInternalUrl(lmStudioBaseUrl as string)}`, '-e', 'ANTHROPIC_AUTH_TOKEN=lm-studio']
+    ? ['-e', `ANTHROPIC_BASE_URL=${hostDockerInternalUrl(lmStudioBaseUrl as string)}`, '-e', 'ANTHROPIC_AUTH_TOKEN=lm-studio',
+        '-e', `CLAUDE_CODE_MAX_CONTEXT_TOKENS=${LM_CONTEXT}`,
+        // Send no effort level, so the model's reasoning setting in LM Studio applies instead of Claude Code's `high`.
+        '-e', 'CLAUDE_CODE_EFFORT_LEVEL=unset']
     : ['-e', `CLAUDE_CODE_OAUTH_TOKEN=${oauthToken}`]
   const modelArg = useLmStudio ? lmStudioModelId(task.model as string) : task.model
   const create = [

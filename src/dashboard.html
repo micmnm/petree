@@ -864,6 +864,11 @@
   .o-h3 { margin: 0; font: 400 30px/1 var(--px); }
   .o-k { font: 400 20px/1 var(--px); color: var(--label); }
   .o-help, .o-msg { font-size: 13px; line-height: 1.45; color: var(--muted); }
+  /* LOAD MODELS verdict: a lit pixel lamp, green ready / gold empty / pink no signal */
+  .o-lamp { --c: var(--go); display: inline-flex; align-items: center; gap: 8px; font: 400 20px/1 var(--px); color: var(--c); }
+  .o-lamp::before { content: ''; width: 12px; height: 12px; background: var(--c); box-shadow: 0 0 8px var(--c); }
+  .o-lamp[data-lamp=empty] { --c: var(--gold); }
+  .o-lamp[data-lamp=off] { --c: var(--need); }
   .o-sub { display: flex; flex-direction: column; gap: 12px; }
   .o-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 10px; }
   .o-tile { padding: 2px; background: var(--line); clip-path: var(--step); }
@@ -1178,6 +1183,7 @@
     <div class="o-acts">
       <button type="button" class="btn2" id="clearNowBtn"><span><b>SWEEP NOW</b><small>clear bins past these days</small></span></button>
       <button type="button" class="btn2" id="lmLoadBtn"><span><b>LOAD MODELS</b><small>ask LM Studio what it has</small></span></button>
+      <span class="o-lamp" id="lmLamp" role="status" hidden></span>
       <span class="o-msg" id="rulesMsg" role="status"></span>
     </div>
     <div class="cl" id="chBox"></div>
@@ -2827,9 +2833,14 @@
       // Asks the URL as typed, saved or not; the tier boxes then suggest what it lists.
       const url = rules.lmStudioBaseUrl.value.trim()
       if (!url) { $('rulesMsg').textContent = 'Set the LM Studio URL first.'; return }
+      const lamp = $('lmLamp')
+      lamp.hidden = false; lamp.dataset.lamp = 'empty'; lamp.textContent = 'CALLING…'
       const r = await fetch('/api/lmstudio/models?baseUrl=' + encodeURIComponent(url)).then((x) => x.json()).catch(() => ({}))
+      const n = r.models?.length ?? 0
       $('lmModels').innerHTML = (r.models ?? []).map((m) => `<option value="${esc(m.id)}">`).join('')
-      $('rulesMsg').textContent = r.error ?? (r.reachable ? `LM Studio has ${r.models.length} model${r.models.length === 1 ? '' : 's'}: pick one per class.` : 'LM Studio not reachable at that URL.')
+      lamp.dataset.lamp = !r.reachable ? 'off' : n ? 'ready' : 'empty'
+      lamp.textContent = !r.reachable ? 'NO SIGNAL' : n ? `READY · ${n} MODEL${n === 1 ? '' : 'S'}` : 'NO MODELS'
+      $('rulesMsg').textContent = r.error ?? (!r.reachable ? 'LM Studio not reachable at that URL.' : n ? 'Pick one per class, then SAVE.' : 'LM Studio is up but has no chat models downloaded.')
     } else if (b.id === 'saveReposYaml') {
       const res = await fetch('/api/repos-yaml', send('PUT', { content: reposYamlText.value }))
       if (!res.ok) { reposYamlMsg.textContent = (await res.json().catch(() => ({}))).error || 'failed to save'; return }

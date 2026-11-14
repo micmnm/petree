@@ -22,9 +22,11 @@ export async function prepareWorkspace(cfg: PetreeConfig, repoNames: string[], w
     // their clone on the petree/<taskId> branch with prior commits — reuse it.
     if (existsSync(join(workDir, name))) continue
     const repo = cfg.repos[name]
+    // Submodules are fetched here with the host's credentials: the sandbox has none,
+    // so a setup-time `git submodule update --init` can't reach private submodules.
     await execFileAsync(
       'git',
-      ['clone', '--branch', repo.defaultBranch, repo.url, join(workDir, name)],
+      ['-c', 'protocol.ext.allow=never', 'clone', '--recurse-submodules', '--branch', repo.defaultBranch, repo.url, join(workDir, name)],
     )
     // Before the agent ever runs: every later host git call restores this copy.
     saveGitConfig(join(workDir, name))

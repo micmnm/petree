@@ -39,6 +39,7 @@ export interface InterviewRecord {
   round: number
   questions: Question[]
   answers: Record<string, Answer | null> // null = "no answer — decide yourself" (WRITE IT NOW only)
+  comments?: Record<string, string> // optional per-question nuance; absent on older records
   how: 'answered' | 'guesses'
   final: boolean
   changed: number
@@ -179,12 +180,22 @@ const sameAnswer = (a: Answer, guess: Question['guess']) =>
   Array.isArray(a) && Array.isArray(guess) ? [...a].sort().join('\n') === [...guess].sort().join('\n') : a === guess
 
 // Checks the answers against the re-read questionnaire (spec §5.5 step 3); a string is the 400 message.
-export function answerRecord(asked: Questionnaire, stage: Stage, answers: unknown, final: boolean): InterviewRecord | string {
+export function answerRecord(asked: Questionnaire, stage: Stage, answers: unknown, final: boolean, rawComments?: unknown): InterviewRecord | string {
   const guesses = answers === 'guesses'
   const given = guesses ? {} : obj(answers)
   if (!given) return "answers must be an object or 'guesses'"
   const unknown = Object.keys(given).find((id) => !asked.questions.some((q) => q.id === id))
   if (unknown) return `unknown question: ${unknown.slice(0, 40)}`
+  const comments: Record<string, string> = {}
+  if (rawComments !== undefined) {
+    const given = obj(rawComments)
+    if (!given) return 'comments must be an object'
+    for (const [id, c] of Object.entries(given)) {
+      if (!asked.questions.some((q) => q.id === id)) return `unknown question in comments: ${id.slice(0, 40)}`
+      if (typeof c !== 'string' || c.length > 500) return `comment for ${id}: a string of at most 500 characters`
+      if (c.trim()) comments[id] = c.trim()
+    }
+  }
   const out: Record<string, Answer | null> = {}
   let changed = 0
   for (const [i, q] of asked.questions.entries()) {
@@ -198,8 +209,8 @@ export function answerRecord(asked: Questionnaire, stage: Stage, answers: unknow
     else return `Q${i + 1} has no guess: answer it first`
   }
   return {
-    stage, round: asked.round, questions: asked.questions, answers: out, how: guesses ? 'guesses' : 'answered',
-    final, changed, whyMore: asked.whyMore, outlook: asked.outlook,
+    stage, round: asked.round, questions: asked.questions, answers: out, ...(Object.keys(comments).length && { comments }),
+    how: guesses ? 'guesses' : 'answered', final, changed, whyMore: asked.whyMore, outlook: asked.outlook,
   }
 }
 
@@ -226,6 +237,7 @@ export function recap(r: InterviewRecord) {
         answer: a === null ? null : answerText(q, a),
         kept: a !== null && sameAnswer(a, q.guess),
         guess: q.guess === null ? null : answerText(q, q.guess),
+        comment: r.comments?.[q.id] ?? null,
       }
     }),
   }
@@ -250,6 +262,8 @@ export function renderAnswers(r: InterviewRecord, note: string): string {
     lines.push(`${i + 1}. [${q.id}] ${q.q}`)
     if (text.includes('\n')) lines.push(`   Answer${tag}:`, ...text.split('\n').map((l) => `      ${l}`))
     else lines.push(`   Answer: ${text}${tag}`)
+    const comment = r.comments?.[q.id]
+    if (comment) lines.push(`   Your comment: ${comment}`)
   })
   if (r.final) lines.push('', `The user pressed WRITE IT NOW: do not ask more questions. Write the ${DOC[r.stage]}.`)
   if (note.trim()) lines.push('', '## Note from the user', '', note.trim())

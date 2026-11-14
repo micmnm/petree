@@ -243,6 +243,29 @@ The user pressed WRITE IT NOW: do not ask more questions. Write the spec.
 Also cap total retry time at 2 minutes.`)
   })
 
+  it('puts a comment on its own line under the answer', () => {
+    const asked = parsed(withQs([FILE.questions[2], FILE.questions[3]]))
+    const r = answerRecord(asked, 'spec', 'guesses', false, { 'on-429': ' A, but only for GET ', attempts: '' }) as InterviewRecord
+    expect(r.comments).toEqual({ 'on-429': 'A, but only for GET' })
+    expect(renderAnswers(r, '')).toBe(`## Answers to your questions (PLAN, round 1)
+
+The user accepted all your guesses.
+
+1. [on-429] Honour Retry-After?
+   Answer: yes — guess kept
+   Your comment: A, but only for GET
+2. [attempts] How many attempts?
+   Answer: 3 attempts — guess kept`)
+    expect(recap(r).recap.map((x) => x.comment)).toEqual(['A, but only for GET', null])
+  })
+
+  it('400s comments for an unknown question, a non-string, or over 500 chars', () => {
+    const asked = parsed(FILE)
+    expect(answerRecord(asked, 'spec', 'guesses', false, { bogus: 'x' })).toBe('unknown question in comments: bogus')
+    expect(answerRecord(asked, 'spec', 'guesses', false, { scope: 1 })).toMatch(/^comment for scope/)
+    expect(answerRecord(asked, 'spec', 'guesses', false, { scope: 'x'.repeat(501) })).toMatch(/^comment for scope/)
+  })
+
   it("uses the accepted-guesses header and leaves out the final line and an empty note", () => {
     const r = answerRecord(parsed(withQs([FILE.questions[2]])), 'investigate', 'guesses', false) as InterviewRecord
     expect(renderAnswers(r, ' ')).toBe(`## Answers to your questions (SCOUT, round 1)

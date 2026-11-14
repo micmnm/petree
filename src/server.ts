@@ -431,8 +431,8 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
     if (t.bin) { res.status(409).json({ error: 'restore first' }); return }
-    const { prompt = '', model, stage, answers, final } = (req.body ?? {}) as
-      { prompt?: string; model?: string; stage?: Stage; answers?: unknown; final?: unknown }
+    const { prompt = '', model, stage, answers, comments, final } = (req.body ?? {}) as
+      { prompt?: string; model?: string; stage?: Stage; answers?: unknown; comments?: unknown; final?: unknown }
     if (typeof prompt !== 'string') {
       res.status(400).json({ error: 'prompt must be a string' })
       return
@@ -465,7 +465,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       if (!asked) { res.status(409).json({ error: 'no questions waiting' }); return }
       if (stage !== undefined && stage !== t.stage) { res.status(400).json({ error: 'answers cannot move the stage' }); return }
       if (final !== undefined && typeof final !== 'boolean') { res.status(400).json({ error: 'final must be a boolean' }); return }
-      const record = answerRecord(asked, t.stage, answers, final === true)
+      const record = answerRecord(asked, t.stage, answers, final === true, comments)
       if (typeof record === 'string') { res.status(400).json({ error: record }); return }
       res.json(store.followUp(t.id, renderAnswers(record, prompt), effectiveModel, t.stage, record))
       void scheduler.tick()

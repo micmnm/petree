@@ -840,7 +840,7 @@ describe('questionnaire API (interview spec §5.5)', () => {
     expect(body.turns[0].interview).toMatchObject({ stage: 'spec', round: 1, how: 'answered', final: false, changed: 2, answers: { scope: 'all', owner: true } })
     const sent = (await thread(t.id)).interview
     expect(sent).toHaveLength(1)
-    expect(sent[0].recap[0]).toEqual({ answer: 'All', kept: false, guess: 'Idempotent only' })
+    expect(sent[0].recap[0]).toEqual({ answer: 'All', kept: false, guess: 'Idempotent only', comment: null })
     expect((await post(`/api/tasks/${t.id}/next`, { answers: { scope: 'all', owner: true } })).status).toBe(409)
   })
 
@@ -854,6 +854,26 @@ describe('questionnaire API (interview spec §5.5)', () => {
     expect(body.turns[0].interview).toMatchObject({ final: true, answers: { scope: 'idem', owner: null } })
     expect(body.prompt).toContain('The user pressed WRITE IT NOW')
     expect((await thread(t.id)).interview[0].recap[1]).toMatchObject({ answer: null, kept: false })
+  })
+
+  it('accepts comments with guesses or final, trims and drops empty ones, and 400s bad ones', async () => {
+    const t = asking()
+    const bad = (comments: unknown) => post(`/api/tasks/${t.id}/next`, { answers: { owner: true }, comments })
+    const unknown = await bad({ nope: 'x' })
+    expect([unknown.status, (await unknown.json()).error]).toEqual([400, 'unknown question in comments: nope'])
+    expect((await bad({ scope: 5 })).status).toBe(400)
+    expect((await bad({ scope: 'x'.repeat(501) })).status).toBe(400)
+    expect((await bad(['x'])).status).toBe(400)
+    const res = await post(`/api/tasks/${t.id}/next`, { answers: { owner: true }, comments: { scope: '  but only GET ', owner: '  ' } })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.turns[0].interview.comments).toEqual({ scope: 'but only GET' })
+    expect(body.prompt).toContain('   Your comment: but only GET')
+    expect((await thread(t.id)).interview[0].recap.map((r: { comment: string | null }) => r.comment)).toEqual(['but only GET', null])
+    const g = asking(JSON.stringify({ questions: [{ id: 'scope', kind: 'choice', q: 'Which?', options: [{ id: 'idem', label: 'Idem' }, { id: 'all', label: 'All' }], guess: 'idem' }] }))
+    const ok = await post(`/api/tasks/${g.id}/next`, { answers: 'guesses', comments: { scope: 'A, but only for GET' } })
+    expect(ok.status).toBe(200)
+    expect((await ok.json()).turns[0].interview).toMatchObject({ how: 'guesses', comments: { scope: 'A, but only for GET' } })
   })
 
   it('400s an invalid answer or a stage move, 409s without a questionnaire', async () => {

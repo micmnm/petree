@@ -533,6 +533,7 @@
   .rc-s { align-self: flex-start; text-transform: uppercase; padding: 2px 7px 1px; font: 20px/1 var(--px); color: var(--label); border: 2px dotted var(--line-strong); }
   .rc-s.mine { border: 2px solid var(--gold); background: var(--gold-tint); color: var(--gold); }
   .rc-s.none { border-style: solid; color: var(--need); border-color: var(--need-frame); }
+  .iqc-lbl { margin-right: 6px; font: 400 20px/1 var(--px); color: var(--label); }
   .rc-end { margin: 0; padding: 10px 12px; background: var(--inset); font-size: 14px; color: var(--muted); }
   .rc-end b { font: 400 20px/1 var(--px); color: var(--ink); margin-right: 6px; }
   /* THE PARTY ASKS (interview spec §5.1b) */
@@ -568,7 +569,10 @@
   .ask-yn { font: 400 30px/.9 var(--px); }
   .ask-was { margin-top: 4px; padding: 1px 6px; border: 2px dotted var(--line-strong); font: normal 20px/1 var(--px); color: var(--label); }
   :checked + .pk-f .ask-was { border-color: var(--gold); color: var(--gold); }
-  .ask-other { display: none; width: 100%; min-height: 44px; padding: 8px 12px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 15px var(--sans); }
+  .iqc-add { align-self: flex-start; min-height: 32px; font-size: 13px; }
+  .ask-q.iqc-open .iqc-add { display: none; }
+  .ask-q.iqc-open .iqc-in { display: block; }
+  .iqc-in, .ask-other { display: none; width: 100%; min-height: 44px; padding: 8px 12px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 15px var(--sans); }
   .ask-q:has(input[value="*"]:checked) .ask-other { display: block; }
   .ask-num { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 15px; color: var(--muted); }
   .ask-num input { width: 120px; min-height: 48px; padding: 8px 12px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 400 30px/1 var(--px); }
@@ -1571,7 +1575,8 @@
       : `<span class="rc-s mine">${x.guess === null ? 'answered' : `changed · your guess: ${esc(x.guess)}`}</span>`
     return `<details class="th-det" data-old="${key}"${thOldOpen.has(key) ? ' open' : ''}><summary><b>${thLv[r.stage]} · ROUND ${r.round}</b><span class="th-k">${n} ANSWER${n === 1 ? '' : 'S'} · ${r.changed} CHANGED</span>${how ? `<small>${how}</small>` : ''}</summary>
       <div class="th-det-body">${r.round > 1 && r.whyMore ? `<p class="rc-end"><b>WHY MORE</b>${esc(r.whyMore)}</p>` : ''}<ol class="rc">${r.questions.map((q, i) => `
-        <li><span class="ask-n">Q${i + 1}</span><div><p class="rc-q">${esc(q.q)}</p><p class="rc-a">${esc(r.recap[i].answer ?? 'no answer')}</p>${tag(r.recap[i])}</div></li>`).join('')}</ol></div></details>`
+        <li><span class="ask-n">Q${i + 1}</span><div><p class="rc-q">${esc(q.q)}</p><p class="rc-a">${esc(r.recap[i].answer ?? 'no answer')}</p>${tag(r.recap[i])}${r.recap[i].comment
+          ? `<p class="rc-q"><b class="iqc-lbl">COMMENT</b>${esc(r.recap[i].comment)}</p>` : ''}</div></li>`).join('')}</ol></div></details>`
   }
 
   // ---- THE PARTY ASKS: the questionnaire form (interview spec §5.1b–c) ----
@@ -1580,6 +1585,9 @@
   let iqKey = '', iqDraft = {}, iqHtml = ''
   const iqQs = () => thInfo.questions?.questions ?? []
   const iqHas = (q) => Object.hasOwn(iqDraft, q.id)
+  // Comments ride in iqDraft under '#<id>' (question ids can't contain '#'), so they never count as "changed".
+  const iqcOf = (q) => iqDraft['#' + q.id] ?? ''
+  const iqcMap = () => Object.fromEntries(iqQs().filter(iqcOf).map((q) => [q.id, iqcOf(q)]))
   const iqTag = (q) => iqHas(q) ? 'YOURS' : q.guess === null ? 'NEEDS AN ANSWER' : 'GUESS'
   // An emptied field reads as undefined: the guess stands (or the question still needs an answer).
   const iqSame = (q, a) => a === undefined || (Array.isArray(a) && Array.isArray(q.guess)
@@ -1601,11 +1609,12 @@
         `<span class="ask-ol">${esc(o.label)}</span>${was([q.guess].flat().includes(o.id))}`)).join('')}${q.allowOther
         ? tile(type, name, '*', !!a?.other, '<span class="ask-ol">Other…</span><small>say it in your own words</small>') : ''}</div>${q.allowOther
         ? `<input class="ask-other" type="text" maxlength="500" value="${esc(a?.other ?? '')}" data-key="${name}:other" aria-label="Your own answer to Q${i + 1}" placeholder="your own answer">` : ''}`
-    return `<div class="ask-q${iqHas(q) ? ' mine' : q.guess === null ? ' needs' : ''}" role="group" aria-labelledby="${h}" data-q="${esc(q.id)}">
+    return `<div class="ask-q${iqHas(q) ? ' mine' : q.guess === null ? ' needs' : ''}${iqcOf(q) ? ' iqc-open' : ''}" role="group" aria-labelledby="${h}" data-q="${esc(q.id)}">
       <div class="ask-qh"><span class="ask-n">Q${i + 1}</span><h3 class="ask-qt" id="${h}">${esc(q.q)}</h3><span class="ask-tag">${iqTag(q)}</span></div>
       ${q.why ? `<p class="ask-why"><b>WHY</b>${esc(q.why)}</p>` : ''}
       <div class="ask-body">${body}<div class="ask-foot">${q.kind === 'multi' ? '<span>pick any</span>' : ''}${q.guess !== null
-        ? `<button type="button" class="th-link ask-reset" data-iq-reset data-key="${name}:reset">reset to guess</button>` : ''}</div></div></div>`
+        ? `<button type="button" class="th-link ask-reset" data-iq-reset data-key="${name}:reset">reset to guess</button>` : ''}<button type="button" class="th-link ask-reset iqc-add" data-iqc-add data-key="${name}:cm">+ add a comment</button></div>
+        <input class="iqc-in" type="text" maxlength="500" value="${esc(iqcOf(q))}" data-key="${name}:comment" aria-label="Comment on Q${i + 1}" placeholder="a comment (optional)"></div></div>`
   }
 
   function iqForm(a) {
@@ -1645,6 +1654,8 @@
     if (!q || !thTask) return
     const a = iqRead(el, q)
     if (iqSame(q, a)) delete iqDraft[q.id]; else iqDraft[q.id] = a
+    const cm = el.querySelector('.iqc-in').value.trim()
+    if (cm) iqDraft['#' + q.id] = cm; else delete iqDraft['#' + q.id]
     localStorage.setItem(iqKey, JSON.stringify(iqDraft))
     el.classList.toggle('mine', iqHas(q))
     el.classList.toggle('needs', !iqHas(q) && q.guess === null)
@@ -1678,9 +1689,10 @@
     // A waiting questionnaire (interview spec §5.1b): answer, WRITE IT NOW or GAME OVER only.
     if (t.state === 'waiting-for-you' && thInfo.questions) {
       const qs = iqQs(), changed = qs.filter(iqHas).length, need = qs.findIndex((q) => q.guess === null && !iqHas(q))
+      const cn = Object.keys(iqcMap()).length, cs = cn ? `${cn} comment${cn === 1 ? '' : 's'}` : ''
       return {
-        primary: B('ask', `${changed ? 'SEND ANSWERS' : 'ACCEPT ALL GUESSES'}${PLAY}`,
-          need >= 0 ? `answer Q${need + 1} first` : `${changed ? `${changed} changed` : 'nothing changed'} · send`, { off: need >= 0 }),
+        primary: B('ask', `${changed || cn ? 'SEND ANSWERS' : 'ACCEPT ALL GUESSES'}${PLAY}`,
+          need >= 0 ? `answer Q${need + 1} first` : `${[changed ? `${changed} changed` : !cn && 'nothing changed', cs].filter(Boolean).join(' · ')} · send`, { off: need >= 0 }),
         quiet: [B('final', 'WRITE IT NOW', 'no more questions · use these answers'), over],
         help: 'Optional. It goes under your answers, whichever button you press.',
       }
@@ -1821,9 +1833,9 @@
       notes(r.endedAt, r.stage)
       const iv = r.interview
       if (iv) {
-        const got = Object.values(iv.answers ?? {}).filter((a) => a !== null).length, nq = iv.questions?.length ?? 0
+        const got = Object.values(iv.answers ?? {}).filter((a) => a !== null).length, nq = iv.questions?.length ?? 0, ncm = Object.keys(iv.comments ?? {}).length
         add('agent', thLv[r.stage], `Questions asked · round ${iv.round}`, 'agent', `${nq} question${nq === 1 ? '' : 's'}.`)
-        add('you', thLv[r.stage], iv.final ? 'Wrote it now' : iv.how === 'guesses' ? 'Accepted the guesses' : `Answered · ${got} answer${got === 1 ? '' : 's'}, ${iv.changed} changed`,
+        add('you', thLv[r.stage], iv.final ? 'Wrote it now' : iv.how === 'guesses' ? 'Accepted the guesses' : `Answered · ${got} answer${got === 1 ? '' : 's'}, ${iv.changed} changed${ncm ? ` · ${ncm} comment${ncm === 1 ? '' : 's'}` : ''}`,
           'by you', note.split('## Note from the user\n\n')[1] ?? '', r.endedAt)
         return
       }
@@ -1988,7 +2000,11 @@
     else localStorage.removeItem(thDraftKey())
   })
   $('thDoc').addEventListener('input', (e) => { const q = e.target.closest('.ask-q'); if (q) iqSync(q) })
-  $('thDoc').addEventListener('click', (e) => { const r = e.target.closest('[data-iq-reset]'); if (r) iqReset(r.closest('.ask-q')) })
+  $('thDoc').addEventListener('click', (e) => {
+    const r = e.target.closest('[data-iq-reset]'), c = e.target.closest('[data-iqc-add]')
+    if (r) iqReset(r.closest('.ask-q'))
+    if (c) { const q = c.closest('.ask-q'); q.classList.add('iqc-open'); q.querySelector('.iqc-in').focus() }
+  })
 
   async function thAct(b) {
     const t = thTask, act = b.dataset.act, note = thNote.value.trim()
@@ -2018,7 +2034,7 @@
         setText(err, res.filter((r) => !r.ok).map((r) => `${r.repo}: ${String(r.output || r.error || 'failed').trim().split('\n').slice(-2).join(' ')}`).join('\n'))
         $('thOut').innerHTML = res.filter((r) => r.ok).map((r) => `${esc(r.repo)}: ${thUrl(r.url)
           ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">PR opened ↗</a>` : act === 'pr' ? 'pushed' : 'update pushed'}`).join(' · ')
-      } else if (ask) await post('next', { prompt: note, answers: iqPayload(act === 'final'), ...(act === 'final' && { final: true }) })
+      } else if (ask) await post('next', { prompt: note, answers: iqPayload(act === 'final'), ...(Object.keys(iqcMap()).length && { comments: iqcMap() }), ...(act === 'final' && { final: true }) })
       else if (withNote && act !== 'queue') await post('next', { prompt: note, ...(b.dataset.stage && { stage: b.dataset.stage }) })
       else if (act === 'queue') await post('comments', { text: note })
       else await post(act) // resume, stop, drop, done, restore

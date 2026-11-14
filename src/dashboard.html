@@ -484,6 +484,25 @@
   .md code { padding: 0 4px; background: var(--screen); border: 1px solid var(--line); font: 14px var(--mono); }
   .md pre { margin: 0 0 12px; padding: 12px 16px; background: var(--screen); border-left: 4px solid var(--line-strong); font: 14px/1.55 var(--mono); white-space: pre-wrap; overflow-x: auto; }
   .md pre code { padding: 0; border: 0; background: none; }
+  .md h4, .md h5, .md h6 { margin: 14px 0 4px; line-height: 1.3; font-size: 16px; }
+  .md h5 { font-size: 15px; } .md h6 { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .md ul ul, .md ol ol, .md ul ol, .md ol ul { margin: 4px 0 0; }
+  .md li { margin: 2px 0; }
+  .md li > p { margin: 0 0 6px; }
+  .md li.md-task { list-style: none; margin-left: -18px; }
+  .md li.md-task input { margin: 0 6px 0 0; vertical-align: -1px; accent-color: var(--ink); }
+  .md blockquote { margin: 0 0 12px; padding: 2px 0 2px 14px; border-left: 4px solid var(--line-strong); color: var(--muted); }
+  .md blockquote > :last-child { margin-bottom: 0; }
+  .md hr { max-width: 680px; margin: 18px 0; border: 0; border-top: 2px solid var(--line-strong); }
+  .md del { color: var(--muted); }
+  .md a { color: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 2px; text-decoration-color: var(--line-strong); }
+  .md a:hover { text-decoration-color: currentColor; }
+  .md .md-table { max-width: 100%; margin: 0 0 12px; overflow-x: auto; }
+  .md table { border-collapse: collapse; font-size: 15px; line-height: 1.45; }
+  .md th, .md td { padding: 6px 12px; border: 1px solid var(--line); text-align: left; vertical-align: top; overflow-wrap: normal; }
+  .md th { background: var(--inset); font-weight: 700; border-color: var(--line-strong); white-space: nowrap; }
+  .md tbody tr:nth-child(even) td { background: var(--inset); }
+  .md .md-center { text-align: center; } .md .md-right { text-align: right; }
   .th-pre { margin: 0; font: 13px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
   .th-move .cart-in { gap: 12px; padding: 22px 26px 24px; }
   .th-note { display: flex; flex-direction: column; gap: 12px; }
@@ -719,6 +738,8 @@
     .clamp { max-height: 200px; }
     .md-box { padding: 16px 18px 20px; }
     .md { font-size: 16px; }
+    .md table { font-size: 14px; }
+    .md th, .md td { padding: 5px 9px; }
     .th-det > summary { gap: 2px 10px; padding: 6px 14px; }
     .th-det > summary b { font-size: 20px; }
     .th-det-body { padding: 0 14px 14px; }

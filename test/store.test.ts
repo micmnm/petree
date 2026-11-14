@@ -3,7 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, beforeEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { TaskStore, canMoveStage, threadTitle, RESUMABLE_STATES, FOLLOWUP_STATES } from '../src/store.js'
+import {
+  TaskStore, canMoveStage, threadTitle, RESUMABLE_STATES, FOLLOWUP_STATES,
+  isLmStudioModel, lmStudioModelId,
+} from '../src/store.js'
 
 let store: TaskStore
 beforeEach(() => {
@@ -72,6 +75,40 @@ describe('TaskStore', () => {
     store.create(input)
     expect(store.countByState('queued')).toBe(2)
     expect(store.nextQueued()?.id).toBe(a.id)
+  })
+
+  it('nextQueued with skipLocalModel skips queued lmstudio: tasks but still finds a cloud one', () => {
+    const local = store.create({ ...input, model: 'lmstudio:big-model' })
+    const cloud = store.create({ ...input, model: 'haiku' })
+    expect(store.nextQueued(new Date(), { skipLocalModel: true })?.id).toBe(cloud.id)
+    expect(store.nextQueued(new Date(), { skipLocalModel: false })?.id).toBe(local.id)
+  })
+
+  it('nextQueued with skipLocalModel finds nothing when only local-model tasks are queued', () => {
+    store.create({ ...input, model: 'lmstudio:big-model' })
+    store.create({ ...input, model: 'lmstudio:another-model' })
+    expect(store.nextQueued(new Date(), { skipLocalModel: true })).toBeUndefined()
+  })
+
+  it('hasActiveLocalModel is true only while an lmstudio: task is running/provisioning', () => {
+    const t = store.create({ ...input, model: 'lmstudio:big-model' })
+    expect(store.hasActiveLocalModel()).toBe(false)
+    store.transition(t.id, 'provisioning')
+    expect(store.hasActiveLocalModel()).toBe(true)
+    store.transition(t.id, 'running')
+    expect(store.hasActiveLocalModel()).toBe(true)
+    store.transition(t.id, 'done')
+    expect(store.hasActiveLocalModel()).toBe(false)
+  })
+})
+
+describe('isLmStudioModel / lmStudioModelId', () => {
+  it('recognizes the lmstudio: prefix and strips it', () => {
+    expect(isLmStudioModel('lmstudio:big-model')).toBe(true)
+    expect(isLmStudioModel('haiku')).toBe(false)
+    expect(isLmStudioModel(null)).toBe(false)
+    expect(isLmStudioModel(undefined)).toBe(false)
+    expect(lmStudioModelId('lmstudio:big-model')).toBe('big-model')
   })
 })
 
@@ -208,10 +245,26 @@ describe('TaskStore retention settings & prune', () => {
     raw.close()
   }
 
+  const noLmStudio = { lmStudioBaseUrl: null, lmStudioHighModel: null, lmStudioMedModel: null, lmStudioLowModel: null }
+
   it('defaults to 3 days / 5 per repo group and persists updates', () => {
-    expect(store.getSettings()).toEqual({ maxAgeDays: 3, maxPerRepoGroup: 5 })
-    expect(store.updateSettings({ maxAgeDays: 7 })).toEqual({ maxAgeDays: 7, maxPerRepoGroup: 5 })
-    expect(store.updateSettings({ maxPerRepoGroup: 10 })).toEqual({ maxAgeDays: 7, maxPerRepoGroup: 10 })
+    expect(store.getSettings()).toEqual({ maxAgeDays: 3, maxPerRepoGroup: 5, ...noLmStudio })
+    expect(store.updateSettings({ maxAgeDays: 7 })).toEqual({ maxAgeDays: 7, maxPerRepoGroup: 5, ...noLmStudio })
+    expect(store.updateSettings({ maxPerRepoGroup: 10 })).toEqual({ maxAgeDays: 7, maxPerRepoGroup: 10, ...noLmStudio })
+  })
+
+  it('persists LM Studio settings independently, and null explicitly clears a field', () => {
+    const withLmStudio = store.updateSettings({
+      lmStudioBaseUrl: 'http://localhost:1234',
+      lmStudioHighModel: 'big-model', lmStudioMedModel: 'mid-model', lmStudioLowModel: 'small-model',
+    })
+    expect(withLmStudio).toEqual({
+      maxAgeDays: 3, maxPerRepoGroup: 5, lmStudioBaseUrl: 'http://localhost:1234',
+      lmStudioHighModel: 'big-model', lmStudioMedModel: 'mid-model', lmStudioLowModel: 'small-model',
+    })
+    // omitting a field on a later update keeps it; explicit null clears it
+    expect(store.updateSettings({ maxAgeDays: 9 }).lmStudioHighModel).toBe('big-model')
+    expect(store.updateSettings({ lmStudioHighModel: null }).lmStudioHighModel).toBeNull()
   })
 
   it('prunes finished tasks older than maxAgeDays, leaving active tasks alone', () => {

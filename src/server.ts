@@ -9,11 +9,46 @@ import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
 import { acceptNote, dropSuggestion, listSuggestions, NoteInputError, readThreadFile } from './notes.js'
 import { pickImage } from './sandbox.js'
-import { FOLLOWUP_STATES, RESUMABLE_STATES, STAGES, canMoveStage, threadTitle } from './store.js'
-import type { Stage, TaskStore, TaskRecord } from './store.js'
+import { FOLLOWUP_STATES, RESUMABLE_STATES, STAGES, LMSTUDIO_PREFIX, canMoveStage, threadTitle } from './store.js'
+import type { Stage, TaskStore, TaskRecord, Settings } from './store.js'
 import type { Response } from 'express'
 
 export const MODELS = ['default', 'haiku', 'sonnet', 'opus']
+
+const LMSTUDIO_TIER_RE = /^lmstudio-(high|med|low)$/
+// Conservative charset for a bare LM Studio model id, shared between the
+// custom-pick request form and the Settings tier mappings — same defensive
+// allowlist style as targetOrError's branch-name check below.
+const LMSTUDIO_MODEL_ID_RE = /^[\w.\-/:]+$/
+const LMSTUDIO_CUSTOM_RE = /^lmstudio-custom:([\w.\-/:]+)$/
+const LMSTUDIO_TIER_FIELD = {
+  high: 'lmStudioHighModel', med: 'lmStudioMedModel', low: 'lmStudioLowModel',
+} as const
+
+// Resolves a requested (always-defined) model string into the value to store
+// on task.model. An LM Studio tier/custom request resolves against Settings
+// instead of resolveModel()/repos.yaml; anything else falls through to the
+// existing cloud-model allowlist + resolveModel(). Callers handle `model ===
+// undefined` themselves — it means different things at each call site ("use
+// configured defaults" on create, "don't change it" on resume/next).
+function resolveTaskModel(
+  model: string,
+  store: TaskStore,
+  repoDefaultModel: string | null,
+  globalDefaultModel: string | null,
+): { model: string | null } | { error: string } {
+  const tier = LMSTUDIO_TIER_RE.exec(model)
+  if (tier) {
+    const field = LMSTUDIO_TIER_FIELD[tier[1] as 'high' | 'med' | 'low']
+    const id = store.getSettings()[field]
+    if (!id) return { error: `no model mapped to lmstudio tier "${tier[1]}" — set it in Settings first` }
+    return { model: `${LMSTUDIO_PREFIX}${id}` }
+  }
+  const custom = LMSTUDIO_CUSTOM_RE.exec(model)
+  if (custom) return { model: `${LMSTUDIO_PREFIX}${custom[1]}` }
+  if (!MODELS.includes(model)) return { error: `unknown model: ${model}` }
+  return { model: resolveModel(model, repoDefaultModel, globalDefaultModel) }
+}
 
 // Shared by /push and /pr: a target must be a plain branch name, never the base
 // branch, HEAD, or a refspec/ref-path trick that could redirect onto it.
@@ -52,8 +87,12 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       res.status(400).json({ error: `unknown stage: ${stage}` })
       return
     }
-    if (model !== undefined && !MODELS.includes(model)) {
-      res.status(400).json({ error: `unknown model: ${model}` })
+    const repoDefaultModel = cfg.repos[repos[0]]?.defaultModel ?? null
+    const resolved = model !== undefined
+      ? resolveTaskModel(model, store, repoDefaultModel, cfg.defaults.defaultModel)
+      : { model: resolveModel(undefined, repoDefaultModel, cfg.defaults.defaultModel) }
+    if ('error' in resolved) {
+      res.status(400).json({ error: resolved.error })
       return
     }
     for (const r of repos) {
@@ -68,7 +107,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) })
       return
     }
-    const effectiveModel = resolveModel(model, cfg.repos[repos[0]].defaultModel, cfg.defaults.defaultModel)
+    const effectiveModel = resolved.model
     const task = store.create({
       prompt,
       repos,
@@ -87,15 +126,96 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   app.get('/api/settings', (_req, res) => { res.json(store.getSettings()) })
 
   app.put('/api/settings', (req, res) => {
-    const { maxAgeDays, maxPerRepoGroup } = (req.body ?? {}) as { maxAgeDays?: number; maxPerRepoGroup?: number }
+    const {
+      maxAgeDays, maxPerRepoGroup, lmStudioBaseUrl, lmStudioHighModel, lmStudioMedModel, lmStudioLowModel,
+    } = (req.body ?? {}) as Partial<Settings>
     for (const [name, v] of [['maxAgeDays', maxAgeDays], ['maxPerRepoGroup', maxPerRepoGroup]] as const) {
       if (v !== undefined && (!Number.isInteger(v) || v < 1)) {
         res.status(400).json({ error: `${name} must be a positive integer` })
         return
       }
     }
-    const settings = store.updateSettings({ maxAgeDays, maxPerRepoGroup })
+    for (const [name, v] of [
+      ['lmStudioBaseUrl', lmStudioBaseUrl], ['lmStudioHighModel', lmStudioHighModel],
+      ['lmStudioMedModel', lmStudioMedModel], ['lmStudioLowModel', lmStudioLowModel],
+    ] as const) {
+      if (v !== undefined && v !== null && typeof v !== 'string') {
+        res.status(400).json({ error: `${name} must be a string or null` })
+        return
+      }
+    }
+    for (const [name, v] of [
+      ['lmStudioHighModel', lmStudioHighModel], ['lmStudioMedModel', lmStudioMedModel], ['lmStudioLowModel', lmStudioLowModel],
+    ] as const) {
+      if (v && !LMSTUDIO_MODEL_ID_RE.test(v)) {
+        res.status(400).json({ error: `${name} contains invalid characters` })
+        return
+      }
+    }
+    if (lmStudioBaseUrl) {
+      try {
+        new URL(lmStudioBaseUrl)
+      } catch {
+        res.status(400).json({ error: 'lmStudioBaseUrl must be a valid URL' })
+        return
+      }
+    }
+    // An empty string from the dashboard's text inputs means "clear this field" —
+    // normalize to null so it round-trips the same way as an explicit null.
+    const norm = (v: string | null | undefined) => (v === '' ? null : v)
+    const settings = store.updateSettings({
+      maxAgeDays, maxPerRepoGroup,
+      lmStudioBaseUrl: norm(lmStudioBaseUrl), lmStudioHighModel: norm(lmStudioHighModel),
+      lmStudioMedModel: norm(lmStudioMedModel), lmStudioLowModel: norm(lmStudioLowModel),
+    })
     res.json({ ...settings, ...store.prune() })
+  })
+
+  // Host-side proxy to LM Studio's own REST API — the sandbox container never
+  // talks to LM Studio directly for anything except inference (see
+  // sandbox.ts); listing models and health-checking happen from here, on the
+  // host, where LM Studio's base URL (e.g. localhost:1234) is directly
+  // reachable without any container networking.
+  app.get('/api/lmstudio/models', async (req, res) => {
+    // ?baseUrl lets the Settings modal's "Sync models" preview a typed-but-
+    // unsaved URL (mirroring the repos.yaml editor's "only Save persists"
+    // convention) without writing it to the DB first.
+    const { baseUrl } = req.query as { baseUrl?: string }
+    const lmStudioBaseUrl = baseUrl ?? store.getSettings().lmStudioBaseUrl
+    if (baseUrl !== undefined) {
+      try {
+        new URL(baseUrl)
+      } catch {
+        res.status(400).json({ error: 'baseUrl must be a valid URL' })
+        return
+      }
+    }
+    if (!lmStudioBaseUrl) {
+      res.json({ reachable: false, models: [] })
+      return
+    }
+    try {
+      const r = await fetch(`${lmStudioBaseUrl}/api/v1/models`, { signal: AbortSignal.timeout(5000) })
+      if (!r.ok) throw new Error(`status ${r.status}`)
+      const body = (await r.json()) as { data?: Array<{ id: string }> }
+      res.json({ reachable: true, models: body.data ?? [] })
+    } catch {
+      res.json({ reachable: false, models: [] })
+    }
+  })
+
+  app.get('/api/lmstudio/health', async (_req, res) => {
+    const { lmStudioBaseUrl } = store.getSettings()
+    if (!lmStudioBaseUrl) {
+      res.json({ reachable: false })
+      return
+    }
+    try {
+      const r = await fetch(`${lmStudioBaseUrl}/api/v1/models`, { signal: AbortSignal.timeout(5000) })
+      res.json({ reachable: r.ok })
+    } catch {
+      res.json({ reachable: false })
+    }
   })
 
   app.post('/api/prune', (_req, res) => { res.json(store.prune()) })
@@ -217,8 +337,11 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       return
     }
     const { model } = (req.body ?? {}) as { model?: string }
-    if (model !== undefined && !MODELS.includes(model)) {
-      res.status(400).json({ error: `unknown model: ${model}` })
+    const resumeResolved = model !== undefined
+      ? resolveTaskModel(model, store, cfg.repos[t.repos[0]]?.defaultModel ?? null, cfg.defaults.defaultModel)
+      : undefined
+    if (resumeResolved && 'error' in resumeResolved) {
+      res.status(400).json({ error: resumeResolved.error })
       return
     }
     // Only these states may re-run the same prompt in place. A done task must
@@ -231,9 +354,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     // Omitted model keeps the task's current one, same convention as /next;
     // resolving it when absent could override a previously-resolved value
     // with a different (e.g. since-changed) global default.
-    const effectiveModel = model !== undefined
-      ? resolveModel(model, cfg.repos[t.repos[0]]?.defaultModel ?? null, cfg.defaults.defaultModel)
-      : undefined
+    const effectiveModel = resumeResolved?.model
     try {
       res.json(store.resume(t.id, effectiveModel))
       void scheduler.tick()
@@ -251,8 +372,11 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       res.status(400).json({ error: 'prompt must be a string' })
       return
     }
-    if (model !== undefined && !MODELS.includes(model)) {
-      res.status(400).json({ error: `unknown model: ${model}` })
+    const nextResolved = model !== undefined
+      ? resolveTaskModel(model, store, cfg.repos[t.repos[0]]?.defaultModel ?? null, cfg.defaults.defaultModel)
+      : undefined
+    if (nextResolved && 'error' in nextResolved) {
+      res.status(400).json({ error: nextResolved.error })
       return
     }
     if (stage !== undefined && !STAGES.includes(stage)) {
@@ -274,9 +398,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     // Omitted model keeps the task's current one; a given model resolves the
     // same way task creation does ('default' -> config defaults). The repo may
     // have been removed from repos.yaml since the task was created.
-    const effectiveModel = model !== undefined
-      ? resolveModel(model, cfg.repos[t.repos[0]]?.defaultModel ?? null, cfg.defaults.defaultModel)
-      : undefined
+    const effectiveModel = nextResolved?.model
     res.json(store.followUp(t.id, prompt, effectiveModel, stage))
     void scheduler.tick()
   })

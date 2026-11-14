@@ -43,4 +43,21 @@ describe('Scheduler', () => {
     expect(store.get(t.id)?.state).toBe('failed')
     expect(store.get(t.id)?.error).toMatch(/boom/)
   })
+
+  it('serializes LM Studio tasks even with concurrency headroom, but keeps launching cloud tasks', async () => {
+    const store = makeStore()
+    const launched: string[] = []
+    const scheduler = new Scheduler(store, 5, async (t: TaskRecord) => { launched.push(t.id) })
+    const local1 = store.create({ ...input, model: 'lmstudio:big-model' })
+    const local2 = store.create({ ...input, model: 'lmstudio:big-model' })
+    const cloud = store.create({ ...input, model: 'haiku' })
+    await scheduler.tick()
+    expect(launched).toEqual([local1.id, cloud.id])
+    expect(store.get(local2.id)?.state).toBe('queued')
+    // local1 finishes, freeing the one local-model slot
+    store.transition(local1.id, 'running')
+    store.transition(local1.id, 'done')
+    await scheduler.tick()
+    expect(launched).toEqual([local1.id, cloud.id, local2.id])
+  })
 })

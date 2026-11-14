@@ -164,6 +164,24 @@
       <span class="muted small" id="settingsMsg"></span>
     </div>
     <div class="modal-section">
+      <h3>LM Studio</h3>
+      <p class="muted small" style="margin:0 0 8px">Serving LM Studio's Anthropic-compatible endpoint on the host. Leave the base URL empty to hide the High/Med/Low/custom model options everywhere.</p>
+      <div class="field">
+        <label class="k" for="lmStudioBaseUrl">base URL</label>
+        <input type="text" id="lmStudioBaseUrl" placeholder="http://localhost:1234" style="flex:1 1 auto">
+        <button type="button" id="syncLmStudioModels">Sync models</button>
+        <span class="muted small" id="lmStudioSyncMsg"></span>
+      </div>
+      <div class="field">
+        <label class="k" for="lmStudioHigh">High</label>
+        <select id="lmStudioHigh"><option value="">— none —</option></select>
+        <label class="k" for="lmStudioMed">Med</label>
+        <select id="lmStudioMed"><option value="">— none —</option></select>
+        <label class="k" for="lmStudioLow">Low</label>
+        <select id="lmStudioLow"><option value="">— none —</option></select>
+      </div>
+    </div>
+    <div class="modal-section">
       <h3>repos.yaml</h3>
       <p class="muted small" style="margin:0 0 8px">Edits apply immediately to new threads — no restart required.</p>
       <textarea id="reposYamlText" spellcheck="false"></textarea>
@@ -197,10 +215,7 @@
     </div>
     <div class="small muted" id="conventions" hidden></div>
     <div class="field"><label class="k">model</label>
-      <select id="model">
-        <option value="default">default</option><option value="haiku">haiku</option>
-        <option value="sonnet">sonnet</option><option value="opus">opus</option>
-      </select>
+      <span id="modelField"></span>
       <label class="k" for="stage">stage</label>
       <select id="stage">
         <option value="investigate" selected>investigate</option><option value="spec">spec</option><option value="build">build</option>
@@ -220,6 +235,66 @@
   import { renderMarkdown } from './markdown.js'
   import { renderActivity } from './activity.js'
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+
+  // LM Studio: cached Settings + reachability + live model list, refreshed on
+  // load and whenever Settings are opened/saved. Drives the model <select> on
+  // the create/resume/next forms (see modelSelectHtml) — never fetched inline
+  // per render, since every task row would otherwise hammer LM Studio's API.
+  let lmStudio = { configured: false, reachable: false, highModel: null, medModel: null, lowModel: null, models: [] }
+  async function refreshLmStudioState() {
+    const s = await (await fetch('/api/settings')).json()
+    lmStudio.configured = !!s.lmStudioBaseUrl
+    lmStudio.highModel = s.lmStudioHighModel
+    lmStudio.medModel = s.lmStudioMedModel
+    lmStudio.lowModel = s.lmStudioLowModel
+    if (!lmStudio.configured) { lmStudio.reachable = false; lmStudio.models = []; return }
+    // Health-check first and skip the models call when unreachable — cheaper
+    // than always asking for the full list just to read its reachable flag.
+    const { reachable } = await (await fetch('/api/lmstudio/health')).json()
+    lmStudio.reachable = reachable
+    lmStudio.models = reachable ? (await (await fetch('/api/lmstudio/models')).json()).models : []
+  }
+
+  // Shared by the create/resume/next model selects, so all three always offer
+  // the same options in the same state (SCOUT round decision: consistency
+  // across selectors). `currentModel` is the task's current stored model
+  // (null/'default'/cloud name/'lmstudio:<id>') — for the create form it's
+  // always 'default'.
+  function modelSelectHtml(id, currentModel) {
+    const current = currentModel || 'default'
+    const cloud = ['default', 'haiku', 'sonnet', 'opus']
+      .map((m) => `<option value="${m}" ${current === m ? 'selected' : ''}>${m}</option>`).join('')
+    if (!lmStudio.configured) {
+      // A task may already be running on an lmstudio: model from before LM
+      // Studio was deconfigured in Settings — keep it selectable rather than
+      // silently falling back to a cloud option the task was never on.
+      const orphaned = current.startsWith('lmstudio:')
+        ? `<option value="lmstudio-custom:${esc(current.slice('lmstudio:'.length))}" selected>${esc(current.slice('lmstudio:'.length))} (LM Studio not configured)</option>`
+        : ''
+      return `<select id="${id}">${cloud}${orphaned}</select>`
+    }
+    const tierOpt = (tier, label, mapped) => {
+      const disabled = !lmStudio.reachable || !mapped
+      const note = !lmStudio.reachable ? ' (LM Studio unreachable)' : !mapped ? ' (not mapped)' : ''
+      const selected = !!mapped && current === `lmstudio:${mapped}`
+      return `<option value="lmstudio-${tier}" ${disabled ? 'disabled' : ''} ${selected ? 'selected' : ''}>${esc(label + note)}</option>`
+    }
+    const isListed = lmStudio.models.some((m) => `lmstudio:${m.id}` === current)
+    // the task's current model may point at a local model LM Studio no longer lists
+    // (unloaded/removed) — keep it selectable rather than silently misrepresenting
+    // what the task is actually running on.
+    const staleCurrent = current.startsWith('lmstudio:') && !isListed
+      ? `<option value="lmstudio-custom:${esc(current.slice('lmstudio:'.length))}" selected>${esc(current.slice('lmstudio:'.length))} (not currently loaded)</option>` : ''
+    const customOpts = lmStudio.reachable
+      ? lmStudio.models.map((m) => `<option value="lmstudio-custom:${esc(m.id)}" ${current === `lmstudio:${m.id}` ? 'selected' : ''}>${esc(m.id)}</option>`).join('')
+      : ''
+    return `<select id="${id}">
+      ${cloud}
+      <optgroup label="LM Studio">${tierOpt('high', 'High', lmStudio.highModel)}${tierOpt('med', 'Med', lmStudio.medModel)}${tierOpt('low', 'Low', lmStudio.lowModel)}</optgroup>
+      ${customOpts || staleCurrent ? `<optgroup label="Custom">${customOpts}${staleCurrent}</optgroup>` : ''}
+    </select>`
+  }
+
   let selected = null, tab = 'Overview', resultShownFor = null
   // Spec/Findings/Notes tabs appear only when the thread has that content
   let threadInfo = { spec: '', findings: '', suggestions: [] }
@@ -254,6 +329,10 @@
   const repoTags = document.getElementById('repoTags')
   const conventions = document.getElementById('conventions')
   fetch('/api/repos').then((r) => r.json()).then((repos) => { allRepos = repos; renderRepoMenu(); renderConventions() })
+
+  const modelField = document.getElementById('modelField')
+  function renderModelField() { modelField.innerHTML = modelSelectHtml('model', 'default') }
+  refreshLmStudioState().then(renderModelField)
 
   function renderRepoTags() {
     repoTags.innerHTML = selectedRepos.map((name) => `<span class="tag">${esc(name)}<button type="button" data-remove="${esc(name)}" aria-label="remove ${esc(name)}">×</button></span>`).join('')
@@ -328,10 +407,22 @@
   const reposYamlText = document.getElementById('reposYamlText')
   const reposYamlMsg = document.getElementById('reposYamlMsg')
   const flashReposYamlMsg = (text) => { reposYamlMsg.textContent = text; setTimeout(() => (reposYamlMsg.textContent = ''), 2500) }
+  const lmStudioBaseUrlInput = document.getElementById('lmStudioBaseUrl')
+  const lmStudioTierSelects = { high: document.getElementById('lmStudioHigh'), med: document.getElementById('lmStudioMed'), low: document.getElementById('lmStudioLow') }
+  const lmStudioSyncMsg = document.getElementById('lmStudioSyncMsg')
+  const flashLmStudioSyncMsg = (text) => { lmStudioSyncMsg.textContent = text; setTimeout(() => (lmStudioSyncMsg.textContent = ''), 2500) }
   async function loadSettings() {
     const s = await (await fetch('/api/settings')).json()
     maxAgeDaysInput.value = s.maxAgeDays
     maxPerRepoGroupInput.value = s.maxPerRepoGroup
+    lmStudioBaseUrlInput.value = s.lmStudioBaseUrl || ''
+    // Show the saved mapping immediately, even before a sync — the select may
+    // only have this one option until "Sync models" adds the full list.
+    const saved = { high: s.lmStudioHighModel, med: s.lmStudioMedModel, low: s.lmStudioLowModel }
+    for (const [tier, select] of Object.entries(lmStudioTierSelects)) {
+      select.innerHTML = '<option value="">— none —</option>'
+      if (saved[tier]) select.innerHTML += `<option value="${esc(saved[tier])}" selected>${esc(saved[tier])}</option>`
+    }
   }
   async function loadReposYaml() {
     const { content } = await (await fetch('/api/repos-yaml')).json()
@@ -341,6 +432,7 @@
     settingsOverlay.hidden = false
     loadSettings()
     loadReposYaml()
+    refreshLmStudioState()
   }
   function closeSettings() { settingsOverlay.hidden = true }
   settingsBtn.addEventListener('click', openSettings)
@@ -369,11 +461,33 @@
   document.getElementById('saveSettings').addEventListener('click', async () => {
     const res = await fetch('/api/settings', {
       method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ maxAgeDays: Number(maxAgeDaysInput.value), maxPerRepoGroup: Number(maxPerRepoGroupInput.value) }),
+      body: JSON.stringify({
+        maxAgeDays: Number(maxAgeDaysInput.value), maxPerRepoGroup: Number(maxPerRepoGroupInput.value),
+        lmStudioBaseUrl: lmStudioBaseUrlInput.value.trim() || null,
+        lmStudioHighModel: lmStudioTierSelects.high.value || null,
+        lmStudioMedModel: lmStudioTierSelects.med.value || null,
+        lmStudioLowModel: lmStudioTierSelects.low.value || null,
+      }),
     })
     if (!res.ok) { flashSettingsMsg((await res.json()).error || 'failed to save'); return }
     flashSettingsMsg('saved')
+    await refreshLmStudioState()
+    renderModelField()
     refresh()
+  })
+  document.getElementById('syncLmStudioModels').addEventListener('click', async () => {
+    const baseUrl = lmStudioBaseUrlInput.value.trim()
+    if (!baseUrl) { flashLmStudioSyncMsg('set a base URL first'); return }
+    // Sync against whatever base URL is currently typed, even if unsaved — save
+    // happens separately via the Save button, same as the repos.yaml editor.
+    const { reachable, models } = await (await fetch(`/api/lmstudio/models?baseUrl=${encodeURIComponent(baseUrl)}`)).json()
+    if (!reachable) { flashLmStudioSyncMsg('LM Studio unreachable'); return }
+    for (const select of Object.values(lmStudioTierSelects)) {
+      const current = select.value
+      select.innerHTML = '<option value="">— none —</option>' +
+        models.map((m) => `<option value="${esc(m.id)}" ${m.id === current ? 'selected' : ''}>${esc(m.id)}</option>`).join('')
+    }
+    flashLmStudioSyncMsg(`synced ${models.length} model(s)`)
   })
   document.getElementById('clearNowBtn').addEventListener('click', async () => {
     await fetch('/api/prune', { method: 'POST' })
@@ -479,9 +593,7 @@
       })
     } else if (tab === 'Overview') {
       const resume = ['paused-limit', 'paused-rate-limit', 'failed', 'cancelled'].includes(t.state)
-        ? `<select id="resumeModel">
-            ${['default', 'haiku', 'sonnet', 'opus'].map((m) => `<option value="${m}" ${(t.model || 'default') === m ? 'selected' : ''}>${m}</option>`).join('')}
-          </select>
+        ? `${modelSelectHtml('resumeModel', t.model)}
           <button data-resume="${esc(t.id)}">resume</button>` : ''
       const stop = ['queued', 'provisioning', 'running'].includes(t.state)
         ? `<button data-stop="${esc(t.id)}">stop</button>` : ''
@@ -520,9 +632,7 @@
           <textarea id="nextPrompt" placeholder="follow-up prompt — continues this thread's session, branch and workspace"></textarea>
           <div class="field" style="margin-top:8px">
             <label class="k">model</label>
-            <select id="nextModel">
-              ${['default', 'haiku', 'sonnet', 'opus'].map((m) => `<option value="${m}" ${(t.model || 'default') === m ? 'selected' : ''}>${m}</option>`).join('')}
-            </select>
+            ${modelSelectHtml('nextModel', t.model)}
             <button class="primary" data-next="${esc(t.id)}" style="margin-left:auto">Continue thread</button>
           </div>
         </div>` : ''}`

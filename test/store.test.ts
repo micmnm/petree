@@ -524,6 +524,7 @@ describe('threads', () => {
     const t = new TaskStore(file).get('old1')!
     expect(t.stage).toBe('build')
     expect(t.comments).toEqual([])
+    expect(t.interview).toBe(false)
   })
 
   it('adds the delivery column to an old database and merges per-repo entries', () => {

@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import type { PetreeConfig } from './config.js'
 import { prepareWorkspace } from './git.js'
 import { aheadCount, commitChanges, commitStat, ensureGitConfig, headSha, taskBranch } from './gitops.js'
+import { waitingQuestions } from './interview.js'
 import { readThreadStatus } from './notes.js'
 import { openPr } from './prs.js'
 import { CliRunner } from './runner.js'
@@ -182,9 +183,11 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
 
   // AUTO-PLAY (spec §5.8): move on to the next stage, or open the PRs after build. Stops on
   // anything but a clean finish, when the agent asked for the user, or once the thread is binned.
+  // A waiting questionnaire always stops it (interview spec §5.7).
   const autoPlay = async (id: string): Promise<void> => {
     const t = store.get(id)
-    if (!t?.autoPlay || t.bin || readThreadStatus(join(cfg.home, 'work', id), t.startedAt)?.needsYou) return
+    if (!t?.autoPlay || t.bin || waitingQuestions(t, cfg.home).asked
+      || readThreadStatus(join(cfg.home, 'work', id), t.startedAt)?.needsYou) return
     try {
       if (t.state === 'waiting-for-you' && t.stage !== 'build') {
         store.followUp(id, '', undefined, t.stage === 'investigate' ? 'spec' : 'build')

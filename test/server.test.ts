@@ -745,7 +745,7 @@ describe('thread API', () => {
   it('serves thread files and suggestions', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     const empty = await (await fetch(`${base}/api/tasks/${t.id}/thread`)).json()
-    expect(empty).toEqual({ spec: null, findings: null, suggestions: [] })
+    expect(empty).toEqual({ spec: null, findings: null, suggestions: [], questions: null, questionsError: null, interview: [] })
     const dir = join(home, 'work', t.id, '_thread')
     mkdirSync(join(dir, 'notes', 'demo'), { recursive: true })
     writeFileSync(join(dir, 'spec.md'), 'the spec')
@@ -774,5 +774,91 @@ describe('thread API', () => {
     expect((await post(`/api/tasks/${t.id}/notes/accept`, { repo: 'nope', topic: 'a', text: 'A', summary: 's' })).status).toBe(400)
     expect((await post(`/api/tasks/${t.id}/notes/drop`, { repo: 'demo', topic: '../x' })).status).toBe(400)
     expect((await post('/api/tasks/deadbeef/notes/drop', { repo: 'demo', topic: 'a' })).status).toBe(404)
+  })
+})
+
+describe('questionnaire API (interview spec §5.5)', () => {
+  const QUESTIONS = {
+    round: 1, outlook: 'last',
+    questions: [
+      { id: 'scope', kind: 'choice', q: 'Which tasks retry?', options: [{ id: 'idem', label: 'Idempotent only' }, { id: 'all', label: 'All' }], guess: 'idem' },
+      { id: 'owner', kind: 'yesno', q: 'Own the budget?', guess: null },
+    ],
+  }
+  // A PLAN gate whose ask turn wrote `file` into _thread/questions.json.
+  function asking(file: unknown = QUESTIONS, interview = true) {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1, stage: 'spec', interview })
+    store.transition(t.id, 'provisioning')
+    store.patch(t.id, { startedAt: new Date(Date.now() - 60_000).toISOString() })
+    store.transition(t.id, 'running')
+    store.transition(t.id, 'waiting-for-you')
+    if (file !== null) {
+      mkdirSync(join(home, 'work', t.id, '_thread'), { recursive: true })
+      writeFileSync(join(home, 'work', t.id, '_thread', 'questions.json'), typeof file === 'string' ? file : JSON.stringify(file))
+    }
+    return t
+  }
+  const thread = async (id: string) => (await fetch(`${base}/api/tasks/${id}/thread`)).json()
+  const card = async (id: string) => (await (await fetch(`${base}/api/tasks/${id}`)).json()).card
+
+  it('creates quests with INTERVIEW on unless told otherwise', async () => {
+    expect((await (await post('/api/tasks', { prompt: 'x', repos: ['demo'] })).json()).interview).toBe(true)
+    expect((await (await post('/api/tasks', { prompt: 'x', repos: ['demo'], interview: false })).json()).interview).toBe(false)
+    expect((await post('/api/tasks', { prompt: 'x', repos: ['demo'], interview: 'yes' })).status).toBe(400)
+  })
+
+  it('serves a waiting questionnaire and puts it in YOUR MOVE', async () => {
+    const t = asking()
+    const info = await thread(t.id)
+    expect(info).toMatchObject({ questionsError: null, interview: [] })
+    expect(info.questions.questions.map((q: { id: string; guess: unknown }) => [q.id, q.guess])).toEqual([['scope', 'idem'], ['owner', null]])
+    expect(await card(t.id)).toMatchObject({
+      group: 'your-move', line: '2 questions before the spec', action: { label: 'Answer 2 questions before the spec' },
+    })
+  })
+
+  it('falls back to the document gate when the file is garbled or INTERVIEW is off', async () => {
+    const bad = asking('{nope')
+    expect(await thread(bad.id)).toMatchObject({ questions: null, questionsError: 'not JSON, or over 32 KiB' })
+    expect((await card(bad.id)).action.label).toBe('Read the spec, then approve or comment')
+    const off = asking(QUESTIONS, false)
+    expect(await thread(off.id)).toMatchObject({ questions: null, questionsError: null })
+    expect((await post(`/api/tasks/${off.id}/next`, { answers: 'guesses' })).status).toBe(409)
+  })
+
+  it('sends the answers as a structured note, records them on the turn, and 409s a second send', async () => {
+    const t = asking()
+    await post(`/api/tasks/${t.id}/comments`, { text: 'queued note' })
+    const res = await post(`/api/tasks/${t.id}/next`, { answers: { scope: 'all', owner: true }, prompt: 'cap it at 2 minutes' })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toMatchObject({ state: 'queued', stage: 'spec' })
+    expect(body.prompt).toContain('## Answers to your questions (PLAN, round 1)')
+    expect(body.prompt).toContain('Answer: All — changed (your guess: Idempotent only)')
+    expect(body.prompt).toContain('## Note from the user\n\ncap it at 2 minutes')
+    expect(body.prompt).toContain('queued note')
+    expect(body.turns[0].interview).toMatchObject({ stage: 'spec', round: 1, how: 'answered', final: false, changed: 2, answers: { scope: 'all', owner: true } })
+    expect((await thread(t.id)).interview).toHaveLength(1)
+    expect((await post(`/api/tasks/${t.id}/next`, { answers: { scope: 'all', owner: true } })).status).toBe(409)
+  })
+
+  it("WRITE IT NOW records an empty no-guess answer as null; 'guesses' needs every guess", async () => {
+    const t = asking()
+    expect((await post(`/api/tasks/${t.id}/next`, { answers: 'guesses' })).status).toBe(400)
+    expect((await post(`/api/tasks/${t.id}/next`, { answers: {} })).status).toBe(400)
+    const res = await post(`/api/tasks/${t.id}/next`, { answers: {}, final: true })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.turns[0].interview).toMatchObject({ final: true, answers: { scope: 'idem', owner: null } })
+    expect(body.prompt).toContain('The user pressed WRITE IT NOW')
+  })
+
+  it('400s an invalid answer or a stage move, 409s without a questionnaire', async () => {
+    const t = asking()
+    const bad = await post(`/api/tasks/${t.id}/next`, { answers: { scope: 'nope' } })
+    expect([bad.status, (await bad.json()).error]).toEqual([400, 'Q1: pick one of idem, all'])
+    expect((await post(`/api/tasks/${t.id}/next`, { answers: { scope: 'all', owner: true }, stage: 'build' })).status).toBe(400)
+    expect((await post(`/api/tasks/${t.id}/next`, { answers: { scope: 'all', owner: true }, final: 'yes' })).status).toBe(400)
+    expect((await post(`/api/tasks/${asking(null).id}/next`, { answers: 'guesses' })).status).toBe(409)
   })
 })

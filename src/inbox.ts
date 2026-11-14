@@ -1,4 +1,5 @@
 import type { PetreeConfig } from './config.js'
+import type { Questionnaire } from './interview.js'
 import type { ThreadStatus } from './notes.js'
 import { prHost } from './prs.js'
 import { STAGES, threadTitle } from './store.js'
@@ -21,7 +22,7 @@ export interface Card {
   prs: { repo: string; url: string; pr: Delivery['pr']; number?: number }[]
 }
 
-const LEVEL: Record<Stage, string> = { investigate: 'SCOUT', spec: 'PLAN', build: 'CRAFT' }
+export const LEVEL: Record<Stage, string> = { investigate: 'SCOUT', spec: 'PLAN', build: 'CRAFT' }
 const READY: Record<Stage, string> = { investigate: 'Findings ready', spec: 'Spec ready', build: 'Build finished' }
 const ACTIVE = ['queued', 'provisioning', 'running', 'paused-rate-limit']
 
@@ -65,7 +66,9 @@ function prLabel(task: TaskRecord, cfg: PetreeConfig): string | null {
   return `Merge PR #${open[0][1].number} on ${host}`
 }
 
-export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: PetreeConfig, now: Date = new Date()): Card {
+// `asked` is the waiting questionnaire (interview.ts waitingQuestions), or null.
+export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: PetreeConfig, now: Date = new Date(),
+  asked: Questionnaire | null = null): Card {
   const level = LEVEL[task.stage]
   const mins = task.startedAt ? Math.max(0, Math.floor((now.getTime() - Date.parse(task.startedAt)) / 60_000)) : 0
   let line: string
@@ -96,7 +99,11 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
     case 'done':
       line = status?.status || READY[task.stage]
       group = 'your-move'
-      if (task.state === 'waiting-for-you') {
+      if (task.state === 'waiting-for-you' && asked) {
+        const n = asked.questions.length, what = `${n} question${n === 1 ? '' : 's'} before the ${task.stage === 'spec' ? 'spec' : 'findings'}`
+        line = `${what}${asked.round > 1 ? ` · round ${asked.round}` : ''}`
+        action = { label: `Answer ${what}`, detail }
+      } else if (task.state === 'waiting-for-you') {
         action = { label: `Read the ${task.stage === 'spec' ? 'spec' : 'findings'}, then approve or comment`, detail }
       } else if (prLabel(task, cfg)) {
         action = { label: prLabel(task, cfg)!, detail }

@@ -1,4 +1,5 @@
 import type { PetreeConfig, RepoConfig } from './config.js'
+import { interviewPhase } from './interview.js'
 import type { Stage, TaskRecord } from './store.js'
 
 // Builds the prompt handed to `claude -p`: stored prompt, stage instructions,
@@ -60,6 +61,93 @@ export const STAGE_INSTRUCTIONS: Record<Stage, string> = {
   build: [...BUILD_BASE, '', ...BUILD_SUBAGENTS].join('\n'),
 }
 
+// The §5.3 example; the agent copies its shape into /work/_thread/questions.json.
+const QUESTIONS_SHAPE = `\`\`\`json
+{
+  "round": 1,
+  "intro": "Before I write the retry spec, three things the code can't tell me.",
+  "outlook": "last",
+  "questions": [
+    { "id": "scope", "kind": "choice", "q": "Which REST tasks should retry?",
+      "why": "Retrying a POST can double-charge unless it has an idempotency key.",
+      "options": [ { "id": "idem", "label": "Idempotent methods only (GET, PUT, DELETE)" },
+                   { "id": "all", "label": "All methods, POST with an idempotency key" } ],
+      "allowOther": true, "guess": "idem" },
+    { "id": "attempts", "kind": "number", "q": "How many attempts at most?",
+      "why": "Sets the worst-case latency of a failing task.", "unit": "attempts",
+      "min": 1, "max": 10, "guess": 3 },
+    { "id": "on-429", "kind": "yesno", "q": "Honour Retry-After on 429 and 503?",
+      "why": "Some upstreams send hours; we may want a ceiling.", "guess": true }
+  ]
+}
+\`\`\`
+Kinds and their guess: "choice" (one option id), "multi" (an array of option ids), "yesno"
+(true or false), "number" (within "min".."max"; "unit" and "step" optional), "text" (a string).
+Ids use lowercase letters, digits and hyphens; choice and multi take 2 to 6 options.`
+
+// The stage block, by interview phase (spec §5.4).
+function stageSection(task: TaskRecord): string[] {
+  const base = task.stage === 'build' && !task.party ? BUILD_BASE.join('\n') : STAGE_INSTRUCTIONS[task.stage]
+  const phase = interviewPhase(task)
+  if (phase.kind !== 'ask') {
+    // In `write`, a last turn with a record is a WRITE IT NOW round.
+    const decisions = phase.kind === 'write' && task.turns.at(-1)?.interview
+      ? ['', "Record the user's answers from this thread under a `Decisions` heading in the document; do not ask more questions."]
+      : []
+    return [`## Stage: ${task.stage}`, '', base, ...decisions]
+  }
+  const inv = task.stage === 'investigate'
+  const doc = inv ? 'findings' : 'spec'
+  if (phase.round > 1) {
+    return [
+      `## Stage: ${task.stage} — your questions were answered (above)`,
+      '',
+      `Write the ${doc} now, following the instructions below, and record the answers under a`,
+      `\`Decisions\` heading. Only if the answers raised questions that block the ${doc}, write a new`,
+      `\`/work/_thread/questions.json\` instead (round ${phase.round}, 1 to 8 questions, same shape), with`,
+      '"whyMore": one line on why you need another round, and "outlook" as before. Then stop.',
+      'The user can end the questions at any time; ask only what you truly need.',
+      '',
+      base,
+    ]
+  }
+  const afterScout = !inv && task.turns.some((t) => t.interview?.stage === 'investigate')
+  return [
+    `## Stage: ${task.stage} — interview first`,
+    '',
+    `Before you write the ${doc}, interview the user with a questionnaire.`,
+    '',
+    inv ? '1. Explore the repos and the question first; do not modify any repo files.'
+      : '1. Explore first: read the repos, `/work/_thread/findings.md` if present, and this thread,\n'
+        + '   so you only ask what the code and the thread cannot tell you. Do not modify repo files.',
+    '2. If the `interview-me` skill is available, use it to decide what to ask',
+    '   (`brainstorming` and `spec-driven-development` may help too). Its one-question-at-a-time',
+    '   rule does not apply here: petree shows all your questions in one form and sends back all',
+    '   the answers at once.',
+    '3. Ask 1 to 8 questions (never more than 8) whose answers would change what you write.',
+    '   Give each your best guess and one short line on why you ask. Prefer choice, multi,',
+    '   yesno and number over text. Never ask what this thread already answered.',
+    '4. Write them to `/work/_thread/questions.json`, exactly in this shape:',
+    '',
+    QUESTIONS_SHAPE,
+    '',
+    `   Set "round" to 1 and "outlook" to "last" if you expect to write the ${doc} after these`,
+    '   answers, "more" if you expect another round.',
+    `5. Then stop. Do not write \`/work/_thread/${doc}.md\` this turn. In status.txt set`,
+    '   needs-you to "Answer <N> questions".',
+    '',
+    ...(afterScout ? [
+      'The SCOUT answers above already settled the scope. Ask only what writing the plan newly',
+      'raised; if nothing did, write the spec now.',
+      '',
+    ] : []),
+    `If nothing is worth asking, do not write questions.json: write the ${doc} now, following`,
+    'the normal instructions:',
+    '',
+    base,
+  ]
+}
+
 function notesSections(repos: string[]): string[] {
   const read = repos.map(
     (r) => `- ${r}: read \`/petree/notes/${r}/INDEX.md\` if present, opening a note only when relevant; read \`/work/${r}/CLAUDE.md\` if present.`,
@@ -90,9 +178,7 @@ const STATUS_SECTION = [
 export function composePrompt(task: TaskRecord, cfg: PetreeConfig): string {
   const head = [
     ...(task.prompt ? [task.prompt, ''] : []),
-    `## Stage: ${task.stage}`,
-    '',
-    task.stage === 'build' && !task.party ? BUILD_BASE.join('\n') : STAGE_INSTRUCTIONS[task.stage],
+    ...stageSection(task),
     '',
     ...notesSections(task.repos),
     '',

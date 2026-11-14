@@ -9,6 +9,7 @@ import { prepareWorkspace } from '../src/git.js'
 import { TaskStore } from '../src/store.js'
 import type { Stage, TaskRecord } from '../src/store.js'
 import { makeLauncher } from '../src/launcher.js'
+import { answerRecord, renderAnswers, waitingQuestions, type InterviewRecord } from '../src/interview.js'
 import type { SandboxCommands } from '../src/sandbox.js'
 import { inspectContainerState } from '../src/sandbox.js'
 
@@ -36,7 +37,7 @@ function makeFixtureRepo(): string {
   return dir
 }
 
-function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: Stage; autoPlay?: boolean } = {}): {
+function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: Stage; autoPlay?: boolean; interview?: boolean } = {}): {
   home: string
   cfg: PetreeConfig
   store: TaskStore
@@ -57,6 +58,7 @@ function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: S
     timeoutMinutes: input.timeoutMinutes ?? 30,
     stage: input.stage ?? 'build',
     autoPlay: input.autoPlay,
+    interview: input.interview,
   })
   const task = store.transition(created.id, 'provisioning')
   return { home, cfg, store, task }
@@ -615,6 +617,27 @@ describe('AUTO-PLAY', () => {
       delete process.env.WD
     }
     expect(store.get(task.id)).toMatchObject({ state: 'waiting-for-you', stage: 'investigate' })
+  })
+
+  it('stops at a questionnaire and runs on after the answers', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'investigate', autoPlay: true, interview: true })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const launch = launcherFor(cfg, store, 'ok', [])
+    const file = JSON.stringify({ round: 1, questions: [{ id: 'db', kind: 'yesno', q: 'Use Postgres?', guess: true }] })
+    writer(home, task.id, `fs.mkdirSync(process.env.WD+'/_thread',{recursive:true});fs.writeFileSync(process.env.WD+'/_thread/questions.json',${JSON.stringify(file)});`)
+    try {
+      await launch(task)
+      expect(store.get(task.id)).toMatchObject({ state: 'waiting-for-you', stage: 'investigate' })
+      const asked = waitingQuestions(store.get(task.id)!, home).asked!
+      const record = answerRecord(asked, 'investigate', 'guesses', false) as InterviewRecord
+      store.followUp(task.id, renderAnswers(record, ''), undefined, 'investigate', record)
+      delete process.env.FAKE_CONTAINER_EXEC // this turn writes the findings, no questions
+      await launch(store.transition(task.id, 'provisioning'))
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    expect(store.get(task.id)).toMatchObject({ state: 'queued', stage: 'spec' })
   })
 
   it('records a failed PR step on the thread instead of throwing', async () => {

@@ -9,6 +9,7 @@ import { openPr, pollPrs } from './prs.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
+import { answerRecord, renderAnswers, waitingQuestions } from './interview.js'
 import { acceptNote, dropSuggestion, listSuggestions, NoteInputError, readThreadFile, readThreadStatus } from './notes.js'
 import { pickImage } from './sandbox.js'
 import { nowPlaying, questStats, readSlice, sliceStats } from './stats.js'
@@ -56,10 +57,11 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   app.use(express.json())
 
   app.post('/api/tasks', (req, res) => {
-    const { prompt, repos, model, stage, party, autoPlay } = (req.body ?? {}) as
-      { prompt?: string; repos?: string[]; model?: string; stage?: Stage; party?: boolean; autoPlay?: boolean }
-    if ((party !== undefined && typeof party !== 'boolean') || (autoPlay !== undefined && typeof autoPlay !== 'boolean')) {
-      res.status(400).json({ error: 'party and autoPlay must be booleans' })
+    const { prompt, repos, model, stage, party, autoPlay, interview = true } = (req.body ?? {}) as
+      { prompt?: string; repos?: string[]; model?: string; stage?: Stage; party?: boolean; autoPlay?: boolean; interview?: boolean }
+    if ((party !== undefined && typeof party !== 'boolean') || (autoPlay !== undefined && typeof autoPlay !== 'boolean')
+      || typeof interview !== 'boolean') {
+      res.status(400).json({ error: 'party, autoPlay and interview must be booleans' })
       return
     }
     if (typeof prompt !== 'string' || !prompt || !Array.isArray(repos) || repos.length === 0) {
@@ -96,6 +98,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       stage,
       party,
       autoPlay,
+      interview,
     })
     void scheduler.tick()
     store.sweep()
@@ -103,7 +106,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   })
 
   const withCard = (t: TaskRecord) =>
-    ({ ...t, card: cardFor(t, readThreadStatus(join(cfg.home, 'work', t.id), t.startedAt), cfg) })
+    ({ ...t, card: cardFor(t, readThreadStatus(join(cfg.home, 'work', t.id), t.startedAt), cfg, undefined, waitingQuestions(t, cfg.home).asked) })
 
   app.get('/api/tasks', (req, res) => {
     res.json(store.list().filter((t) => req.query.archived === '1' || !t.archivedAt).map(withCard))
@@ -395,7 +398,8 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
     if (t.bin) { res.status(409).json({ error: 'restore first' }); return }
-    const { prompt = '', model, stage } =(req.body ?? {}) as { prompt?: string; model?: string; stage?: Stage }
+    const { prompt = '', model, stage, answers, final } = (req.body ?? {}) as
+      { prompt?: string; model?: string; stage?: Stage; answers?: unknown; final?: unknown }
     if (typeof prompt !== 'string') {
       res.status(400).json({ error: 'prompt must be a string' })
       return
@@ -416,16 +420,28 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       res.status(400).json({ error: `illegal stage move ${t.stage} -> ${stage} from state ${t.state}` })
       return
     }
-    if (!prompt.trim() && !t.comments.some((c) => !c.consumed) && (stage === undefined || stage === t.stage)) {
-      res.status(400).json({ error: 'prompt, a pending comment, or a stage change is required' })
-      return
-    }
     // Omitted model keeps the task's current one; a given model resolves the
     // same way task creation does ('default' -> config defaults). The repo may
     // have been removed from repos.yaml since the task was created.
     const effectiveModel = model !== undefined
       ? resolveModel(model, cfg.repos[t.repos[0]]?.defaultModel ?? null, cfg.defaults.defaultModel)
       : undefined
+    // Answers to a questionnaire (spec §5.5): checked against the file re-read now, never the client's copy.
+    if (answers !== undefined) {
+      const { asked } = waitingQuestions(t, cfg.home)
+      if (!asked) { res.status(409).json({ error: 'no questions waiting' }); return }
+      if (stage !== undefined && stage !== t.stage) { res.status(400).json({ error: 'answers cannot move the stage' }); return }
+      if (final !== undefined && typeof final !== 'boolean') { res.status(400).json({ error: 'final must be a boolean' }); return }
+      const record = answerRecord(asked, t.stage, answers, final === true)
+      if (typeof record === 'string') { res.status(400).json({ error: record }); return }
+      res.json(store.followUp(t.id, renderAnswers(record, prompt), effectiveModel, t.stage, record))
+      void scheduler.tick()
+      return
+    }
+    if (!prompt.trim() && !t.comments.some((c) => !c.consumed) && (stage === undefined || stage === t.stage)) {
+      res.status(400).json({ error: 'prompt, a pending comment, or a stage change is required' })
+      return
+    }
     res.json(store.followUp(t.id, prompt, effectiveModel, stage))
     void scheduler.tick()
   })
@@ -448,10 +464,14 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
     const workDir = join(cfg.home, 'work', t.id)
+    const waiting = waitingQuestions(t, cfg.home)
     res.json({
       spec: readThreadFile(workDir, 'spec.md'),
       findings: readThreadFile(workDir, 'findings.md'),
       suggestions: listSuggestions(join(cfg.home, 'notes'), workDir, t.repos),
+      questions: waiting.asked,
+      questionsError: waiting.error,
+      interview: t.turns.flatMap((x) => x.interview ?? []),
     })
   })
 

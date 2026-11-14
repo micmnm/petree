@@ -37,7 +37,7 @@ function resolveReal(p: string): string | null {
 
 // The agent controls everything under workDir and can plant symlinks there, so
 // every path is resolved and must stay inside the root before it is touched.
-function contained(p: string, root: string): boolean {
+export function contained(p: string, root: string): boolean {
   const real = resolveReal(p)
   const realRoot = resolveReal(root)
   return real !== null && realRoot !== null && real.startsWith(realRoot + sep)
@@ -49,7 +49,7 @@ function assertContained(p: string, root: string): void {
 
 // A bounded read of a regular file. The agent can plant a FIFO (a plain read blocks the server forever),
 // a device, a last-second symlink or a huge file, so: no follow, no blocking, fstat the fd, cap the size.
-function readCapped(p: string, max: number): { text: string; mtimeMs: number } | null {
+export function readCapped(p: string, max: number): { text: string; mtimeMs: number } | null {
   let fd: number
   try {
     fd = openSync(p, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK)

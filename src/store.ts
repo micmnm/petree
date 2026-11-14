@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { randomUUID } from 'node:crypto'
+import type { InterviewRecord } from './interview.js'
 import { mergeStats, type TurnStats } from './stats.js'
 
 export type TaskState =
@@ -23,6 +24,7 @@ export interface Turn {
   endedAt: string
   stage: Stage
   stats?: TurnStats | null
+  interview?: InterviewRecord // the questions this turn asked and how they were answered
 }
 
 export interface TaskRecord {
@@ -50,6 +52,7 @@ export interface TaskRecord {
   delivery: Record<string, Delivery>
   party: boolean
   autoPlay: boolean
+  interview?: boolean
   turnStats?: TurnStats | null
   seq: number
   bin: Bin | null
@@ -138,7 +141,7 @@ function rowToTask(r: any): TaskRecord {
     turns: (JSON.parse(r.turns ?? '[]') as Turn[]).map((t) => ({ ...t, stage: t.stage ?? 'build' })),
     stage: r.stage, comments: JSON.parse(r.comments ?? '[]'),
     delivery: JSON.parse(r.delivery ?? '{}'),
-    party: r.party !== 0, autoPlay: r.auto_play === 1,
+    party: r.party !== 0, autoPlay: r.auto_play === 1, interview: r.interview === 1,
     seq: r.seq ?? 0, bin: r.bin ?? null, binReason: r.bin_reason ?? null,
     binnedAt: r.binned_at ?? null, archivedAt: r.archived_at ?? null,
     createdAt: r.created_at, updatedAt: r.updated_at,
@@ -176,6 +179,7 @@ export class TaskStore {
       if (!cols.includes('party')) this.db.exec('ALTER TABLE tasks ADD COLUMN party INTEGER NOT NULL DEFAULT 1')
       if (!cols.includes('auto_play')) this.db.exec('ALTER TABLE tasks ADD COLUMN auto_play INTEGER NOT NULL DEFAULT 0')
       if (!cols.includes('turn_stats')) this.db.exec('ALTER TABLE tasks ADD COLUMN turn_stats TEXT')
+      if (!cols.includes('interview')) this.db.exec('ALTER TABLE tasks ADD COLUMN interview INTEGER NOT NULL DEFAULT 0')
       for (const c of ['bin TEXT', 'binned_at TEXT', 'bin_reason TEXT', 'archived_at TEXT', 'seq INTEGER']) {
         if (!cols.includes(c.split(' ')[0])) this.db.exec(`ALTER TABLE tasks ADD COLUMN ${c}`)
       }
@@ -216,14 +220,14 @@ export class TaskStore {
       WHERE archived_at IS NULL AND state IN ('cancelled', 'paused-limit')`).run(now)
   }
 
-  create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number; model?: string | null; stage?: Stage; party?: boolean; autoPlay?: boolean }): TaskRecord {
+  create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number; model?: string | null; stage?: Stage; party?: boolean; autoPlay?: boolean; interview?: boolean }): TaskRecord {
     const now = new Date().toISOString()
     const id = randomUUID().slice(0, 8)
     this.db.prepare(`INSERT INTO tasks
-      (id, prompt, repos, mode, state, token_budget, timeout_minutes, model, stage, party, auto_play, created_at, updated_at, seq)
-      VALUES (?, ?, ?, 'unattended', 'queued', ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM tasks))`)
+      (id, prompt, repos, mode, state, token_budget, timeout_minutes, model, stage, party, auto_play, interview, created_at, updated_at, seq)
+      VALUES (?, ?, ?, 'unattended', 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM tasks))`)
       .run(id, input.prompt, JSON.stringify(input.repos), input.tokenBudget, input.timeoutMinutes, input.model ?? null,
-        input.stage ?? 'investigate', input.party === false ? 0 : 1, input.autoPlay ? 1 : 0, now, now)
+        input.stage ?? 'investigate', input.party === false ? 0 : 1, input.autoPlay ? 1 : 0, input.interview ? 1 : 0, now, now)
     return this.get(id)!
   }
 
@@ -345,7 +349,8 @@ export class TaskStore {
   // Archive the finished turn and requeue the task with a follow-up prompt,
   // folding pending comments in and optionally moving the stage.
   // sessionId is kept — it is what lets the next run resume the conversation.
-  followUp(id: string, prompt: string, model?: string | null, stage?: Stage): TaskRecord {
+  // `interview` is stored on the archived (question) turn.
+  followUp(id: string, prompt: string, model?: string | null, stage?: Stage, interview?: InterviewRecord): TaskRecord {
     return this.db.transaction(() => {
       const t = this.get(id)
       if (!t) throw new Error(`no task ${id}`)
@@ -359,7 +364,7 @@ export class TaskStore {
       }
       const turns: Turn[] = [
         ...t.turns,
-        { prompt: t.prompt, result: t.result, tokensUsed: t.tokensUsed, endedAt: new Date().toISOString(), stage: t.stage, stats: t.turnStats },
+        { prompt: t.prompt, result: t.result, tokensUsed: t.tokensUsed, endedAt: new Date().toISOString(), stage: t.stage, stats: t.turnStats, ...(interview && { interview }) },
       ]
       const pending = t.comments.filter((c) => !c.consumed)
       const full = pending.length

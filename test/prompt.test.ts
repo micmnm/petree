@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { PetreeConfig, RepoConfig } from '../src/config.js'
-import type { TaskRecord } from '../src/store.js'
+import type { InterviewRecord } from '../src/interview.js'
+import type { Stage, TaskRecord, Turn } from '../src/store.js'
 import { composePrompt, STAGE_INSTRUCTIONS } from '../src/prompt.js'
 
 function repo(over: Partial<RepoConfig> = {}): RepoConfig {
@@ -146,5 +147,53 @@ describe('composePrompt', () => {
   it('ignores repo names that are no longer in the registry', () => {
     const out = composePrompt(task({ repos: ['gone'] }), config({ demo: repo({ test: ['npm test'] }) }))
     expect(out).not.toContain('## Repo conventions')
+  })
+})
+
+describe('composePrompt with INTERVIEW (spec §5.4)', () => {
+  const cfg = config({ demo: repo() })
+  const answered = (stage: Stage, round: number, final = false): Turn =>
+    ({ prompt: '', result: 'r', tokensUsed: 0, endedAt: '', stage, interview: { stage, round, final } as InterviewRecord })
+  const plain = (stage: Stage): Turn => ({ prompt: '', result: 'r', tokensUsed: 0, endedAt: '', stage })
+
+  it("keeps today's stage block when off or at build", () => {
+    expect(composePrompt(task({ stage: 'spec', interview: false }), cfg)).toBe(composePrompt(task({ stage: 'spec' }), cfg))
+    expect(composePrompt(task({ stage: 'build', interview: true }), cfg)).toBe(composePrompt(task({ stage: 'build' }), cfg))
+  })
+
+  it('round 1 asks for questions.json first, with the normal instructions as the fallback', () => {
+    const inv = composePrompt(task({ stage: 'investigate', interview: true }), cfg)
+    expect(inv).toContain('## Stage: investigate — interview first')
+    expect(inv).toContain('1. Explore the repos and the question first; do not modify any repo files.')
+    expect(inv).toContain('Write them to `/work/_thread/questions.json`')
+    expect(inv).toContain('"kind": "choice"')
+    expect(inv).toContain('Do not write `/work/_thread/findings.md` this turn')
+    expect(inv.indexOf('If nothing is worth asking')).toBeLessThan(inv.indexOf(STAGE_INSTRUCTIONS.investigate))
+    const spec = composePrompt(task({ stage: 'spec', interview: true, turns: [plain('investigate')] }), cfg)
+    expect(spec).toContain('Do not write `/work/_thread/spec.md` this turn')
+    expect(spec).toContain('`interview-me`')
+    expect(spec).not.toContain('The SCOUT answers above')
+  })
+
+  it('PLAN after an answered SCOUT round asks only what the plan newly raised', () => {
+    const out = composePrompt(task({ stage: 'spec', interview: true, turns: [answered('investigate', 1), plain('investigate')] }), cfg)
+    expect(out).toContain('## Stage: spec — interview first')
+    expect(out).toContain('The SCOUT answers above already settled the scope.')
+  })
+
+  it('round N writes the document, or asks one more round with whyMore', () => {
+    const out = composePrompt(task({ stage: 'spec', interview: true, turns: [answered('spec', 1)] }), cfg)
+    expect(out).toContain('## Stage: spec — your questions were answered (above)')
+    expect(out).toContain('(round 2, 1 to 8 questions, same shape)')
+    expect(out).toContain('"whyMore"')
+    expect(out.indexOf('Decisions')).toBeLessThan(out.indexOf(STAGE_INSTRUCTIONS.spec))
+  })
+
+  it('after WRITE IT NOW writes with a Decisions section; a retry after the document does not repeat it', () => {
+    const final = composePrompt(task({ stage: 'spec', interview: true, turns: [answered('spec', 1, true)] }), cfg)
+    expect(final).toContain(`## Stage: spec\n\n${STAGE_INSTRUCTIONS.spec}\n\nRecord the user's answers from this thread under a \`Decisions\` heading`)
+    expect(final).not.toContain('questions.json')
+    const retry = composePrompt(task({ stage: 'spec', interview: true, turns: [answered('spec', 1), plain('spec')] }), cfg)
+    expect(retry).toBe(composePrompt(task({ stage: 'spec' }), cfg))
   })
 })

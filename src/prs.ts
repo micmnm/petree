@@ -136,6 +136,12 @@ export async function openPr(
   return { ok: made.ok, output: made.output, url: made.url }
 }
 
+// The body is the quest prompt; a long one buries the PR page (GitHub caps at 65536, Azure at 4000).
+const PR_BODY_MAX = 1000
+const TRUNCATED = '\n\n…(truncated)'
+export const prBody = (s: string): string =>
+  s.length <= PR_BODY_MAX ? s : s.slice(0, PR_BODY_MAX - TRUNCATED.length) + TRUNCATED
+
 export async function createPullRequest(
   repoUrl: string,
   cwd: string,
@@ -153,15 +159,14 @@ export async function createPullRequest(
   try {
     if (host.kind === 'github') {
       const output = (await run('gh', ['pr', 'create', '--repo', host.slug, '--head', target, '--base', baseBranch,
-        '--title', title, `--body=${body}`], cwd)).trim()
+        '--title', title, `--body=${prBody(body)}`], cwd)).trim()
       // gh pr create prints the new PR's URL as the last line of stdout.
       const url = output.split('\n').pop()
       return { ok: true, output, url, number: url ? prNumber(url) : undefined }
     }
     const output = await run('az', ['repos', 'pr', 'create', '--org', azureOrg(host), '--project', host.project,
       '--repository', host.repo, '--source-branch', target, '--target-branch', baseBranch,
-      // Azure rejects descriptions over 4000 characters.
-      '--title', title, `--description=${body.slice(0, 4000)}`, '-o', 'json'])
+      '--title', title, `--description=${prBody(body)}`, '-o', 'json'])
     const id = JSON.parse(output).pullRequestId as number
     return { ok: true, output: output.trim(), url: azureUrl(host, id), number: id }
   } catch (err) {

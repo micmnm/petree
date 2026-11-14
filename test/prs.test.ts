@@ -84,7 +84,19 @@ describe('createPullRequest', () => {
     expect(az.cwd).toBeUndefined()
     const desc = az.args.find((a) => a.startsWith('--description='))!
     expect(desc.startsWith('--description=-x')).toBe(true)
-    expect(desc.length).toBe('--description='.length + 4000)
+    expect(desc.length).toBe('--description='.length + 1000)
+    expect(desc.endsWith('…(truncated)')).toBe(true)
+  })
+
+  it('caps the GitHub PR body at 1000 characters and leaves a short one alone', async () => {
+    const args: string[][] = []
+    const run: Run = async (_cmd, a) => { args.push(a); return 'https://github.com/o/r/pull/1' }
+    await createPullRequest('https://github.com/o/r', '/d', 'f', 'main', 't', 'z'.repeat(3000), run)
+    await createPullRequest('https://github.com/o/r', '/d', 'f', 'main', 't', 'short', run)
+    const body = (i: number) => args[i].find((a) => a.startsWith('--body='))!.slice('--body='.length)
+    expect(body(0).length).toBe(1000)
+    expect(body(0).endsWith('…(truncated)')).toBe(true)
+    expect(body(1)).toBe('short')
   })
 
   it('reports a missing CLI and unsupported hosts without running anything', async () => {

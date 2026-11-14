@@ -1,0 +1,1147 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interview Screens</title>
+<!-- Static mockups for docs/superpowers/specs/2026-11-14-petree-interview-questionnaire-design.md §5.1.
+     Tokens and component CSS are copied from src/dashboard.html; phone rules run as container queries
+     so the 390 px frames get the real phone layout inside a wide page. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono&family=Jersey+10&display=swap">
+<style>
+  /* Tokens: docs/design/handheld-arcade.md §2 (copied from src/dashboard.html) */
+  :root {
+    color-scheme: light;
+    --shell: #E4E5DF; --screen: #F6F6F1; --inset: #ECEDE6; --line: #C9CBC1; --line-strong: #A9AC9F;
+    --ink: #363B47; --muted: #5E6472; --label: #6B7180;
+    --need: #B8327A; --need-tint: #F7E3EE; --need-frame: #B8327A;
+    --go: #3D7A2A; --go-fill: #7DB84A; --go-tint: #E3EFD9;
+    --gold: #9A5B00; --gold-fill: #F2A93B; --gold-tint: #FBEBD0;
+    --on-fill: #363B47;
+    --tag-bg: var(--need); --tag-ink: var(--screen);
+    --chip-bg: var(--need); --chip-ink: var(--screen); --chip-num: var(--screen); --chip-frame: var(--need);
+    --sp-armour: var(--line-strong); --sp-visor: var(--ink);
+    --strip: rgba(242,169,59,.45);
+    --tex: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%223%22 height=%223%22%3E%3Cpath d=%22M0 2.5H3M2.5 0V2.5%22 stroke=%22%23363B47%22 stroke-opacity=%220.05%22/%3E%3C/svg%3E');
+    --h0: #5B6CC9; --h1: #C2582E; --h2: #2E8C86; --h3: #8A55B8; --h4: #6E8A1F; --h5: #4F7FA8; --h6: #7A6A3A; --h7: #3E86B5;
+    --px: 'Jersey 10', ui-monospace, monospace;
+    --sans: 'Atkinson Hyperlegible', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --step: polygon(0 4px,4px 4px,4px 0,calc(100% - 4px) 0,calc(100% - 4px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px));
+    --cart: polygon(0 4px,4px 4px,4px 0,calc(100% - 18px) 0,calc(100% - 18px) 6px,calc(100% - 12px) 6px,calc(100% - 12px) 12px,calc(100% - 6px) 12px,calc(100% - 6px) 18px,100% 18px,100% calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px));
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --shell: #2A2E38; --screen: #343946; --inset: #2F3440; --line: #4A5062; --line-strong: #5C6378;
+      --ink: #E4E2D8; --muted: #B3B7C4; --label: #9DA2B2;
+      --need: #F28CC0; --need-tint: #4A3445; --need-frame: #B5608F;
+      --go: #A8D877; --go-tint: #36452F;
+      --gold: #F5B95E; --gold-fill: #E0A64E; --gold-tint: #4A4030;
+      --on-fill: #2A2E38;
+      --tag-bg: var(--shell); --tag-ink: var(--need);
+      --chip-bg: var(--need-tint); --chip-ink: var(--need); --chip-num: var(--shell); --chip-frame: var(--need-frame);
+      --sp-armour: #E4E2D8; --sp-visor: #2A2E38;
+      --strip: rgba(224,166,78,.35);
+      --tex: repeating-linear-gradient(180deg, rgba(228,226,216,.03) 0 1px, transparent 1px 3px);
+      --h0: #8F9BE6; --h1: #E88A63; --h2: #5EC2BB; --h3: #B98BE0; --h4: #A3C25A; --h5: #8DB4D9; --h6: #C2AE78; --h7: #7FBCE3;
+    }
+  }
+  /* The review bar's DARK switch; same values as the media query above. */
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --shell: #2A2E38; --screen: #343946; --inset: #2F3440; --line: #4A5062; --line-strong: #5C6378;
+    --ink: #E4E2D8; --muted: #B3B7C4; --label: #9DA2B2;
+    --need: #F28CC0; --need-tint: #4A3445; --need-frame: #B5608F;
+    --go: #A8D877; --go-tint: #36452F;
+    --gold: #F5B95E; --gold-fill: #E0A64E; --gold-tint: #4A4030;
+    --on-fill: #2A2E38;
+    --tag-bg: var(--shell); --tag-ink: var(--need);
+    --chip-bg: var(--need-tint); --chip-ink: var(--need); --chip-num: var(--shell); --chip-frame: var(--need-frame);
+    --sp-armour: #E4E2D8; --sp-visor: #2A2E38;
+    --strip: rgba(224,166,78,.35);
+    --tex: repeating-linear-gradient(180deg, rgba(228,226,216,.03) 0 1px, transparent 1px 3px);
+    --h0: #8F9BE6; --h1: #E88A63; --h2: #5EC2BB; --h3: #B98BE0; --h4: #A3C25A; --h5: #8DB4D9; --h6: #C2AE78; --h7: #7FBCE3;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--shell); color: var(--ink); font: 16px/1.5 var(--sans); }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .btn-start:focus-visible, .btn2:focus-visible { clip-path: none; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+  /* ---------- Review shell (mockup only) ---------- */
+  .rv { position: sticky; top: 0; z-index: 20; background: var(--ink); color: var(--screen); }
+  .rv-in { max-width: 1340px; margin: 0 auto; padding: 10px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; }
+  .rv-t { flex: 1 1 260px; display: flex; flex-direction: column; }
+  .rv-t b { font: 30px/1 var(--px); letter-spacing: .5px; }
+  .rv-t span { font-size: 13px; opacity: .8; }
+  .rv nav { display: flex; flex-wrap: wrap; gap: 4px; }
+  .rv nav a { min-height: 36px; display: inline-flex; align-items: center; padding: 0 10px; border: 2px solid currentColor; font: 20px/1 var(--px); text-decoration: none; }
+  .rv-theme { display: flex; gap: 2px; padding: 2px; border: 2px solid currentColor; }
+  .rv-theme button { min-height: 36px; padding: 0 10px; border: 0; background: transparent; color: inherit; font: 20px/1 var(--px); cursor: pointer; }
+  .rv-theme button[aria-pressed="true"] { background: var(--screen); color: var(--ink); }
+  .doc { max-width: 1340px; margin: 0 auto; padding: 24px 16px 80px; display: flex; flex-direction: column; gap: 56px; }
+  .scr { display: flex; flex-direction: column; gap: 14px; scroll-margin-top: 72px; }
+  .scr-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; max-width: 900px; }
+  .scr-k { font: 40px/1 var(--px); color: var(--gold); }
+  .scr-h h2 { margin: 0; font: 400 40px/1 var(--px); }
+  .scr-h p { flex-basis: 100%; margin: 0; color: var(--muted); font-size: 15px; }
+  .scr-h code { font: 13px var(--mono); }
+  .row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 28px; }
+  .vp { max-width: 100%; overflow-x: auto; }
+  .dev-desk { width: 1280px; background: var(--shell); outline: 2px solid var(--line-strong); }
+  .dev-mid { width: 1000px; background: var(--shell); outline: 2px solid var(--line-strong); }
+  .dev-phone { box-sizing: content-box; width: 390px; height: 844px; overflow-y: auto; border: 10px solid #1C1F26; border-radius: 28px; background: var(--shell); container-type: inline-size; }
+  .dev-cap { margin: 6px 0 0; font: 20px/1 var(--px); color: var(--label); }
+  .note { max-width: 420px; margin: 0; padding: 12px 14px; background: var(--screen); border-left: 4px solid var(--gold-fill); font-size: 14px; line-height: 1.5; color: var(--muted); }
+  .note b { color: var(--ink); }
+
+  /* ---------- Copied from src/dashboard.html ---------- */
+  .hud { background-color: var(--screen); background-image: var(--tex); border-bottom: 2px solid var(--line-strong); }
+  .hud-in { max-width: 1160px; margin: 0 auto; padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+  .brand { flex: 1 1 auto; display: flex; align-items: flex-end; gap: 10px; min-height: 44px; text-decoration: none; }
+  .brand .word { font: 40px/1 var(--px); letter-spacing: 1px; }
+  .sprout { flex: none; width: 48px; height: 51px; }
+  .ym-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 6px; background: var(--chip-bg); color: var(--chip-ink); box-shadow: inset 0 0 0 2px var(--chip-frame); clip-path: var(--step); text-decoration: none; font: 20px/1 var(--px); }
+  .ym-chip .num { min-width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; background: var(--chip-num); color: var(--need); font-size: 30px; }
+  .btn-start { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 18px 4px 14px; border: 0; background: var(--gold-fill); color: var(--on-fill); text-decoration: none; clip-path: var(--step); font: inherit; cursor: pointer; }
+  .btn-start:active, .btn2:active { transform: translateY(1px); }
+  .stack { display: flex; flex-direction: column; gap: 1px; text-align: left; }
+  .w30 { font: 30px/.8 var(--px); }
+  .sub { font-size: 13px; font-weight: 700; line-height: 1.1; }
+  .gear { flex: none; width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--line-strong); background: var(--inset); color: var(--ink); }
+  .page { max-width: 1160px; margin: 0 auto; padding: 32px 24px 64px; display: flex; flex-direction: column; gap: 48px; }
+  .page.sub-page { gap: 20px; }
+  .page.th-view { max-width: 960px; gap: 32px; }
+  .page.nq-view { max-width: 960px; }
+  .ptitle { margin: 0; font: 400 40px/1 var(--px); letter-spacing: .5px; }
+  .back { align-self: flex-start; text-decoration: none; }
+  .sec { display: flex; flex-direction: column; gap: 20px; }
+  .sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+  .sec h2 { margin: 0; display: inline-flex; align-items: center; gap: 10px; font: 400 40px/1 var(--px); letter-spacing: .5px; }
+  .hint { font-size: 15px; color: var(--muted); }
+  .count { min-width: 36px; height: 36px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; font: 30px/1 var(--px); clip-path: var(--step); }
+  .count.need { background: var(--chip-bg); color: var(--chip-ink); box-shadow: inset 0 0 0 2px var(--chip-frame); }
+  .count.go { background: var(--go-fill); color: var(--on-fill); }
+  .count.none { background: var(--inset); color: var(--ink); box-shadow: inset 0 0 0 2px var(--line-strong); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 24px 22px; }
+
+  /* Cartridge card (§4.1) */
+  .cart { display: flex; min-width: 0; color: var(--ink); text-decoration: none; }
+  .cart-frame { flex: 1; min-width: 0; display: flex; padding: 2px; background: var(--line-strong); clip-path: var(--cart); transition: transform .12s steps(2); }
+  .cart.need .cart-frame, .cart-frame.need { background: var(--need-frame); }
+  .cart:hover .cart-frame { transform: translateY(-2px); }
+  .cart-in { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 14px 18px 8px; background-color: var(--screen); background-image: var(--tex); clip-path: var(--cart); }
+  .c-top { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "emb id" "title title" "sum sum"; align-items: center; column-gap: 12px; }
+  .c-top .emb { grid-area: emb; }
+  .c-id { grid-area: id; display: flex; align-items: baseline; gap: 8px; min-width: 0; padding-right: 20px; }
+  .c-id .q { font: 30px/1 var(--px); letter-spacing: .5px; }
+  .c-meta { display: none; min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-title { grid-area: title; min-width: 0; margin: 14px 0 0; font-size: 19px; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-sum { grid-area: sum; margin: 4px 0 0; font-size: 15px; line-height: 1.5; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .emb { flex: none; padding: 4px; background: var(--inset); border: 2px solid var(--line); display: grid; grid-template-columns: repeat(5, 6px); grid-auto-rows: 6px; }
+  .emb i { background: var(--shell); }
+  .ym { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 12px 12px; background: var(--need-tint); border-left: 4px solid var(--need-frame); }
+  .ym-tag { display: inline-flex; align-items: center; gap: 7px; padding: 4px 8px 3px; background: var(--tag-bg); color: var(--tag-ink); font: 20px/1 var(--px); }
+  .cursor { width: 7px; height: 13px; background: currentColor; }
+  .cursor.hollow { background: none; border: 2px solid currentColor; }
+  .ym-act { font-size: 16px; font-weight: 700; line-height: 1.35; }
+  .qs { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 2px solid var(--line); border-left: 4px solid var(--go-fill); }
+  .qs-tag, .qs-time { display: inline-flex; align-items: center; gap: 7px; color: var(--go); font: 20px/1 var(--px); white-space: nowrap; }
+  .np-trail { flex: 0 1 auto; min-width: 0; display: flex; gap: 3px; overflow: hidden; }
+  .np-trail i { flex: none; width: 6px; height: 6px; background: var(--line); animation: npTrail 1.6s steps(3, end) infinite; animation-delay: calc(var(--i) * .1s - 1.6s); }
+  @keyframes npTrail { 0% { background: var(--go-fill); } 25%, 100% { background: var(--line); } }
+  .np { display: flex; align-items: baseline; gap: 10px; min-width: 0; margin: 0; }
+  .np b { flex: none; font: 400 20px/1 var(--px); color: var(--go); }
+  .np span { min-width: 0; font: 14px var(--mono); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  /* Level track (§4.3) */
+  .prog { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+  .lvline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+  .lv { font: 20px/1 var(--px); color: var(--label); }
+  .stg { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .track { display: flex; align-items: flex-start; padding: 2px 18px 0; }
+  .node { flex: 0 0 32px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .node i { width: 20px; height: 20px; margin: 6px 0; display: flex; align-items: center; justify-content: center; font: normal 20px/1 var(--px); }
+  .node.done i { background: var(--go-fill); color: var(--on-fill); }
+  .node.todo i, .node.skipped i { border: 2px dashed var(--line-strong); }
+  .node.current i { width: 24px; height: 24px; margin: 4px 0; outline: 1px solid; outline-offset: 2px; }
+  .node.need i { background: var(--need); outline-color: var(--need); color: var(--screen); }
+  .node.run i { background: var(--gold-fill); outline-color: var(--gold); color: var(--on-fill); }
+  .node b { font: 400 20px/1 var(--px); color: var(--label); white-space: nowrap; }
+  .node.need b { color: var(--need); }
+  .node.run b { color: var(--gold); }
+  .seg { flex: 1 1 auto; height: 4px; margin: 14px 3px 0; background: repeating-linear-gradient(90deg, var(--line-strong) 0 4px, transparent 4px 8px); }
+  .seg.done { margin: 14px 0 0; background: var(--go-fill); }
+  .c-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 10px; border-top: 2px dotted var(--line); }
+  .rchip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 1px 7px; border: 2px solid var(--line-strong); font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+  .rchip i { flex: none; width: 8px; height: 8px; }
+  .age { margin-left: auto; font: 20px/1 var(--px); color: var(--label); }
+  .strip { height: 5px; margin: 0 22px 0 38px; background: repeating-linear-gradient(90deg, var(--strip) 0 7px, transparent 7px 11px); }
+  .btn2 { flex: none; display: inline-block; border: 0; border-radius: 0; padding: 2px; background: var(--line-strong); color: var(--ink); font: inherit; text-decoration: none; cursor: pointer; clip-path: var(--step); }
+  .btn2 > span { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-height: 44px; padding: 6px 16px 6px 14px; background: var(--screen); clip-path: var(--step); }
+  .btn2 b { font: 400 30px/.8 var(--px); }
+  .btn2 small { font-size: 13px; font-weight: 700; line-height: 1.1; }
+
+  /* New quest (spec §5.1f) */
+  .nq-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .nq-h h2 { margin: 0; font: 400 40px/1 var(--px); }
+  .nq-k { font: 20px/1 var(--px); color: var(--label); }
+  .nq-line { margin: 0; font-size: 14px; line-height: 1.4; color: var(--muted); }
+  .nq-sec .cart-in { gap: 16px; padding: 20px 18px 12px; }
+  .pick { position: relative; display: flex; cursor: pointer; }
+  .pick input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+  .pk-f { flex: 1 1 auto; min-width: 0; display: flex; padding: 2px; background: var(--line-strong); clip-path: var(--step); }
+  .pk-in { flex: 1 1 auto; min-width: 0; display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: var(--screen); clip-path: var(--step); }
+  :checked + .pk-f { background: var(--gold); }
+  :checked + .pk-f > .pk-in { background: var(--gold-tint); }
+  :focus-visible + .pk-f { clip-path: none; outline: 3px solid var(--gold); outline-offset: 3px; }
+  .box { flex: none; margin-top: 6px; }
+  .box .fr { fill: var(--line-strong); }
+  .box .ck { display: none; fill: var(--gold); }
+  :checked + .pk-f .box .fr { fill: var(--gold); }
+  :checked + .pk-f .box .ck { display: inline; }
+  .pk-t { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .pk-h { display: flex; align-items: baseline; gap: 8px; }
+  .pk-h b { font: 400 30px/.9 var(--px); }
+  .pk-t small { font-size: 14px; line-height: 1.4; color: var(--muted); }
+  .nq-lv { font: 20px/1 var(--px); color: var(--label); }
+  :checked + .pk-f .nq-lv { color: var(--gold); }
+  .nq-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+  .nq-sws { display: flex; flex-direction: column; border-bottom: 2px dotted var(--line); }
+  .nq-sw { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 68px; padding: 12px 4px; border: 0; border-top: 2px dotted var(--line); background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .nq-sw:focus-visible { outline-offset: -3px; }
+  .nq-sw > span:first-child { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .nq-sw b { font: 400 30px/.9 var(--px); }
+  .nq-sw small { font-size: 14px; line-height: 1.4; color: var(--muted); }
+  .sw { flex: none; display: inline-flex; align-items: center; gap: 10px; font: 20px/1 var(--px); color: var(--muted); }
+  .sw-w { width: 32px; text-align: right; }
+  .sw-t { display: flex; gap: 2px; padding: 2px; background: var(--inset); border: 2px solid var(--line-strong); }
+  .sw-t span { width: 22px; height: 22px; }
+  [aria-checked="false"] .sw-t span:first-child { background: var(--screen); border: 2px solid var(--line-strong); }
+  [aria-checked="true"] .sw { color: var(--go); }
+  [aria-checked="true"] .sw-t span:last-child { background: var(--go-fill); }
+  .nq-foot { display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: space-between; gap: 16px 24px; }
+  .nq-end { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px 18px; }
+  .nq-sum { font-size: 14px; color: var(--muted); }
+  .nq-go { gap: 12px; min-height: 60px; padding: 6px 24px 6px 18px; }
+  .nq-go b { font: 400 40px/.8 var(--px); }
+
+  /* Thread page (spec §5.1b–d) */
+  .th-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .th-id { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; font-size: 13px; color: var(--muted); }
+  .th-id code { font: 13px var(--mono); color: var(--ink); }
+  .th-head .cart-in { gap: 16px; padding: 22px 26px 12px; }
+  .th-title { display: flex; align-items: flex-end; gap: 14px 18px; padding-right: 12px; }
+  .th-name { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .th-q { font: 30px/.9 var(--px); color: var(--label); }
+  .th-h1 { margin: 0; font-size: 30px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .th-title .sprout { width: 64px; height: 68px; }
+  .th-sum { margin: 0; max-width: 680px; color: var(--muted); }
+  .th-head .prog { max-width: 560px; margin-top: 0; }
+  .th-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding-top: 10px; border-top: 2px dotted var(--line); font-size: 13px; color: var(--muted); }
+  .frame { padding: 2px; background: var(--line-strong); clip-path: var(--step); }
+  .frame > div { display: flex; flex-direction: column; gap: 12px; padding: 18px 22px 20px; background: var(--screen); clip-path: var(--step); }
+  .frame.need { background: var(--need-frame); }
+  .frame.need > div { background: var(--need-tint); }
+  .frame.go { background: var(--go-fill); }
+  .frame.doc > div { padding: 12px; }
+  .th-big { align-self: flex-start; font-size: 30px; }
+  .ym-tag.th-big { padding: 5px 10px 4px; }
+  .th-big .cursor { width: 9px; height: 20px; }
+  .th-act { margin: 0; max-width: 720px; font-size: 20px; font-weight: 700; line-height: 1.4; }
+  .th-say { margin: 0; max-width: 720px; color: var(--muted); }
+  .th-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; font-size: 14px; color: var(--muted); }
+  .th-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: var(--ink); font: 700 14px var(--sans); text-decoration: underline; cursor: pointer; }
+  .th-qs > div { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 18px 24px; }
+  .th-qs-main { flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .th-qs-t { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+  .th-sec { display: flex; flex-direction: column; gap: 12px; }
+  .th-doch { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .th-h { margin: 0; font: 400 40px/1 var(--px); }
+  .th-doch code { font: 13px var(--mono); color: var(--muted); }
+  .th-doch.was .th-h { color: var(--muted); }
+  .th-run { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 12px 16px; background: var(--go-tint); }
+  .th-run span { font-size: 15px; color: var(--muted); }
+  .clamp { position: relative; max-height: 260px; overflow: hidden; --fade: var(--screen); }
+  .clamp.over::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 48px; background: linear-gradient(transparent, var(--fade)); }
+  .md-box { padding: 26px 30px 30px; background-color: var(--inset); background-image: var(--tex); box-shadow: inset 0 2px 0 var(--line); --fade: var(--inset); }
+  .rd-open { align-self: flex-start; }
+  .md { font-size: 17px; line-height: 1.6; }
+  .md > * { max-width: 680px; }
+  .md h1, .md h2, .md h3 { margin: 18px 0 6px; line-height: 1.25; }
+  .md h1 { font-size: 24px; } .md h2 { font-size: 20px; }
+  .md > :first-child { margin-top: 0; }
+  .md p, .md ul { margin: 0 0 12px; }
+  .md ul { padding-left: 22px; }
+  .md code { padding: 0 4px; background: var(--screen); border: 1px solid var(--line); font: 14px var(--mono); }
+  .th-move .cart-in { gap: 12px; padding: 22px 26px 24px; }
+  .th-note { display: flex; flex-direction: column; gap: 12px; }
+  .th-h3 { font: 30px/1 var(--px); }
+  .th-note .hint { margin: 0; max-width: 680px; line-height: 1.5; }
+  .th-notebox { display: block; width: 100%; min-height: 128px; padding: 14px 16px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 16px/1.5 var(--sans); resize: vertical; }
+  .th-bar { display: flex; flex-direction: column; gap: 8px; }
+  .th-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 16px; padding-top: 8px; }
+  .th-go { min-height: 60px; padding: 8px 22px 8px 18px; }
+  .th-go svg { margin-left: 8px; }
+  .th-go:disabled { opacity: .55; cursor: not-allowed; }
+  .th-quiet { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 56px; padding: 6px 10px; border: 0; background: transparent; color: var(--muted); font: inherit; text-align: left; cursor: pointer; }
+  .th-quiet.push { margin-left: auto; }
+  .th-quiet b { font: 400 30px/.85 var(--px); }
+  .th-quiet small { font-size: 13px; font-weight: 700; line-height: 1.2; }
+  .th-det { background: var(--screen); border: 2px solid var(--line); }
+  .th-det > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-height: 56px; padding: 6px 18px; cursor: pointer; list-style: none; }
+  .th-det > summary::-webkit-details-marker { display: none; }
+  .th-det > summary::before { content: ''; flex: none; width: 8px; height: 14px; background: var(--label); clip-path: polygon(0 0,25% 0,25% 14.3%,50% 14.3%,50% 28.6%,75% 28.6%,75% 42.9%,100% 42.9%,100% 57.1%,75% 57.1%,75% 71.4%,50% 71.4%,50% 85.7%,25% 85.7%,25% 100%,0 100%); }
+  .th-det[open] > summary::before { transform: rotate(90deg); }
+  .th-det > summary b { font: 400 30px/1 var(--px); }
+  .th-det > summary small { flex: 1 1 260px; min-width: 0; font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .th-k { font: 20px/1 var(--px); color: var(--label); }
+  .th-det-body { display: flex; flex-direction: column; gap: 12px; padding: 0 18px 18px; }
+  .th-old { gap: 8px; }
+  .ql { margin: 0; padding: 0; list-style: none; }
+  .ql li { display: flex; gap: 14px; padding: 12px 0; border-top: 2px dotted var(--line); }
+  .ql-dot { flex: none; width: 12px; height: 12px; margin-top: 5px; }
+  .ql-dot.agent { background: var(--go-fill); }
+  .ql-dot.you { background: var(--gold-fill); }
+  .ql-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .ql-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+  .ql-h span:last-child { font-size: 14px; color: var(--muted); }
+  .ql-det { margin: 0; font-size: 15px; color: var(--muted); }
+  .ql-when { flex: none; padding-top: 2px; font: 20px/1 var(--px); color: var(--label); white-space: nowrap; }
+  .th-info div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 9px 0; border-top: 2px dotted var(--line); }
+  .th-info dt { margin: 0; font: 20px/1 var(--px); color: var(--label); }
+  .th-info dd { margin: 0; min-width: 0; font-weight: 700; text-align: right; }
+  .th-info { margin: 0; }
+
+  /* Options (spec §5.1g) */
+  .cart-in.o-panel { gap: 18px; padding: 22px 26px 12px; }
+  .o-panel h2 { margin: 0; display: inline-flex; align-items: center; gap: 12px; font: 400 40px/1 var(--px); }
+  .o-h3 { margin: 0; font: 400 30px/1 var(--px); }
+  .o-k { font: 400 20px/1 var(--px); color: var(--label); }
+  .o-help, .o-msg { font-size: 13px; line-height: 1.45; color: var(--muted); }
+  .o-sub { display: flex; flex-direction: column; gap: 12px; }
+  .o-picks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .o-pick { position: relative; display: inline-flex; max-width: 100%; padding: 2px; background: var(--line-strong); clip-path: var(--step); cursor: pointer; }
+  .o-pick input { position: absolute; width: 1px; height: 1px; margin: 0; opacity: 0; }
+  .o-pick > span { display: inline-flex; align-items: center; gap: 10px; min-width: 0; min-height: 44px; padding: 6px 16px 6px 12px; background: var(--screen); clip-path: var(--step); }
+  .o-pick:has(:checked) { background: var(--gold); }
+  .o-pick:has(:checked) > span { background: var(--gold-tint); }
+  .o-pick:has(:focus-visible), .o-save:focus-visible { clip-path: none; outline: 3px solid var(--gold); outline-offset: 3px; }
+  .o-box { flex: none; color: var(--line-strong); }
+  .o-pick :checked + span .o-box { color: var(--gold); }
+  .o-pick :not(:checked) + span .o-ck { display: none; }
+  .o-pw { display: flex; flex-direction: column; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+  .o-pw b { font: 400 30px/.8 var(--px); }
+  .o-pw i { font: normal 20px/1 var(--px); color: var(--label); }
+  .o-pw small { font-size: 14px; line-height: 1.2; color: var(--muted); }
+  .o-pick.sm .o-pw b { font-size: 20px; line-height: 1; }
+  .o-badge { padding: 3px 9px; background: var(--inset); color: var(--muted); font-size: 13px; font-weight: 700; }
+  .o-badge.gold { background: var(--gold-tint); color: var(--gold); }
+  .o-badge.ink { padding: 3px 8px 2px; background: var(--ink); color: var(--screen); font: 20px/1 var(--px); }
+  .o-rules { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 22px 24px; }
+  .o-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+  .o-num { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; font-size: 15px; color: var(--muted); }
+  .o-num input { flex: none; width: 150px; min-height: 48px; padding: 10px 14px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 14px/1.5 var(--mono); }
+  .o-foot { display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: space-between; gap: 16px 24px; }
+  .o-foot > div { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+  .o-quiet { display: inline-flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; min-height: 48px; padding: 4px 8px; border: 0; background: none; color: var(--muted); text-align: left; text-decoration: none; }
+  .o-quiet b { font: 400 30px/.8 var(--px); }
+  .o-quiet small { font-size: 13px; font-weight: 700; line-height: 1.1; }
+  .o-save { display: inline-flex; align-items: center; gap: 12px; min-height: 60px; padding: 6px 24px 6px 18px; border: 0; background: var(--gold-fill); color: var(--on-fill); clip-path: var(--step); font: inherit; cursor: pointer; }
+  .o-save b { font: 400 40px/.8 var(--px); }
+
+  /* ---------- New for the interview (spec §5.1) ---------- */
+  .nq-sw:disabled { cursor: not-allowed; }
+  .nq-sw:disabled > * { opacity: .5; }
+  .nq-sw .why-off { display: block; margin-top: 2px; font-weight: 700; color: var(--label); }
+  /* THE PARTY ASKS */
+  .ask { display: flex; flex-direction: column; gap: 0; }
+  .ask-round { display: flex; flex-direction: column; gap: 8px; padding: 14px 16px; background-color: var(--inset); background-image: var(--tex); border-left: 4px solid var(--need-frame); }
+  .ask-rh { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .ask-rk { padding: 4px 9px 3px; background: var(--ink); color: var(--screen); font: 30px/.9 var(--px); letter-spacing: .5px; }
+  .ask-out { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px 3px; border: 2px solid currentColor; font: 20px/1 var(--px); }
+  .ask-out.last { color: var(--go); }
+  .ask-out.more { color: var(--gold); }
+  .ask-out i { width: 8px; height: 8px; background: currentColor; }
+  .ask-cnt { margin-left: auto; font: 20px/1 var(--px); color: var(--label); }
+  .ask-intro { margin: 0; max-width: 720px; font-size: 16px; line-height: 1.5; }
+  .ask-intro b { margin-right: 6px; font: 400 20px/1 var(--px); color: var(--need); }
+  .ask-q { display: flex; flex-direction: column; gap: 10px; padding: 18px 4px 20px; border-top: 2px dotted var(--line); }
+  .ask-round + .ask-q { border-top: 0; }
+  .ask-qh { display: flex; align-items: flex-start; gap: 12px; }
+  .ask-n { flex: none; min-width: 40px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; background: var(--inset); border: 2px solid var(--line-strong); font: 20px/1 var(--px); color: var(--ink); }
+  .ask-qt { flex: 1 1 auto; min-width: 0; margin: 2px 0 0; font-size: 19px; font-weight: 700; line-height: 1.3; }
+  .ask-tag { flex: none; padding: 4px 8px 3px; font: 20px/1 var(--px); white-space: nowrap; border: 2px dotted var(--line-strong); color: var(--label); }
+  .mine > .ask-qh .ask-tag { border: 2px solid var(--gold); background: var(--gold-fill); color: var(--on-fill); }
+  .needs > .ask-qh .ask-tag { border: 2px solid var(--need-frame); background: var(--need-tint); color: var(--need); }
+  .ask-why { margin: 0 0 0 52px; max-width: 680px; font-size: 14px; line-height: 1.45; color: var(--muted); }
+  .ask-why b { margin-right: 6px; font: 400 20px/1 var(--px); color: var(--label); }
+  .ask-body { display: flex; flex-direction: column; gap: 8px; margin-left: 52px; }
+  .ask-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr)); gap: 10px; }
+  .ask-opts.two { grid-template-columns: repeat(2, minmax(0, 160px)); }
+  .ask .pk-in { gap: 10px; padding: 10px 12px; }
+  .ask .box { margin-top: 3px; }
+  .ask .pk-t { gap: 2px; }
+  .ask-ol { font-size: 16px; font-weight: 700; line-height: 1.3; }
+  .ask-yn { font: 400 30px/.9 var(--px); }
+  .ask-was { margin-top: 4px; padding: 1px 6px; border: 2px dotted var(--line-strong); font: normal 20px/1 var(--px); color: var(--label); }
+  :checked + .pk-f .ask-was { border-color: var(--gold); color: var(--gold); }
+  .ask-other { display: none; width: 100%; min-height: 44px; padding: 8px 12px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 15px var(--sans); }
+  .ask-q:has(input[value="other"]:checked) .ask-other { display: block; }
+  .ask-num { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 15px; color: var(--muted); }
+  .ask-num input { width: 120px; min-height: 48px; padding: 8px 12px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 400 30px/1 var(--px); }
+  .ask-num .ask-was { margin: 0; }
+  .ask-text { display: block; width: 100%; max-width: 680px; min-height: 88px; padding: 10px 14px; border: 2px solid var(--line-strong); border-radius: 0; background: var(--inset); color: var(--ink); font: 15px/1.5 var(--sans); resize: vertical; }
+  .ask-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; min-height: 24px; font-size: 13px; color: var(--muted); }
+  .ask-reset { min-height: 32px; font-size: 13px; }
+  .ask-q:not(.mine) .ask-reset { display: none; }
+  /* inbox card question block */
+  /* The link lives inside .cart-in: clip-path makes .cart-frame and .cart-in stacking contexts,
+     so a link outside them would sit above every button in the card. */
+  .cart.need .cart-in { position: relative; }
+  .cart-link { position: absolute; inset: 0; z-index: 1; }
+  .cart-link:focus-visible { outline-offset: -3px; }
+  .ask-c { align-self: stretch; display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 2px dotted var(--need-frame); }
+  .ask-cq { margin: 0; display: flex; align-items: flex-start; gap: 8px; font-size: 15px; font-weight: 700; line-height: 1.35; }
+  .ask-cq span:last-child { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .ask-cq .ask-n { min-width: 32px; height: 24px; background: var(--screen); font-size: 20px; }
+  .ask-cq .ask-r { flex: none; padding: 2px 6px 1px; background: var(--ink); color: var(--screen); font: 400 20px/1 var(--px); }
+  .ask-cg { margin: 0; font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ask-cg b { font: 400 20px/1 var(--px); color: var(--need); }
+  .ask-cf { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
+  .ask-more { font: 20px/1 var(--px); color: var(--label); }
+  .ask-acc { position: relative; z-index: 2; }
+  .ask-acc > span { min-height: 44px; padding: 5px 12px 5px 10px; }
+  .ask-acc b { font-size: 20px; line-height: 1; }
+  .ask-acc.armed { background: var(--need-frame); }
+  .ask-acc.armed > span { position: relative; overflow: hidden; background: var(--need); color: var(--screen); }
+  .ask-tick { position: absolute; left: 0; bottom: 0; height: 4px; width: 100%; background: var(--screen); transform-origin: left; transform: scaleX(var(--left, 1)); }
+  .ask-acc.armed.counting .ask-tick { animation: tick 4s linear forwards; }
+  @keyframes tick { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+  .ask-acc.sent { background: var(--go-fill); }
+  .ask-acc.sent > span { background: var(--go-tint); color: var(--go); }
+  /* answered recap */
+  .rc { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; }
+  .rc li { display: flex; gap: 12px; padding: 12px 0; border-top: 2px dotted var(--line); }
+  .rc li > div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .rc-q { margin: 0; font-size: 15px; color: var(--muted); }
+  .rc-a { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.35; }
+  .rc-s { align-self: flex-start; padding: 2px 7px 1px; font: 20px/1 var(--px); color: var(--label); border: 2px dotted var(--line-strong); }
+  .rc-s.mine { border: 2px solid var(--gold); background: var(--gold-tint); color: var(--gold); }
+  .rc-s.none { border-style: solid; color: var(--need); border-color: var(--need-frame); }
+  .rc-end { margin: 0; padding: 10px 12px; background: var(--inset); font-size: 14px; color: var(--muted); }
+  .rc-end b { font: 400 20px/1 var(--px); color: var(--ink); margin-right: 6px; }
+  /* GAME RULES › FROM YOUR ~/.claude */
+  .cl { display: flex; flex-direction: column; gap: 18px; padding-top: 18px; border-top: 2px dotted var(--line); }
+  .cl-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .cl-h code { font: 400 30px/1 var(--px); }
+  .cl-k { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .cl-skills { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 10px; }
+  .cl-skills .o-pick, .cl-plugs .o-pick { display: flex; }
+  .cl-skills .o-pick > span, .cl-plugs .o-pick > span { flex: 1 1 auto; align-items: flex-start; }
+  .cl-skills .o-box, .cl-plugs .o-box { margin-top: 2px; }
+  .cl-plugs { display: flex; flex-direction: column; gap: 10px; }
+  .cl-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .cl-warn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; background: var(--gold-tint); color: var(--gold); font-size: 13px; font-weight: 700; }
+  .cl-use { padding: 3px 8px 2px; background: var(--go-fill); color: var(--on-fill); font: 20px/1 var(--px); }
+  .cl-sw { border-bottom: 2px dotted var(--line); }
+  .cl-faded { opacity: .55; }
+
+  /* ---------- Phone (design §5), as container queries on .dev-phone ---------- */
+  @container (max-width: 600px) {
+    .hud-in { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "brand chip gear" "start start start"; gap: 8px 10px; padding: 8px 16px 10px; }
+    .brand { grid-area: brand; min-width: 0; gap: 8px; }
+    .brand .word { font-size: 30px; }
+    .hud .sprout { width: 32px; height: 34px; }
+    .ym-chip { grid-area: chip; gap: 6px; padding: 0 10px 0 6px; }
+    .ym-chip .num { min-width: 28px; height: 30px; }
+    .gear { grid-area: gear; width: 44px; height: 44px; }
+    .hud .btn-start { grid-area: start; justify-self: end; padding: 4px 12px 4px 10px; }
+    .page { padding: 18px 16px 24px; gap: 28px; }
+    .page.th-view { gap: 22px; }
+    .sec { gap: 12px; }
+    .sec h2 { font-size: 30px; gap: 8px; }
+    .count { min-width: 28px; height: 28px; padding: 0 6px; font-size: 20px; }
+    .sec .hint { display: none; }
+    .grid { gap: 14px; }
+    .cart-in { gap: 10px; padding: 12px 14px 6px; }
+    .c-top { grid-template-areas: "emb id" "emb title" "sum sum"; }
+    .c-id { padding-right: 14px; }
+    .c-id .q { font-size: 20px; }
+    .c-meta { display: block; }
+    .c-title { margin-top: 3px; font-size: 17px; }
+    .c-sum { margin-top: 10px; line-height: 1.45; }
+    .ym { gap: 6px; padding: 8px 10px 10px; }
+    .ym-tag { padding: 3px 7px 2px; }
+    .ym-act { font-size: 15px; }
+    .prog { flex-direction: row; align-items: center; gap: 12px; margin-top: 0; }
+    .prog .track { order: -1; flex: 0 0 120px; height: 20px; padding: 0; align-items: center; }
+    .lv, .node b, .c-foot, .desk { display: none; }
+    .node { flex: none; gap: 0; }
+    .node i { width: 10px; height: 10px; margin: 0; font-size: 0; }
+    .node i svg { display: none; }
+    .node.current i { width: 12px; height: 12px; margin: 0 3px; }
+    .seg { height: 2px; margin: 0 2px; background: repeating-linear-gradient(90deg, var(--line-strong) 0 2px, transparent 2px 4px); }
+    .seg.done { margin: 0; }
+    .sname { font: 20px/1 var(--px); }
+    .prog.need .sname { color: var(--need); }
+    .btn2 > span { padding: 5px 10px; }
+    .btn2 b { font-size: 20px; line-height: 1; }
+    .th-head .cart-in { gap: 12px; padding: 14px 14px 6px; }
+    .th-title { align-items: center; gap: 12px; padding-right: 14px; }
+    .th-title .sprout { display: none; }
+    .th-q { font-size: 20px; }
+    .th-h1 { font-size: 20px; }
+    .th-sum { font-size: 15px; }
+    .th-head .prog { flex-direction: column; align-items: stretch; gap: 8px; }
+    .th-head .prog .track { order: 0; flex: none; height: auto; padding: 4px 4px 0; }
+    .th-head .lv { display: inline; }
+    .th-head .node i { width: 20px; height: 20px; font-size: 20px; }
+    .th-head .node i svg { display: block; }
+    .th-head .node.current i { width: 24px; height: 24px; }
+    .th-head .seg { height: 4px; margin: 0 3px; background: repeating-linear-gradient(90deg, var(--line-strong) 0 4px, transparent 4px 8px); }
+    .th-head .seg.done { margin: 0; background: var(--go-fill); }
+    .frame > div { gap: 8px; padding: 12px 14px 14px; }
+    .th-big { font-size: 20px; }
+    .ym-tag.th-big { padding: 3px 7px 2px; }
+    .th-big .cursor { width: 6px; height: 12px; }
+    .th-act { font-size: 15px; line-height: 1.35; }
+    .th-h { font-size: 30px; }
+    .th-det > summary { gap: 2px 10px; padding: 6px 14px; }
+    .th-det > summary b { font-size: 20px; }
+    .th-det-body { padding: 0 14px 14px; }
+    .th-move, .th-move > .cart-in { display: contents; }
+    .th-move .strip { display: none; }
+    .th-note { order: 2; gap: 8px; }
+    .th-notebox { min-height: 0; height: 124px; resize: none; }
+    .th-bar { order: 3; position: sticky; bottom: 0; z-index: 5; margin: 0 -16px -24px; padding: 10px 16px 8px; background: var(--shell); border-top: 2px solid var(--line-strong); }
+    .th-btns { gap: 6px 8px; padding-top: 0; }
+    .th-go { flex: 1 1 100%; justify-content: center; }
+    .th-go .stack { align-items: center; text-align: center; }
+    .th-quiet, .th-quiet.push { flex: 1 1 0; min-width: 0; align-items: center; justify-content: center; min-height: 48px; margin: 0; padding: 4px; text-align: center; }
+    .th-quiet b { font-size: 20px; line-height: 1; }
+    /* questionnaire on phone (spec §5.1c) */
+    .ask-round { padding: 12px; }
+    .ask-cnt { margin-left: 0; flex-basis: 100%; }
+    .ask-rk { font-size: 20px; }
+    .ask-q { padding: 14px 0 16px; }
+    .ask-qh { gap: 8px; flex-wrap: wrap; }
+    .ask-qt { flex-basis: calc(100% - 50px); font-size: 17px; }
+    .ask-qh .ask-tag { order: 3; margin-left: 48px; }
+    .ask-why { margin-left: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .ask-body { margin-left: 0; }
+    .ask-opts, .ask-opts.two { grid-template-columns: minmax(0, 1fr); }
+    .ask-num input, .ask-text { width: 100%; max-width: none; }
+  }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="play" viewBox="0 0 4 7"><rect x="0" y="0" width="1" height="7"/><rect x="1" y="1" width="1" height="5"/><rect x="2" y="2" width="1" height="3"/><rect x="3" y="3" width="1" height="1"/></symbol>
+  <symbol id="check" viewBox="0 0 7 6"><rect x="0" y="2" width="1" height="2"/><rect x="1" y="3" width="1" height="2"/><rect x="2" y="4" width="1" height="2"/><rect x="3" y="3" width="1" height="2"/><rect x="4" y="2" width="1" height="2"/><rect x="5" y="1" width="1" height="2"/><rect x="6" y="0" width="1" height="2"/></symbol>
+  <symbol id="warn" viewBox="0 0 7 6"><g style="fill:var(--gold)"><rect x="3" y="0" width="1" height="1"/><rect x="2" y="1" width="3" height="2"/><rect x="1" y="3" width="5" height="2"/><rect x="0" y="5" width="7" height="1"/></g><rect x="3" y="2" width="1" height="2" style="fill:var(--gold-tint)"/></symbol>
+  <symbol id="gear" viewBox="0 0 12 12"><rect x="4" y="0" width="4" height="1"/><rect x="1" y="1" width="2" height="1"/><rect x="4" y="1" width="4" height="1"/><rect x="9" y="1" width="2" height="1"/><rect x="1" y="2" width="10" height="1"/><rect x="2" y="3" width="8" height="1"/><rect x="0" y="4" width="5" height="1"/><rect x="7" y="4" width="5" height="1"/><rect x="0" y="5" width="4" height="2"/><rect x="8" y="5" width="4" height="2"/><rect x="0" y="7" width="5" height="1"/><rect x="7" y="7" width="5" height="1"/><rect x="2" y="8" width="8" height="1"/><rect x="1" y="9" width="10" height="1"/><rect x="1" y="10" width="2" height="1"/><rect x="4" y="10" width="4" height="1"/><rect x="9" y="10" width="2" height="1"/><rect x="4" y="11" width="4" height="1"/></symbol>
+  <symbol id="sprout" viewBox="0 0 16 17">
+    <rect x="3" y="16" width="10" height="1" style="fill:var(--line)"/>
+    <g style="fill:var(--go-fill)"><rect x="4" y="0" width="3" height="1"/><rect x="9" y="0" width="3" height="1"/><rect x="3" y="1" width="4" height="1"/><rect x="9" y="1" width="4" height="1"/></g>
+    <g style="fill:var(--go)"><rect x="7" y="1" width="2" height="1"/><rect x="5" y="2" width="6" height="1"/><rect x="7" y="3" width="2" height="1"/></g>
+    <g style="fill:var(--sp-armour)"><rect x="5" y="4" width="6" height="1"/><rect x="4" y="5" width="8" height="1"/><rect x="4" y="6" width="1" height="1"/><rect x="11" y="6" width="1" height="1"/><rect x="4" y="7" width="6" height="1"/><rect x="5" y="10" width="6" height="1"/><rect x="5" y="11" width="4" height="1"/><rect x="12" y="11" width="1" height="4"/></g>
+    <rect x="5" y="6" width="6" height="1" style="fill:var(--sp-visor)"/>
+    <g style="fill:var(--muted)"><rect x="10" y="7" width="2" height="1"/><rect x="5" y="8" width="6" height="1"/><rect x="9" y="11" width="2" height="1"/><rect x="9" y="13" width="2" height="2"/><rect x="9" y="15" width="3" height="1"/><rect x="5" y="13" width="2" height="2"/><rect x="4" y="15" width="3" height="1"/></g>
+    <g style="fill:var(--gold)"><rect x="3" y="9" width="8" height="1"/><rect x="2" y="10" width="2" height="1"/></g>
+    <g style="fill:var(--gold-fill)"><rect x="6" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="5" y="12" width="6" height="1"/><rect x="12" y="9" width="1" height="1"/><rect x="11" y="10" width="3" height="1"/></g>
+  </symbol>
+</svg>
+
+<header class="rv">
+  <div class="rv-in">
+    <div class="rv-t"><b>PETREE · INTERVIEW SCREENS</b><span>Static mockups for spec 2026-11-14 §5.1 · sample quest Q-024 “Retry with backoff for REST tasks”</span></div>
+    <nav aria-label="Screens"><a href="#a">A</a><a href="#b">B</a><a href="#c">C</a><a href="#d">D</a><a href="#e">E</a><a href="#f">F</a><a href="#g">G</a></nav>
+    <div class="rv-theme" role="group" aria-label="Theme">
+      <button type="button" data-theme-set="" aria-pressed="true">AUTO</button>
+      <button type="button" data-theme-set="light" aria-pressed="false">LIGHT</button>
+      <button type="button" data-theme-set="dark" aria-pressed="false">DARK</button>
+    </div>
+  </div>
+</header>
+
+<div class="doc">
+
+<!-- ===================== (a) New quest options ===================== -->
+<section class="scr" id="a" aria-labelledby="a-h">
+  <div class="scr-h"><span class="scr-k">(a)</span><h2 id="a-h">NEW QUEST · RULES OF PLAY</h2>
+    <p>Step 4 of <code>#/new</code> with the third switch. Top: INTERVIEW and AUTO-PLAY both on. Bottom: STARTING LEVEL is CRAFT, so INTERVIEW is greyed out.</p></div>
+  <div class="row">
+    <div class="vp"><div class="dev-mid"><div class="page nq-view sub-page">
+      <section class="cart-frame nq-sec" aria-label="Rules of play"><div class="cart-in">
+        <div class="nq-h"><span class="nq-k">STEP 4/4</span><h2>RULES OF PLAY</h2><span class="hint">Where the quest begins and how far it goes on its own.</span></div>
+        <span class="nq-k">STARTING LEVEL</span>
+        <div class="nq-tiles" role="radiogroup" aria-label="Starting level">
+          <label class="pick"><input type="radio" name="a-lv" checked><span class="pk-f"><span class="pk-in">
+            <svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg>
+            <span class="pk-t"><span class="pk-h"><b>SCOUT</b><span class="nq-lv">LV 1</span></span><small>look around, write findings, stop for you</small></span></span></span></label>
+          <label class="pick"><input type="radio" name="a-lv"><span class="pk-f"><span class="pk-in">
+            <svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg>
+            <span class="pk-t"><span class="pk-h"><b>PLAN</b><span class="nq-lv">LV 2</span></span><small>write a spec, stop for your OK</small></span></span></span></label>
+          <label class="pick"><input type="radio" name="a-lv"><span class="pk-f"><span class="pk-in">
+            <svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg>
+            <span class="pk-t"><span class="pk-h"><b>CRAFT</b><span class="nq-lv">LV 3</span></span><small>build it straight away</small></span></span></span></label>
+        </div>
+        <div class="nq-sws">
+          <button type="button" class="nq-sw" role="switch" aria-checked="true" data-sw><span><b>PARTY MODE</b><small>let it spawn subagents for parallel work</small></span><span class="sw" aria-hidden="true"><span class="sw-w">ON</span><span class="sw-t"><span></span><span></span></span></span></button>
+          <button type="button" class="nq-sw" role="switch" aria-checked="true" data-sw><span><b>AUTO-PLAY</b><small>go all the way to an open PR without stopping at gates; you still merge</small></span><span class="sw" aria-hidden="true"><span class="sw-w">ON</span><span class="sw-t"><span></span><span></span></span></span></button>
+          <button type="button" class="nq-sw" role="switch" aria-checked="true" data-sw><span><b>INTERVIEW</b><small>ask you a few questions before findings and spec; guesses filled in</small></span><span class="sw" aria-hidden="true"><span class="sw-w">ON</span><span class="sw-t"><span></span><span></span></span></span></button>
+        </div>
+        <p class="nq-line">AUTO-PLAY is on, so the quest starts at SCOUT and runs on to an open PR. It never merges; you do. SCOUT and PLAN each start with a questionnaire for you. AUTO-PLAY still stops at every questionnaire; after you answer it runs on.</p>
+        <div class="strip" aria-hidden="true"></div>
+      </div></section>
+      <div class="nq-foot">
+        <a class="btn2" href="#a"><span><b>BACK</b><small>to the inbox, draft kept</small></span></a>
+        <div class="nq-end">
+          <span class="nq-sum">1 repo · KNIGHT · Sonnet · starts at SCOUT · interview</span>
+          <button type="button" class="btn-start nq-go"><svg width="8" height="14" fill="currentColor" aria-hidden="true"><use href="#play"/></svg><span class="stack"><b>PRESS START</b><span class="sub">start the thread</span></span></button>
+        </div>
+      </div>
+      <section class="cart-frame nq-sec" aria-label="Rules of play, starting at CRAFT"><div class="cart-in">
+        <div class="nq-h"><span class="nq-k">VARIANT</span><h2>STARTING AT CRAFT</h2></div>
+        <div class="nq-sws">
+          <button type="button" class="nq-sw" role="switch" aria-checked="false"><span><b>AUTO-PLAY</b><small>go all the way to an open PR without stopping at gates; you still merge</small></span><span class="sw" aria-hidden="true"><span class="sw-w">OFF</span><span class="sw-t"><span></span><span></span></span></span></button>
+          <button type="button" class="nq-sw" role="switch" aria-checked="true" disabled><span><b>INTERVIEW</b><small>ask you a few questions before findings and spec; guesses filled in<span class="why-off">only SCOUT and PLAN ask · this quest starts at CRAFT</span></small></span><span class="sw" aria-hidden="true"><span class="sw-w">ON</span><span class="sw-t"><span></span><span></span></span></span></button>
+        </div>
+        <p class="nq-line">AUTO-PLAY is off, so the quest starts at CRAFT and stops at every gate for your OK.</p>
+        <div class="strip" aria-hidden="true"></div>
+      </div></section>
+    </div></div></div>
+  </div>
+</section>
+
+<!-- ===================== (b) Thread page, PLAN questionnaire, desktop ===================== -->
+<section class="scr" id="b" aria-labelledby="b-h">
+  <div class="scr-h"><span class="scr-k">(b)</span><h2 id="b-h">THREAD · PLAN QUESTIONNAIRE · DESKTOP 1280</h2>
+    <p>Round 1 of PLAN with Q1 and Q2 changed, so the main button reads SEND ANSWERS · 2 changed. Change the answers or press “reset to guess” to see the button switch back to ACCEPT ALL GUESSES.</p></div>
+  <div class="vp"><div class="dev-desk">
+    <header class="hud"><div class="hud-in">
+      <a class="brand" href="#b"><svg class="sprout" aria-hidden="true"><use href="#sprout"/></svg><span class="word">PETREE</span></a>
+      <a class="ym-chip" href="#d"><span class="num">2</span>YOUR MOVE</a>
+      <a class="btn-start" href="#a"><svg width="8" height="14" fill="currentColor" aria-hidden="true"><use href="#play"/></svg><span class="stack"><span class="w30">PRESS START</span><span class="sub">start a new thread</span></span></a>
+      <a class="gear" href="#g" aria-label="Options"><svg width="24" height="24" fill="currentColor" aria-hidden="true"><use href="#gear"/></svg></a>
+    </div></header>
+    <main class="page sub-page th-view">
+      <div class="th-top"><a class="btn2 back" href="#d"><span><b>BACK</b><small>to the inbox</small></span></a><span class="th-id">thread <code>7c1e04ab</code></span></div>
+
+      <section class="th-head"><div class="cart-frame need"><div class="cart-in">
+        <div class="th-title"><span class="emb" data-emb="0110110001111110100101101" data-hue="h2"></span><div class="th-name"><span class="th-q">Q-024</span><h1 class="th-h1">Retry with backoff for REST tasks</h1></div><svg class="sprout" aria-hidden="true"><use href="#sprout"/></svg></div>
+        <p class="th-sum">Findings approved. Before the spec: six questions on scope, limits and backoff.</p>
+        <div class="prog need"><div class="lvline"><span class="lv">LV 2/5</span><span class="stg"><span class="sname">PLAN</span> · spec</span></div>
+          <div class="track" role="img" aria-label="Level 2 of 5: PLAN, the spec stage, waiting for you"><span class="node done"><i><svg width="14" height="12" fill="currentColor"><use href="#check"/></svg></i><b>SCOUT</b></span><span class="seg done"></span><span class="node current need"><i>2</i><b>PLAN</b></span><span class="seg"></span><span class="node todo"><i></i><b>CRAFT</b></span><span class="seg"></span><span class="node todo"><i></i><b>SHIP</b></span><span class="seg"></span><span class="node todo"><i></i><b>VICTORY</b></span></div></div>
+        <div class="th-foot"><span class="rchip"><i style="background:var(--h2)"></i>task-runner · work</span><span class="rchip"><i style="background:var(--h5)"></i>api-gateway · work</span><span>no PR yet</span><span class="age">4M</span></div>
+        <div class="strip" aria-hidden="true"></div></div></div></section>
+
+      <section><div class="frame need"><div>
+        <span class="ym-tag th-big"><svg width="6" height="11" fill="currentColor" aria-hidden="true"><use href="#play"/></svg>YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
+        <p class="th-act">Answer 6 questions before the spec</p>
+        <p class="th-say">Six choices the code can’t make for me: which calls retry, how often, and what counts as retryable.</p>
+        <div class="th-meta"><span>agent · end of the PLAN turn · 4m ago</span><span>round 1 · guesses filled in</span><button type="button" class="th-link">Jump to your choices</button></div>
+      </div></div></section>
+
+      <section class="th-sec" aria-labelledby="b-ask">
+        <div class="th-doch"><h2 class="th-h" id="b-ask">THE PARTY ASKS</h2><code>_thread/questions.json · round 1 · 6 questions</code></div>
+        <div class="frame doc"><div>
+          <div class="ask" data-ask="b">
+            <div class="ask-round">
+              <div class="ask-rh"><span class="ask-rk">ROUND 1</span><span class="ask-out more"><i></i>EXPECT ANOTHER ROUND</span><span class="ask-cnt">6 QUESTIONS · GUESSES FILLED IN</span></div>
+              <p class="ask-intro">Before I write the retry spec, six things the code can’t tell me. My guesses are filled in; change only what’s wrong.</p>
+            </div>
+
+            <div class="ask-q mine" role="group" aria-labelledby="b-q1" data-guess="idem">
+              <div class="ask-qh"><span class="ask-n">Q1</span><h3 class="ask-qt" id="b-q1">Which REST tasks should retry?</h3><span class="ask-tag">YOURS</span></div>
+              <p class="ask-why"><b>WHY</b>Retrying a POST can double-charge a customer unless the call carries an idempotency key.</p>
+              <div class="ask-body"><div class="ask-opts">
+                <label class="pick"><input type="radio" name="b-q1" value="idem"><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">Idempotent methods only</span><small>GET, PUT, DELETE</small><em class="ask-was">GUESS</em></span></span></span></label>
+                <label class="pick"><input type="radio" name="b-q1" value="all" checked><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">All methods</span><small>POST only with an idempotency key</small></span></span></span></label>
+                <label class="pick"><input type="radio" name="b-q1" value="flag"><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">Opt-in per task</span><small>a <code>retry:</code> flag on the task</small></span></span></span></label>
+                <label class="pick"><input type="radio" name="b-q1" value="other"><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">Other…</span><small>say it in your own words</small></span></span></span></label>
+              </div>
+              <input class="ask-other" type="text" aria-label="Your own answer to Q1" placeholder="your own answer">
+              <div class="ask-foot"><button type="button" class="th-link ask-reset">reset to guess</button></div></div>
+            </div>
+
+            <div class="ask-q mine" role="group" aria-labelledby="b-q2" data-guess="3">
+              <div class="ask-qh"><span class="ask-n">Q2</span><h3 class="ask-qt" id="b-q2">How many attempts at most?</h3><span class="ask-tag">YOURS</span></div>
+              <p class="ask-why"><b>WHY</b>Sets the worst-case latency of a task whose upstream is down.</p>
+              <div class="ask-body"><div class="ask-num"><input type="number" min="1" max="10" step="1" value="5" aria-label="Attempts"><span>attempts · 1 to 10</span><em class="ask-was">GUESS 3</em></div>
+              <div class="ask-foot"><button type="button" class="th-link ask-reset">reset to guess</button></div></div>
+            </div>
+
+            <div class="ask-q" role="group" aria-labelledby="b-q3" data-guess="full">
+              <div class="ask-qh"><span class="ask-n">Q3</span><h3 class="ask-qt" id="b-q3">Which backoff curve?</h3><span class="ask-tag">GUESS</span></div>
+              <p class="ask-why"><b>WHY</b>Without jitter, every failing task retries in lockstep and hammers the upstream together.</p>
+              <div class="ask-body"><div class="ask-opts">
+                <label class="pick"><input type="radio" name="b-q3" value="full" checked><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">Exponential, full jitter</span><small>random wait up to 2ⁿ × 200 ms</small><em class="ask-was">GUESS</em></span></span></span></label>
+                <label class="pick"><input type="radio" name="b-q3" value="equal"><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">Exponential, equal jitter</span><small>half fixed, half random</small></span></span></span></label>
+                <label class="pick"><input type="radio" name="b-q3" value="fixed"><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">Fixed delay</span><small>1 s between attempts</small></span></span></span></label>
+              </div>
+              <div class="ask-foot"><button type="button" class="th-link ask-reset">reset to guess</button></div></div>
+            </div>
+
+            <div class="ask-q" role="group" aria-labelledby="b-q4" data-guess="yes">
+              <div class="ask-qh"><span class="ask-n">Q4</span><h3 class="ask-qt" id="b-q4">Honour Retry-After on 429 and 503?</h3><span class="ask-tag">GUESS</span></div>
+              <p class="ask-why"><b>WHY</b>Some upstreams answer with hours; we may want our own ceiling instead.</p>
+              <div class="ask-body"><div class="ask-opts two">
+                <label class="pick"><input type="radio" name="b-q4" value="yes" checked><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-yn">YES</span><em class="ask-was">GUESS</em></span></span></span></label>
+                <label class="pick"><input type="radio" name="b-q4" value="no"><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-yn">NO</span></span></span></span></label>
+              </div>
+              <div class="ask-foot"><button type="button" class="th-link ask-reset">reset to guess</button></div></div>
+            </div>
+
+            <div class="ask-q" role="group" aria-labelledby="b-q5" data-guess="5xx,429,timeout,reset">
+              <div class="ask-qh"><span class="ask-n">Q5</span><h3 class="ask-qt" id="b-q5">Which failures count as retryable?</h3><span class="ask-tag">GUESS</span></div>
+              <p class="ask-why"><b>WHY</b>Retrying a 400 or a 401 only repeats the same mistake.</p>
+              <div class="ask-body"><div class="ask-opts">
+                <label class="pick"><input type="checkbox" name="b-q5" value="5xx" checked><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">5xx server errors</span><em class="ask-was">GUESS</em></span></span></span></label>
+                <label class="pick"><input type="checkbox" name="b-q5" value="429" checked><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">429 Too Many Requests</span><em class="ask-was">GUESS</em></span></span></span></label>
+                <label class="pick"><input type="checkbox" name="b-q5" value="timeout" checked><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">Timeouts</span><em class="ask-was">GUESS</em></span></span></span></label>
+                <label class="pick"><input type="checkbox" name="b-q5" value="reset" checked><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">Connection reset</span><em class="ask-was">GUESS</em></span></span></span></label>
+                <label class="pick"><input type="checkbox" name="b-q5" value="408"><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">408 Request Timeout</span></span></span></span></label>
+              </div>
+              <div class="ask-foot"><span>pick any</span><button type="button" class="th-link ask-reset">reset to guess</button></div></div>
+            </div>
+
+            <div class="ask-q" role="group" aria-labelledby="b-q6" data-guess="Never retry once the response body has started streaming.">
+              <div class="ask-qh"><span class="ask-n">Q6</span><h3 class="ask-qt" id="b-q6">Anything the retries must never do?</h3><span class="ask-tag">GUESS</span></div>
+              <p class="ask-why"><b>WHY</b>A free-text catch-all, so I don’t write a constraint you already know is wrong.</p>
+              <div class="ask-body"><textarea class="ask-text" aria-label="Your answer to Q6">Never retry once the response body has started streaming.</textarea>
+              <div class="ask-foot"><button type="button" class="th-link ask-reset">reset to guess</button></div></div>
+            </div>
+          </div>
+        </div></div>
+      </section>
+
+      <section class="th-sec th-old" aria-label="Earlier documents">
+        <details class="th-det"><summary><b>FINDINGS · SCOUT</b><small>REST tasks fail hard on the first 5xx; three call sites, one shared client…</small></summary><div class="th-det-body"></div></details>
+        <details class="th-det"><summary><b>SCOUT · ROUND 1</b><span class="th-k">4 ANSWERS · 0 CHANGED</span><small>accepted the guesses · yesterday</small></summary><div class="th-det-body"></div></details>
+      </section>
+
+      <section class="cart-frame th-move" aria-label="Your note and your choice"><div class="cart-in">
+        <div class="th-note">
+          <label class="th-h3" for="b-note">YOUR NOTE TO THE PARTY</label>
+          <p class="hint">Optional. It goes under your answers, whichever button you press. Your draft is kept if you leave this page.</p>
+          <textarea class="th-notebox" id="b-note" rows="4">Also cap the total retry time at 2 minutes, whatever the attempt count says.</textarea>
+        </div>
+        <div class="th-bar" role="group" aria-label="Your choice">
+          <div class="th-btns">
+            <button type="button" class="btn-start th-go" data-smart="b"><span class="stack"><b class="w30"><span data-word>SEND ANSWERS</span><svg width="8" height="14" fill="currentColor" aria-hidden="true"><use href="#play"/></svg></b><span class="sub" data-sub>2 changed · send</span></span></button>
+            <button type="button" class="th-quiet push"><b>WRITE IT NOW</b><small>no more questions · use these answers</small></button>
+            <button type="button" class="th-quiet"><b>GAME OVER</b><small>drop to the bin</small></button>
+          </div>
+        </div>
+        <div class="strip" aria-hidden="true"></div>
+      </div></section>
+    </main>
+  </div></div>
+</section>
+
+<!-- ===================== (c) Same at phone width, round 2 ===================== -->
+<section class="scr" id="c" aria-labelledby="c-h">
+  <div class="scr-h"><span class="scr-k">(c)</span><h2 id="c-h">THREAD · PHONE 390</h2>
+    <p>The same page one round later. ROUND 2 shows the agent’s reason for asking more and its outlook. Nothing has changed yet, so the sticky bar offers ACCEPT ALL GUESSES. Scroll inside the frame.</p></div>
+  <div class="row">
+    <div class="vp">
+      <div class="dev-phone">
+        <header class="hud"><div class="hud-in">
+          <a class="brand" href="#c"><svg class="sprout" aria-hidden="true"><use href="#sprout"/></svg><span class="word">PETREE</span></a>
+          <a class="ym-chip" href="#d"><span class="num">2</span>YOUR MOVE</a>
+          <a class="gear" href="#g" aria-label="Options"><svg width="24" height="24" fill="currentColor" aria-hidden="true"><use href="#gear"/></svg></a>
+        </div></header>
+        <main class="page sub-page th-view">
+          <div class="th-top"><a class="btn2 back" href="#d"><span><b>BACK</b><small>to the inbox</small></span></a></div>
+          <section class="th-head"><div class="cart-frame need"><div class="cart-in">
+            <div class="th-title"><span class="emb" data-emb="0110110001111110100101101" data-hue="h2"></span><div class="th-name"><span class="th-q">Q-024</span><h1 class="th-h1">Retry with backoff for REST tasks</h1></div></div>
+            <p class="th-sum">Your POST answer raised three more questions.</p>
+            <div class="prog need"><div class="lvline"><span class="lv">LV 2/5</span><span class="stg"><span class="sname">PLAN</span> · spec</span></div>
+              <div class="track" role="img" aria-label="Level 2 of 5: PLAN, waiting for you"><span class="node done"><i><svg width="14" height="12" fill="currentColor"><use href="#check"/></svg></i><b>SCOUT</b></span><span class="seg done"></span><span class="node current need"><i>2</i><b>PLAN</b></span><span class="seg"></span><span class="node todo"><i></i><b>CRAFT</b></span><span class="seg"></span><span class="node todo"><i></i><b>SHIP</b></span><span class="seg"></span><span class="node todo"><i></i><b>VICTORY</b></span></div></div>
+            <div class="th-foot"><span class="rchip"><i style="background:var(--h2)"></i>task-runner</span><span class="rchip"><i style="background:var(--h5)"></i>api-gateway</span><span class="age">1M</span></div>
+          </div></div></section>
+          <section><div class="frame need"><div>
+            <span class="ym-tag th-big"><svg width="6" height="11" fill="currentColor" aria-hidden="true"><use href="#play"/></svg>YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
+            <p class="th-act">Answer 3 questions before the spec</p>
+            <div class="th-meta"><span>agent · end of the PLAN turn · 1m ago</span></div>
+          </div></div></section>
+          <section class="th-sec" aria-labelledby="c-ask">
+            <div class="th-doch"><h2 class="th-h" id="c-ask">THE PARTY ASKS</h2></div>
+            <div class="frame doc"><div>
+              <div class="ask" data-ask="c">
+                <div class="ask-round">
+                  <div class="ask-rh"><span class="ask-rk">ROUND 2</span><span class="ask-out last"><i></i>LIKELY THE LAST ROUND</span><span class="ask-cnt">3 QUESTIONS</span></div>
+                  <p class="ask-intro"><b>WHY MORE</b>You chose to retry POST with an idempotency key. That raised three questions about the key and the time budget.</p>
+                </div>
+                <div class="ask-q" role="group" aria-labelledby="c-q1" data-guess="idem-key">
+                  <div class="ask-qh"><span class="ask-n">Q1</span><h3 class="ask-qt" id="c-q1">Which header carries the key?</h3><span class="ask-tag">GUESS</span></div>
+                  <p class="ask-why"><b>WHY</b>api-gateway already forwards one of them; the other would need a config change.</p>
+                  <div class="ask-body"><div class="ask-opts">
+                    <label class="pick"><input type="radio" name="c-q1" value="idem-key" checked><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">Idempotency-Key</span><small>the IETF draft name</small><em class="ask-was">GUESS</em></span></span></span></label>
+                    <label class="pick"><input type="radio" name="c-q1" value="req-id"><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-ol">X-Request-Id</span><small>reuse the tracing id</small></span></span></span></label>
+                  </div><div class="ask-foot"><button type="button" class="th-link ask-reset">reset to guess</button></div></div>
+                </div>
+                <div class="ask-q" role="group" aria-labelledby="c-q2" data-guess="120">
+                  <div class="ask-qh"><span class="ask-n">Q2</span><h3 class="ask-qt" id="c-q2">Cap the total retry time at?</h3><span class="ask-tag">GUESS</span></div>
+                  <p class="ask-why"><b>WHY</b>Your note asked for a cap; this is where it lives.</p>
+                  <div class="ask-body"><div class="ask-num"><input type="number" min="10" max="600" step="10" value="120" aria-label="Seconds"><span>seconds</span></div>
+                  <div class="ask-foot"><button type="button" class="th-link ask-reset">reset to guess</button></div></div>
+                </div>
+                <div class="ask-q" role="group" aria-labelledby="c-q3" data-guess="no">
+                  <div class="ask-qh"><span class="ask-n">Q3</span><h3 class="ask-qt" id="c-q3">Log every retry at INFO?</h3><span class="ask-tag">GUESS</span></div>
+                  <p class="ask-why"><b>WHY</b>At 5 attempts a flaky upstream fills the log fast.</p>
+                  <div class="ask-body"><div class="ask-opts two">
+                    <label class="pick"><input type="radio" name="c-q3" value="yes"><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-yn">YES</span></span></span></span></label>
+                    <label class="pick"><input type="radio" name="c-q3" value="no" checked><span class="pk-f"><span class="pk-in"><svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/><g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="pk-t"><span class="ask-yn">NO</span><em class="ask-was">GUESS</em></span></span></span></label>
+                  </div><div class="ask-foot"><button type="button" class="th-link ask-reset">reset to guess</button></div></div>
+                </div>
+              </div>
+            </div></div>
+          </section>
+          <section class="cart-frame th-move" aria-label="Your note and your choice"><div class="cart-in">
+            <div class="th-note">
+              <label class="th-h3" for="c-note">YOUR NOTE TO THE PARTY</label>
+              <textarea class="th-notebox" id="c-note" rows="3" placeholder="Optional. It goes under your answers."></textarea>
+            </div>
+            <div class="th-bar" role="group" aria-label="Your choice">
+              <div class="th-btns">
+                <button type="button" class="btn-start th-go" data-smart="c"><span class="stack"><b class="w30"><span data-word>ACCEPT ALL GUESSES</span><svg width="8" height="14" fill="currentColor" aria-hidden="true"><use href="#play"/></svg></b><span class="sub" data-sub>nothing changed · send</span></span></button>
+                <button type="button" class="th-quiet push"><b>WRITE IT NOW</b><small>no more questions</small></button>
+                <button type="button" class="th-quiet"><b>GAME OVER</b><small>drop to the bin</small></button>
+              </div>
+            </div>
+            <div class="strip" aria-hidden="true"></div>
+          </div></section>
+        </main>
+      </div>
+      <p class="dev-cap">390 × 844 · scrolls inside</p>
+    </div>
+    <p class="note"><b>Phone order</b> follows the dashboard: the note and the decision bar move to the end, and the bar sticks to the bottom. The round header wraps: ROUND chip and outlook on one line, the count and reason below. “Why” lines clamp to two lines, and tiles stack in one column.</p>
+  </div>
+</section>
+
+<!-- ===================== (d) Inbox card ===================== -->
+<section class="scr" id="d" aria-labelledby="d-h">
+  <div class="scr-h"><span class="scr-k">(d)</span><h2 id="d-h">INBOX · YOUR MOVE CARD WITH A QUESTION</h2>
+    <p>The card shows the first question, its guess, “+N more” and a two-tap ACCEPT GUESSES. The first tap arms the button for 4 s, and the second tap within that time sends the guesses. Try it on the left card. The right card is frozen in the armed state. Clicking anywhere else on a card opens the thread.</p></div>
+  <div class="row">
+    <div class="vp"><div class="dev-mid"><main class="page">
+      <section class="sec" aria-labelledby="d-ym">
+        <div class="sec-head"><h2 id="d-ym">YOUR MOVE <span aria-hidden="true">·</span> <span class="count need">2</span></h2><span class="hint">Quests waiting on you.</span></div>
+        <div class="grid">
+          <div class="cart need">
+            <div class="cart-frame"><div class="cart-in">
+              <a class="cart-link" href="#b" aria-label="Q-024, Retry with backoff for REST tasks: open the questionnaire"></a>
+              <div class="c-top"><span class="emb" data-emb="0110110001111110100101101" data-hue="h2"></span><span class="c-id"><span class="q">Q-024</span><span class="c-meta">task-runner, api-gateway · 4m</span></span>
+                <h3 class="c-title">Retry with backoff for REST tasks</h3><p class="c-sum">Findings approved. Six questions on scope, limits and backoff before the spec.</p></div>
+              <div class="ym"><span class="ym-tag"><svg width="6" height="11" fill="currentColor" aria-hidden="true"><use href="#play"/></svg>YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
+                <span class="ym-act">Answer 6 questions before the spec</span>
+                <div class="ask-c">
+                  <p class="ask-cq"><span class="ask-n">Q1</span><span>Which REST tasks should retry?</span></p>
+                  <p class="ask-cg"><b>GUESS ▸</b> Idempotent methods only (GET, PUT, DELETE)</p>
+                  <div class="ask-cf"><span class="ask-more">+5 MORE</span>
+                    <button type="button" class="btn2 ask-acc" data-twotap="6"><span><b data-w>ACCEPT GUESSES</b><small data-s>sends all 6 · two taps</small><i class="ask-tick" aria-hidden="true"></i></span></button></div>
+                </div></div>
+              <div class="prog need"><div class="lvline"><span class="lv">LV 2/5</span><span class="stg"><span class="sname">PLAN</span> · spec</span></div>
+                <div class="track" role="img" aria-label="Level 2 of 5: PLAN, waiting for you"><span class="node done"><i><svg width="14" height="12" fill="currentColor"><use href="#check"/></svg></i><b>SCOUT</b></span><span class="seg done"></span><span class="node current need"><i>2</i><b>PLAN</b></span><span class="seg"></span><span class="node todo"><i></i><b>CRAFT</b></span><span class="seg"></span><span class="node todo"><i></i><b>SHIP</b></span><span class="seg"></span><span class="node todo"><i></i><b>VICTORY</b></span></div></div>
+              <div class="c-foot"><span class="rchip"><i style="background:var(--h2)"></i>task-runner · work</span><span class="rchip"><i style="background:var(--h5)"></i>api-gateway · work</span><span class="age">4M</span></div>
+              <div class="strip" aria-hidden="true"></div></div></div>
+          </div>
+
+          <div class="cart need">
+            <div class="cart-frame"><div class="cart-in">
+              <a class="cart-link" href="#c" aria-label="Q-019, Tag filter for the repo picker: open the questionnaire"></a>
+              <div class="c-top"><span class="emb" data-emb="1010101110010011101010101" data-hue="h3"></span><span class="c-id"><span class="q">Q-019</span><span class="c-meta">petree · 12m</span></span>
+                <h3 class="c-title">Tag filter for the repo picker</h3><p class="c-sum">Round 2: your answer on chip colours raised two more.</p></div>
+              <div class="ym"><span class="ym-tag"><svg width="6" height="11" fill="currentColor" aria-hidden="true"><use href="#play"/></svg>YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
+                <span class="ym-act">Answer 2 questions before the spec</span>
+                <div class="ask-c">
+                  <p class="ask-cq"><span class="ask-r">R2</span><span class="ask-n">Q1</span><span>Should a repo with no tags show under ALL only, or also under an UNTAGGED tile?</span></p>
+                  <p class="ask-cg"><b>GUESS ▸</b> ALL only</p>
+                  <div class="ask-cf"><span class="ask-more">+1 MORE</span>
+                    <button type="button" class="btn2 ask-acc armed" style="--left:.55"><span><b>SURE? 2 GUESSES ▶</b><small>tap again within 4 s</small><i class="ask-tick" aria-hidden="true"></i></span></button></div>
+                </div></div>
+              <div class="prog need"><div class="lvline"><span class="lv">LV 2/5</span><span class="stg"><span class="sname">PLAN</span> · spec</span></div>
+                <div class="track" role="img" aria-label="Level 2 of 5: PLAN, waiting for you"><span class="node skipped"><i>1</i><b>SCOUT</b></span><span class="seg"></span><span class="node current need"><i>2</i><b>PLAN</b></span><span class="seg"></span><span class="node todo"><i></i><b>CRAFT</b></span><span class="seg"></span><span class="node todo"><i></i><b>SHIP</b></span><span class="seg"></span><span class="node todo"><i></i><b>VICTORY</b></span></div></div>
+              <div class="c-foot"><span class="rchip"><i style="background:var(--h3)"></i>petree · personal</span><span class="age">12M</span></div>
+              <div class="strip" aria-hidden="true"></div></div></div>
+          </div>
+        </div>
+      </section>
+    </main></div></div>
+    <div class="vp">
+      <div class="dev-phone" style="height:auto; max-height: 844px">
+        <main class="page">
+          <section class="sec" aria-labelledby="d-ym2">
+            <div class="sec-head"><h2 id="d-ym2">YOUR MOVE <span aria-hidden="true">·</span> <span class="count need">2</span></h2></div>
+            <div class="grid">
+              <div class="cart need">
+                <div class="cart-frame"><div class="cart-in">
+                  <a class="cart-link" href="#c" aria-label="Q-024, Retry with backoff for REST tasks: open the questionnaire"></a>
+                  <div class="c-top"><span class="emb" data-emb="0110110001111110100101101" data-hue="h2"></span><span class="c-id"><span class="q">Q-024</span><span class="c-meta">task-runner, api-gateway · 4m</span></span>
+                    <h3 class="c-title">Retry with backoff for REST tasks</h3><p class="c-sum">Findings approved. Six questions before the spec.</p></div>
+                  <div class="ym"><span class="ym-tag"><svg width="6" height="11" fill="currentColor" aria-hidden="true"><use href="#play"/></svg>YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
+                    <span class="ym-act">Answer 6 questions before the spec</span>
+                    <div class="ask-c">
+                      <p class="ask-cq"><span class="ask-n">Q1</span><span>Which REST tasks should retry?</span></p>
+                      <p class="ask-cg"><b>GUESS ▸</b> Idempotent methods only (GET, PUT, DELETE)</p>
+                      <div class="ask-cf"><span class="ask-more">+5 MORE</span>
+                        <button type="button" class="btn2 ask-acc" data-twotap="6"><span><b data-w>ACCEPT GUESSES</b><small data-s>two taps</small><i class="ask-tick" aria-hidden="true"></i></span></button></div>
+                    </div></div>
+                  <div class="prog need"><div class="lvline"><span class="lv">LV 2/5</span><span class="stg"><span class="sname">PLAN</span> · spec</span></div>
+                    <div class="track" role="img" aria-label="Level 2 of 5: PLAN, waiting for you"><span class="node done"><i><svg width="14" height="12" fill="currentColor"><use href="#check"/></svg></i><b>SCOUT</b></span><span class="seg done"></span><span class="node current need"><i>2</i><b>PLAN</b></span><span class="seg"></span><span class="node todo"><i></i><b>CRAFT</b></span><span class="seg"></span><span class="node todo"><i></i><b>SHIP</b></span><span class="seg"></span><span class="node todo"><i></i><b>VICTORY</b></span></div></div>
+                  <div class="strip" aria-hidden="true"></div></div></div>
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+      <p class="dev-cap">390 · same card on the phone</p>
+    </div>
+  </div>
+  <p class="note"><b>Markup:</b> the card is a <code>div</code> with a stretched link (<code>.cart-link</code>, <code>inset: 0</code>), and ACCEPT GUESSES sits above it, so there is never a button inside an anchor. The link must be inside <code>.cart-in</code>: <code>clip-path</code> turns <code>.cart-frame</code> and <code>.cart-in</code> into stacking contexts, so a link placed outside them covers the button. Esc, a blur, or 4 s without a second tap disarms the button.</p>
+</section>
+
+<!-- ===================== (e) Recap in a later stage ===================== -->
+<section class="scr" id="e" aria-labelledby="e-h">
+  <div class="scr-h"><span class="scr-k">(e)</span><h2 id="e-h">LATER: THE ANSWERED Q&amp;A RECAP</h2>
+    <p>The spec is written and waiting at the PLAN gate. Each answered round sits under the spec as one collapsed block, here shown open. The spec carries the answers in its own <b>Decisions</b> section, and the quest log records each round.</p></div>
+  <div class="vp"><div class="dev-mid"><main class="page sub-page th-view">
+    <section><div class="frame need"><div>
+      <span class="ym-tag th-big"><svg width="6" height="11" fill="currentColor" aria-hidden="true"><use href="#play"/></svg>YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
+      <p class="th-act">Read the spec, then approve or comment</p>
+      <div class="th-meta"><span>agent · end of the PLAN turn · 2h ago</span></div>
+    </div></div></section>
+    <section class="th-sec" aria-labelledby="e-spec">
+      <div class="th-doch"><h2 class="th-h" id="e-spec">SPEC</h2><code>_thread/spec.md · 1,240 words</code></div>
+      <div class="frame doc"><div>
+        <div class="clamp over md md-box"><h1>Retry with backoff for REST tasks</h1>
+          <h2>Decisions</h2>
+          <ul><li>Retry all methods; POST only with an <code>Idempotency-Key</code> header (Q1, round 1 · round 2).</li>
+            <li>At most 5 attempts, and never more than 120 s in total (Q2 · your note · round 2).</li>
+            <li>Exponential backoff with full jitter, base 200 ms (Q3, guess kept).</li>
+            <li>Retry-After honoured on 429 and 503, capped by the 120 s budget.</li></ul>
+          <h2>Design</h2><p>One <code>RetryPolicy</code> in the shared REST client…</p></div>
+        <button type="button" class="btn2 rd-open"><span><b>READ ALL ▶</b><small>open in the reader · 1,240 words</small></span></button>
+      </div></div>
+    </section>
+    <section class="th-sec th-old" aria-label="Answers and earlier documents">
+      <details class="th-det" open><summary><b>PLAN · ROUND 1</b><span class="th-k">6 ANSWERS · 2 CHANGED</span><small>answered 2h ago · with your note</small></summary>
+        <div class="th-det-body"><ol class="rc">
+          <li><span class="ask-n">Q1</span><div><p class="rc-q">Which REST tasks should retry?</p><p class="rc-a">All methods, POST only with an idempotency key</p><span class="rc-s mine">CHANGED · GUESS WAS: IDEMPOTENT ONLY</span></div></li>
+          <li><span class="ask-n">Q2</span><div><p class="rc-q">How many attempts at most?</p><p class="rc-a">5 attempts</p><span class="rc-s mine">CHANGED · GUESS WAS: 3</span></div></li>
+          <li><span class="ask-n">Q3</span><div><p class="rc-q">Which backoff curve?</p><p class="rc-a">Exponential, full jitter</p><span class="rc-s">GUESS KEPT</span></div></li>
+          <li><span class="ask-n">Q4</span><div><p class="rc-q">Honour Retry-After on 429 and 503?</p><p class="rc-a">Yes</p><span class="rc-s">GUESS KEPT</span></div></li>
+          <li><span class="ask-n">Q5</span><div><p class="rc-q">Which failures count as retryable?</p><p class="rc-a">5xx, 429, timeouts, connection reset</p><span class="rc-s">GUESS KEPT</span></div></li>
+          <li><span class="ask-n">Q6</span><div><p class="rc-q">Anything the retries must never do?</p><p class="rc-a">Never retry once the response body has started streaming.</p><span class="rc-s">GUESS KEPT</span></div></li>
+        </ol><p class="rc-end"><b>YOUR NOTE</b>Also cap the total retry time at 2 minutes, whatever the attempt count says.</p></div></details>
+      <details class="th-det" open><summary><b>PLAN · ROUND 2</b><span class="th-k">3 ANSWERS · 0 CHANGED</span><small>you ended the questions · 2h ago</small></summary>
+        <div class="th-det-body"><p class="rc-end"><b>WHY MORE</b>You chose to retry POST with an idempotency key, which raised three questions about the key and the time budget.</p><ol class="rc">
+          <li><span class="ask-n">Q1</span><div><p class="rc-q">Which header carries the key?</p><p class="rc-a">Idempotency-Key</p><span class="rc-s">GUESS KEPT</span></div></li>
+          <li><span class="ask-n">Q2</span><div><p class="rc-q">Cap the total retry time at?</p><p class="rc-a">120 seconds</p><span class="rc-s">GUESS KEPT</span></div></li>
+          <li><span class="ask-n">Q3</span><div><p class="rc-q">Log every retry at INFO?</p><p class="rc-a">No</p><span class="rc-s">GUESS KEPT · WRITE IT NOW</span></div></li>
+        </ol></div></details>
+      <details class="th-det"><summary><b>FINDINGS · SCOUT</b><small>REST tasks fail hard on the first 5xx; three call sites, one shared client…</small></summary><div class="th-det-body"></div></details>
+      <details class="th-det"><summary><b>SCOUT · ROUND 1</b><span class="th-k">4 ANSWERS · 0 CHANGED</span><small>accepted the guesses · yesterday</small></summary><div class="th-det-body"></div></details>
+    </section>
+    <section class="th-sec" aria-label="Quest log">
+      <details class="th-det" open><summary><b>QUEST LOG</b><span class="th-k">9</span><small>latest: Spec ready</small></summary><div class="th-det-body"><ol class="ql">
+        <li><span class="ql-dot agent"></span><div class="ql-main"><span class="ql-h"><b>Spec ready</b><span>PLAN · 1,240 words</span></span><p class="ql-det">Retry policy in the shared REST client, POST with Idempotency-Key, 120 s budget.</p></div><span class="ql-when">2H</span></li>
+        <li><span class="ql-dot you"></span><div class="ql-main"><span class="ql-h"><b>You answered · write it now</b><span>PLAN round 2 · 3 guesses kept</span></span></div><span class="ql-when">2H</span></li>
+        <li><span class="ql-dot agent"></span><div class="ql-main"><span class="ql-h"><b>Asked 3 questions</b><span>PLAN round 2 · likely the last</span></span></div><span class="ql-when">2H</span></li>
+        <li><span class="ql-dot you"></span><div class="ql-main"><span class="ql-h"><b>You answered · 2 changed, 4 guesses kept</b><span>PLAN round 1 · with a note</span></span></div><span class="ql-when">3H</span></li>
+        <li><span class="ql-dot agent"></span><div class="ql-main"><span class="ql-h"><b>Asked 6 questions</b><span>PLAN round 1 · expects another round</span></span></div><span class="ql-when">3H</span></li>
+        <li><span class="ql-dot you"></span><div class="ql-main"><span class="ql-h"><b>Approved, on to PLAN</b><span>by you</span></span></div><span class="ql-when">1D</span></li>
+      </ol></div></details>
+    </section>
+  </main></div></div>
+</section>
+
+<!-- ===================== (f) Questing: preparing questions ===================== -->
+<section class="scr" id="f" aria-labelledby="f-h">
+  <div class="scr-h"><span class="scr-k">(f)</span><h2 id="f-h">QUESTING · PREPARING QUESTIONS</h2>
+    <p>A question turn is running. The card line and the thread panel say a questionnaire is coming, and the findings it builds on stay readable underneath.</p></div>
+  <div class="row">
+    <div class="vp"><div class="dev-mid"><main class="page sub-page th-view">
+      <section><div class="frame go th-qs"><div><div class="th-qs-main">
+        <div class="th-qs-t"><span class="qs-tag th-big">QUESTING…<span class="cursor hollow" aria-hidden="true"></span></span><span class="qs-time">3:12</span><span class="np-trail" aria-hidden="true"><i style="--i:0"></i><i style="--i:1"></i><i style="--i:2"></i><i style="--i:3"></i><i style="--i:4"></i><i style="--i:5"></i><i style="--i:6"></i><i style="--i:7"></i><i style="--i:8"></i><i style="--i:9"></i><i style="--i:10"></i><i style="--i:11"></i><i style="--i:12"></i><i style="--i:13"></i><i style="--i:14"></i><i style="--i:15"></i></span></div>
+        <p class="th-act">Preparing questions · PLAN · 3m</p>
+        <p class="np"><b>NOW PLAYING</b><span>Read src/rest/client.ts · Grep "fetch(" in api-gateway</span></p>
+        <span class="th-meta">PLAN run · started 14:02</span></div>
+        <button type="button" class="btn2"><span><b>PAUSE</b><small>stop this turn</small></span></button></div></div></section>
+      <section class="th-sec" aria-labelledby="f-doc">
+        <div class="th-doch was"><h2 class="th-h" id="f-doc">FINDINGS</h2><code>_thread/findings.md · from SCOUT · 860 words</code></div>
+        <div class="frame doc"><div>
+          <div class="th-run"><b>The party is reading the code, then writing questions for you… (3 min)</b><span>Below are the findings it builds on. The questionnaire takes their place when the turn ends.</span></div>
+          <div class="clamp over md md-box" style="max-height:150px"><h1>Findings: REST task failures</h1><p>REST tasks fail hard on the first 5xx. Three call sites go through one shared client in <code>src/rest/client.ts</code>, so one retry policy covers them all.</p></div>
+        </div></div>
+      </section>
+    </main></div></div>
+    <div class="vp"><div style="width:360px"><div class="grid" style="grid-template-columns:1fr">
+      <a class="cart run" href="#f"><div class="cart-frame"><div class="cart-in">
+        <div class="c-top"><span class="emb" data-emb="0110110001111110100101101" data-hue="h2"></span><span class="c-id"><span class="q">Q-024</span></span>
+          <h3 class="c-title">Retry with backoff for REST tasks</h3><p class="c-sum">Preparing questions · PLAN · 3m</p></div>
+        <div class="qs"><span class="qs-tag">QUESTING…<span class="cursor hollow" aria-hidden="true"></span></span><span class="qs-time">3:12</span></div>
+        <div class="prog run"><div class="lvline"><span class="lv">LV 2/5</span><span class="stg"><span class="sname">PLAN</span> · spec</span></div>
+          <div class="track" role="img" aria-label="Level 2 of 5: PLAN, running"><span class="node done"><i><svg width="14" height="12" fill="currentColor"><use href="#check"/></svg></i><b>SCOUT</b></span><span class="seg done"></span><span class="node current run"><i>2</i><b>PLAN</b></span><span class="seg"></span><span class="node todo"><i></i><b>CRAFT</b></span><span class="seg"></span><span class="node todo"><i></i><b>SHIP</b></span><span class="seg"></span><span class="node todo"><i></i><b>VICTORY</b></span></div></div>
+        <div class="c-foot"><span class="rchip"><i style="background:var(--h2)"></i>task-runner · work</span><span class="age">3M</span></div>
+        <div class="strip" aria-hidden="true"></div></div></div></a>
+    </div><p class="dev-cap">QUESTING card · line from card.line</p></div></div>
+  </div>
+</section>
+
+<!-- ===================== (g) GAME RULES allowlist ===================== -->
+<section class="scr" id="g" aria-labelledby="g-h">
+  <div class="scr-h"><span class="scr-k">(g)</span><h2 id="g-h">OPTIONS · GAME RULES · FROM YOUR ~/.claude</h2>
+    <p>A new section of the existing GAME RULES panel, filled from <code>GET /api/claude-home</code> and saved by the page’s SAVE. Skill and plugin names are samples.</p></div>
+  <div class="vp"><div class="dev-mid"><main class="page sub-page">
+    <section class="cart-frame" aria-labelledby="g-rules"><div class="cart-in o-panel">
+      <div class="sec-head"><h2 id="g-rules">GAME RULES</h2><span class="hint">Defaults for every quest and how long old ones stay around.</span></div>
+      <div class="o-rules cl-faded" aria-hidden="true">
+        <label class="o-field"><span class="o-k">CONCURRENCY</span><span class="o-num"><input type="number" value="3" tabindex="-1">quests at once</span></label>
+        <label class="o-field"><span class="o-k">TOKEN BUDGET</span><span class="o-num"><input type="number" value="500000" tabindex="-1">tokens per quest</span></label>
+        <label class="o-field"><span class="o-k">TIMEOUT</span><span class="o-num"><input type="number" value="30" tabindex="-1">minutes per turn</span></label>
+      </div>
+
+      <div class="cl">
+        <div class="cl-h"><h3 class="o-h3">FROM YOUR</h3><code>~/.claude</code><span class="hint">Mounted read-only into every sandbox, so quests work like your own sessions. Changes apply from each quest’s next turn.</span></div>
+
+        <div class="nq-sws cl-sw">
+          <button type="button" class="nq-sw" role="switch" aria-checked="true" data-sw><span><b>INSTRUCTIONS</b><small>CLAUDE.md + 3 rules files. Petree’s stage instructions win on conflict. They contain machine and infrastructure details, which every quest will see. <code>@imports</code> outside ~/.claude won’t resolve.</small></span><span class="sw" aria-hidden="true"><span class="sw-w">ON</span><span class="sw-t"><span></span><span></span></span></span></button>
+        </div>
+
+        <div class="o-sub">
+          <div class="cl-k"><span class="o-k">PERSONAL SKILLS</span><span class="o-help">~/.claude/skills · picked 2 of 6 · synced skills aren’t offered</span></div>
+          <div class="cl-skills">
+            <label class="o-pick sm"><input type="checkbox" checked><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>release-notes</b><small>Draft release notes from merged PRs and the changelog.</small></span></span></label>
+            <label class="o-pick sm"><input type="checkbox" checked><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>sql-review</b><small>Review SQL migrations for locks and missing indexes.</small></span></span></label>
+            <label class="o-pick sm"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>local-llm-triage</b><small>Triage long outputs with a local model.</small><span class="cl-badges"><span class="cl-warn"><svg width="14" height="12" aria-hidden="true"><use href="#warn"/></svg>needs a local tool</span></span></span></span></label>
+            <label class="o-pick sm"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>docs-lookup</b><small>Fetch current library docs through an MCP server.</small><span class="cl-badges"><span class="cl-warn"><svg width="14" height="12" aria-hidden="true"><use href="#warn"/></svg>mentions MCP</span></span></span></span></label>
+            <label class="o-pick sm"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>helm-charts</b><small>Adjust deployment charts and values files.</small></span></span></label>
+            <label class="o-pick sm"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>sip-protocol</b><small>Answer SIP and SDP questions with RFC references.</small></span></span></label>
+          </div>
+        </div>
+
+        <div class="o-sub">
+          <div class="cl-k"><span class="o-k">PLUGINS</span><span class="o-help">whole plugins: skills, hooks and MCP servers · picked 2 of 5 · anything that can’t start shows in the quest’s INFO</span></div>
+          <div class="cl-plugs">
+            <label class="o-pick"><input type="checkbox" checked><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>agent-skills</b><i>addy-agent-skills · 0.6.15</i><span class="cl-badges"><span class="cl-use">USED BY INTERVIEW</span><span class="o-badge">21 skills</span><span class="o-badge">no hooks</span><span class="o-badge">no MCP</span></span><small>ships interview-me and spec-driven-development</small></span></span></label>
+            <label class="o-pick"><input type="checkbox" checked><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>superpowers</b><i>claude-plugins-official · 7.0.2</i><span class="cl-badges"><span class="cl-use">USED BY INTERVIEW</span><span class="o-badge">14 skills</span><span class="o-badge">hooks: SessionStart</span><span class="o-badge">no MCP</span></span><small>ships brainstorming</small></span></span></label>
+            <label class="o-pick"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>ralph-loop</b><i>claude-plugins-official · 1.0.1</i><span class="cl-badges"><span class="o-badge">3 skills</span><span class="o-badge">hooks: Stop</span><span class="cl-warn"><svg width="14" height="12" aria-hidden="true"><use href="#warn"/></svg>Stop hook: can keep a turn running</span></span></span></span></label>
+            <label class="o-pick"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>figma</b><i>claude-plugins-official · 2.2.157</i><span class="cl-badges"><span class="o-badge">17 skills</span><span class="o-badge">MCP: figma</span><span class="cl-warn"><svg width="14" height="12" aria-hidden="true"><use href="#warn"/></svg>MCP may need network or login</span></span></span></span></label>
+            <label class="o-pick"><input type="checkbox"><span><svg class="o-box" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M0 0h8v8H0zM1 1v6h6V1z"/><g class="o-ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg><span class="o-pw"><b>playwright</b><i>claude-plugins-official · 099387b</i><span class="cl-badges"><span class="o-badge">0 skills</span><span class="o-badge">MCP: playwright</span><span class="cl-warn"><svg width="14" height="12" aria-hidden="true"><use href="#warn"/></svg>MCP may need network or login</span></span></span></span></label>
+          </div>
+        </div>
+      </div>
+      <div class="strip" aria-hidden="true"></div>
+    </div></section>
+    <div class="o-foot">
+      <span></span>
+      <div><a class="o-quiet" href="#g"><b>BACK</b><small>leave without saving</small></a>
+        <button type="button" class="o-save"><span class="stack"><b>SAVE</b><span class="sub">write repos.yaml and rules</span></span></button></div>
+    </div>
+    <section class="th-sec" aria-label="Info preview">
+      <details class="th-det" open><summary><b>INFO</b><small>preview: what a quest reports about the mounts</small></summary><div class="th-det-body"><dl class="th-info">
+        <div><dt>INTERVIEW</dt><dd>on</dd></div>
+        <div><dt>INSTRUCTIONS</dt><dd>CLAUDE.md + 3 rules</dd></div>
+        <div><dt>SKILLS</dt><dd>41 loaded · skipped: release-notes (name taken by shared)</dd></div>
+        <div><dt>PLUGINS</dt><dd>2 of 2 loaded</dd></div>
+        <div><dt>MCP</dt><dd>none allowlisted</dd></div>
+      </dl></div></details>
+    </section>
+  </main></div></div>
+</section>
+
+</div>
+
+<script type="module">
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)]
+
+  // Emblems: a 25-cell pattern, coloured by the first repo's hue (design §4.2).
+  for (const el of $$('[data-emb]')) {
+    el.innerHTML = [...el.dataset.emb].map((b) => b === '1' ? `<i style="background:var(--${el.dataset.hue})"></i>` : '<i></i>').join('')
+  }
+
+  // Theme switch for review; AUTO follows prefers-color-scheme.
+  for (const b of $$('[data-theme-set]')) {
+    b.addEventListener('click', () => {
+      const v = b.dataset.themeSet
+      if (v) document.documentElement.dataset.theme = v
+      else delete document.documentElement.dataset.theme
+      for (const o of $$('[data-theme-set]')) o.setAttribute('aria-pressed', String(o === b))
+    })
+  }
+
+  // Pixel switches toggle in place.
+  for (const s of $$('[data-sw]')) {
+    s.addEventListener('click', () => {
+      const on = s.getAttribute('aria-checked') !== 'true'
+      s.setAttribute('aria-checked', String(on))
+      s.querySelector('.sw-w').textContent = on ? 'ON' : 'OFF'
+    })
+  }
+
+  // Questionnaire: GUESS/YOURS per question, and the smart button (spec §5.1b, decision 7).
+  const valueOf = (q) => {
+    const boxes = $$('input[type=radio], input[type=checkbox]', q)
+    if (boxes.length) return boxes.filter((i) => i.checked).map((i) => i.value).sort().join(',')
+    return (q.querySelector('input[type=number], textarea')?.value ?? '').trim()
+  }
+  const guessOf = (q) => q.dataset.guess.split(',').sort().join(',')
+  const setGuess = (q) => {
+    const boxes = $$('input[type=radio], input[type=checkbox]', q)
+    if (boxes.length) boxes.forEach((i) => { i.checked = q.dataset.guess.split(',').includes(i.value) })
+    else q.querySelector('input[type=number], textarea').value = q.dataset.guess
+  }
+  for (const ask of $$('[data-ask]')) {
+    const btn = document.querySelector(`[data-smart="${ask.dataset.ask}"]`)
+    const update = () => {
+      let changed = 0
+      for (const q of $$('.ask-q', ask)) {
+        const mine = valueOf(q) !== guessOf(q)
+        q.classList.toggle('mine', mine)
+        q.querySelector('.ask-tag').textContent = mine ? 'YOURS' : 'GUESS'
+        changed += mine
+      }
+      btn.querySelector('[data-word]').textContent = changed ? 'SEND ANSWERS' : 'ACCEPT ALL GUESSES'
+      btn.querySelector('[data-sub]').textContent = changed ? `${changed} changed · send` : 'nothing changed · send'
+    }
+    ask.addEventListener('input', update)
+    ask.addEventListener('change', update)
+    for (const r of $$('.ask-reset', ask)) r.addEventListener('click', () => { setGuess(r.closest('.ask-q')); update() })
+    update()
+  }
+
+  // Two-tap ACCEPT GUESSES (decision 5): arm for 4 s, the second tap sends.
+  for (const b of $$('[data-twotap]')) {
+    const n = b.dataset.twotap, w = b.querySelector('[data-w]'), s = b.querySelector('[data-s]'), idle = [w.textContent, s.textContent]
+    let timer = 0
+    const reset = () => { clearTimeout(timer); b.classList.remove('armed', 'counting', 'sent'); [w.textContent, s.textContent] = idle }
+    b.addEventListener('click', () => {
+      if (b.classList.contains('sent')) return
+      if (!b.classList.contains('armed')) {
+        b.classList.add('armed')
+        void b.offsetWidth
+        b.classList.add('counting')
+        w.textContent = `SURE? ${n} GUESSES ▶`
+        s.textContent = 'tap again within 4 s'
+        timer = setTimeout(reset, 4000)
+        return
+      }
+      clearTimeout(timer)
+      b.classList.remove('armed', 'counting')
+      b.classList.add('sent')
+      w.textContent = 'SENT'
+      s.textContent = 'card moves to QUESTING'
+      timer = setTimeout(reset, 2500)
+    })
+    b.addEventListener('keydown', (e) => { if (e.key === 'Escape') reset() })
+    b.addEventListener('blur', () => { if (b.classList.contains('armed')) reset() })
+  }
+</script>
+</html>

@@ -569,6 +569,13 @@ describe('thread API', () => {
     expect((await post('/api/tasks', { prompt: 'x', repos: ['demo', 'odd'] })).status).toBe(400)
   })
 
+  it('stores party and autoPlay from the request, defaulting to party on / auto-play off', async () => {
+    expect(await (await post('/api/tasks', { prompt: 'x', repos: ['demo'] })).json()).toMatchObject({ party: true, autoPlay: false })
+    const set = await (await post('/api/tasks', { prompt: 'x', repos: ['demo'], party: false, autoPlay: true })).json()
+    expect(set).toMatchObject({ party: false, autoPlay: true })
+    expect((await post('/api/tasks', { prompt: 'x', repos: ['demo'], party: 'no' })).status).toBe(400)
+  })
+
   it('attaches a card to the task list and to a single task', async () => {
     const t = gated('spec')
     const one = await (await fetch(`${base}/api/tasks/${t.id}`)).json()

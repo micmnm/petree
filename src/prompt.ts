@@ -24,6 +24,25 @@ function repoSection(name: string, repo: RepoConfig): string {
   return lines.join('\n')
 }
 
+const BUILD_BASE = [
+  'Do what the prompt above asks. Only when it asks for nothing specific (e.g. an',
+  'approve with no text), implement `/work/_thread/spec.md`, or `/work/_thread/findings.md`',
+  'if there is no spec. Do not ask interactive questions: make a reasonable call and',
+  'list open questions in your final message.',
+]
+
+// Dropped when PARTY MODE is off (the Task/Agent tools are disallowed too).
+const BUILD_SUBAGENTS = [
+  'For multi-part work, maximise parallelism. First break the work down with the',
+  '`planning-and-task-breakdown` skill into tasks marked independent or dependent.',
+  'Dispatch every independent task to its own subagent in parallel (one message with',
+  'several Agent calls, typically one per repo or per independent slice), each told to',
+  'follow the `incremental-implementation` and `test-driven-development` skills.',
+  'Run dependent tasks after their prerequisites. You, the lead agent, integrate the',
+  'results, then run every Build and Tests command and fix failures. Optionally finish',
+  'with a `code-review-and-quality` pass by a subagent.',
+]
+
 export const STAGE_INSTRUCTIONS: Record<Stage, string> = {
   investigate: [
     'Explore the repos and the question above; do not modify any repo files.',
@@ -38,21 +57,7 @@ export const STAGE_INSTRUCTIONS: Record<Stage, string> = {
     'Do not wait for answers or ask interactive questions: list open questions at the',
     'end of the spec and in your final message.',
   ].join('\n'),
-  build: [
-    'Do what the prompt above asks. Only when it asks for nothing specific (e.g. an',
-    'approve with no text), implement `/work/_thread/spec.md`, or `/work/_thread/findings.md`',
-    'if there is no spec. Do not ask interactive questions: make a reasonable call and',
-    'list open questions in your final message.',
-    '',
-    'For multi-part work, maximise parallelism. First break the work down with the',
-    '`planning-and-task-breakdown` skill into tasks marked independent or dependent.',
-    'Dispatch every independent task to its own subagent in parallel (one message with',
-    'several Agent calls, typically one per repo or per independent slice), each told to',
-    'follow the `incremental-implementation` and `test-driven-development` skills.',
-    'Run dependent tasks after their prerequisites. You, the lead agent, integrate the',
-    'results, then run every Build and Tests command and fix failures. Optionally finish',
-    'with a `code-review-and-quality` pass by a subagent.',
-  ].join('\n'),
+  build: [...BUILD_BASE, '', ...BUILD_SUBAGENTS].join('\n'),
 }
 
 function notesSections(repos: string[]): string[] {
@@ -87,7 +92,7 @@ export function composePrompt(task: TaskRecord, cfg: PetreeConfig): string {
     ...(task.prompt ? [task.prompt, ''] : []),
     `## Stage: ${task.stage}`,
     '',
-    STAGE_INSTRUCTIONS[task.stage],
+    task.stage === 'build' && !task.party ? BUILD_BASE.join('\n') : STAGE_INSTRUCTIONS[task.stage],
     '',
     ...notesSections(task.repos),
     '',

@@ -5,7 +5,7 @@ import express from 'express'
 import { parseConfigText, resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
 import { localCheckout, repoStatus, diffBranch, pushBranch, taskBranch, headSha } from './gitops.js'
-import { createPullRequest, pollPrs } from './prs.js'
+import { openPr, pollPrs } from './prs.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
@@ -15,7 +15,7 @@ import {
   DEFAULT_KEYS, REPO_KEYS, NotEditable, addRepo, hashText, pickFields, readRepoFields,
   removeRepo, repoEditable, replaceRepo, setDefaults,
 } from './repos-yaml.js'
-import { FOLLOWUP_STATES, RESUMABLE_STATES, STAGES, canMoveStage, threadTitle } from './store.js'
+import { FOLLOWUP_STATES, RESUMABLE_STATES, STAGES, canMoveStage } from './store.js'
 import type { Stage, TaskStore, TaskRecord } from './store.js'
 import type { Response } from 'express'
 
@@ -49,7 +49,12 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   app.use(express.json())
 
   app.post('/api/tasks', (req, res) => {
-    const { prompt, repos, model, stage } = (req.body ?? {}) as { prompt?: string; repos?: string[]; model?: string; stage?: Stage }
+    const { prompt, repos, model, stage, party, autoPlay } = (req.body ?? {}) as
+      { prompt?: string; repos?: string[]; model?: string; stage?: Stage; party?: boolean; autoPlay?: boolean }
+    if ((party !== undefined && typeof party !== 'boolean') || (autoPlay !== undefined && typeof autoPlay !== 'boolean')) {
+      res.status(400).json({ error: 'party and autoPlay must be booleans' })
+      return
+    }
     if (typeof prompt !== 'string' || !prompt || !Array.isArray(repos) || repos.length === 0) {
       res.status(400).json({ error: 'prompt and repos[] are required' })
       return
@@ -82,6 +87,8 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       timeoutMinutes: cfg.defaults.timeoutMinutes,
       model: effectiveModel,
       stage,
+      party,
+      autoPlay,
     })
     void scheduler.tick()
     store.prune()
@@ -316,18 +323,9 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (!norm) return
     const repoDir = join(cfg.home, 'work', t.id, repo as string)
     if (!existsSync(repoDir)) { res.status(400).json({ error: 'no work dir for task' }); return }
-    const pushed = pushBranch(repoDir, t.id, norm)
-    if (!pushed.ok) { res.json(pushed); return }
-    // The branch is on the remote now, whether or not the PR gets created.
-    store.setDelivery(t.id, repo as string, { target: norm, prHead: headSha(repoDir) })
-    const base = cfg.repos[repo as string]?.defaultBranch ?? 'main'
-    const title = `petree ${t.id}: ${threadTitle(t)}`
-    const made = await createPullRequest(cfg.repos[repo as string].url, repoDir, norm, base, title, t.turns[0]?.prompt ?? t.prompt)
-    if (made.ok && made.url) {
-      store.setDelivery(t.id, repo as string, { url: made.url, number: made.number, pr: 'open' })
-    }
+    const made = await openPr(store, cfg, t, repo as string, norm)
     void pollPrs(store, cfg, t.id)
-    res.json({ ok: made.ok, output: made.output, url: made.url })
+    res.json(made)
   })
 
   app.post('/api/tasks/:id/resume', (req, res) => {

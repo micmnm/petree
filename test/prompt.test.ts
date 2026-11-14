@@ -25,7 +25,7 @@ function task(over: Partial<TaskRecord> = {}): TaskRecord {
     id: 'abc123', prompt: 'fix the bug', repos: ['demo'], mode: 'unattended',
     state: 'provisioning', sessionId: null, tokensUsed: 0, tokenBudget: 500000,
     timeoutMinutes: 30, error: null, result: null, model: null, turns: [], createdAt: '', updatedAt: '',
-    restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'build', comments: [], delivery: {},
+    restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'build', comments: [], delivery: {}, party: true, autoPlay: false,
     ...over,
   }
 }
@@ -55,6 +55,13 @@ describe('composePrompt', () => {
     expect(build).toContain('planning-and-task-breakdown')
     expect(build).toContain('in parallel')
     expect(build).toContain('test-driven-development')
+  })
+
+  it('drops the subagent paragraph from build when PARTY MODE is off', () => {
+    const out = composePrompt(task({ party: false }), config({ demo: repo() }))
+    expect(out).toContain('Do what the prompt above asks')
+    expect(out).not.toContain('subagent')
+    expect(out).not.toContain('planning-and-task-breakdown')
   })
 
   it('tells build turns to follow the prompt above before falling back to the spec', () => {

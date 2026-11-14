@@ -1,8 +1,9 @@
 import { execFile } from 'node:child_process'
+import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { PetreeConfig } from './config.js'
-import { scrubUrls, taskBranch } from './gitops.js'
-import type { Delivery, TaskStore } from './store.js'
+import { headSha, pushBranch, scrubUrls, taskBranch } from './gitops.js'
+import { threadTitle, type Delivery, type TaskRecord, type TaskStore } from './store.js'
 
 const execFileAsync = promisify(execFile)
 
@@ -83,6 +84,27 @@ export async function pollPrs(store: TaskStore, cfg: PetreeConfig, onlyId?: stri
       }
     }
   }
+}
+
+// Push petree/<id> to `target`, open the PR and record delivery; shared by POST /pr and AUTO-PLAY.
+export async function openPr(
+  store: TaskStore,
+  cfg: PetreeConfig,
+  t: TaskRecord,
+  repo: string,
+  target: string,
+  create: typeof createPullRequest = createPullRequest,
+): Promise<{ ok: boolean; output: string; url?: string }> {
+  const repoDir = join(cfg.home, 'work', t.id, repo)
+  const pushed = pushBranch(repoDir, t.id, target)
+  if (!pushed.ok) return pushed
+  // The branch is on the remote now, whether or not the PR gets created.
+  store.setDelivery(t.id, repo, { target, prHead: headSha(repoDir) })
+  const base = cfg.repos[repo]?.defaultBranch ?? 'main'
+  const title = `petree ${t.id}: ${threadTitle(t)}`
+  const made = await create(cfg.repos[repo].url, repoDir, target, base, title, t.turns[0]?.prompt ?? t.prompt)
+  if (made.ok && made.url) store.setDelivery(t.id, repo, { url: made.url, number: made.number, pr: 'open' })
+  return { ok: made.ok, output: made.output, url: made.url }
 }
 
 export async function createPullRequest(

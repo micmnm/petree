@@ -3,13 +3,17 @@ import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readSync
 import { join } from 'node:path'
 import type { PetreeConfig } from './config.js'
 import { prepareWorkspace } from './git.js'
-import { commitChanges, headSha, repoStatus } from './gitops.js'
+import { commitChanges, headSha, repoStatus, taskBranch } from './gitops.js'
+import { readThreadStatus } from './notes.js'
+import { openPr } from './prs.js'
 import { CliRunner } from './runner.js'
 import { buildSandboxCommands, readToken, type SandboxCommands } from './sandbox.js'
 import { threadTitle, type TaskRecord, type TaskStore } from './store.js'
 
 export interface LauncherOptions {
   buildCommands?: (task: TaskRecord, workDir: string) => SandboxCommands
+  // Injected by tests so AUTO-PLAY never pushes or calls gh/az.
+  openPr?: typeof openPr
 }
 
 export interface Launcher {
@@ -150,6 +154,27 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
 
     // The turn is finalized — the detached container is no longer needed.
     await runCommand(commands.remove)
+    await autoPlay(task.id)
+  }
+
+  // AUTO-PLAY (spec §5.8): move on to the next stage, or open the PRs after build. Stops on
+  // anything but a clean finish, or when the agent asked for the user.
+  const autoPlay = async (id: string): Promise<void> => {
+    const t = store.get(id)
+    if (!t?.autoPlay || readThreadStatus(join(cfg.home, 'work', id), t.startedAt)?.needsYou) return
+    try {
+      if (t.state === 'waiting-for-you' && t.stage !== 'build') {
+        store.followUp(id, '', undefined, t.stage === 'investigate' ? 'spec' : 'build')
+      } else if (t.state === 'done' && t.stage === 'build') {
+        const errors: string[] = []
+        for (const [repo, d] of Object.entries(t.delivery)) {
+          if (d.ahead <= 0 || d.pr) continue
+          const made = await (opts.openPr ?? openPr)(store, cfg, t, repo, taskBranch(id))
+          if (!made.ok) errors.push(`${repo}: ${made.output}`)
+        }
+        if (errors.length) store.patch(id, { error: `auto PR failed: ${errors.join('; ')}` })
+      }
+    } catch { /* thread moved or was pruned meanwhile */ }
   }
 
   const launch = async function launch(task: TaskRecord): Promise<void> {

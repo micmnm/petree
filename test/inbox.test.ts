@@ -16,7 +16,7 @@ function task(over: Partial<TaskRecord> = {}): TaskRecord {
     id: 'abc123', prompt: 'fix the bug\nmore', repos: ['demo'], mode: 'unattended',
     state: 'waiting-for-you', sessionId: null, tokensUsed: 0, tokenBudget: 1,
     timeoutMinutes: 30, error: null, result: null, model: null, turns: [], createdAt: '', updatedAt: '',
-    restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'investigate', comments: [], delivery: {},
+    restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'investigate', comments: [], delivery: {}, party: true, autoPlay: false,
     ...over,
   }
 }

@@ -36,7 +36,7 @@ function makeFixtureRepo(): string {
   return dir
 }
 
-function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: Stage } = {}): {
+function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: Stage; autoPlay?: boolean } = {}): {
   home: string
   cfg: PetreeConfig
   store: TaskStore
@@ -56,6 +56,7 @@ function setup(input: { tokenBudget?: number; timeoutMinutes?: number; stage?: S
     tokenBudget: input.tokenBudget ?? 500000,
     timeoutMinutes: input.timeoutMinutes ?? 30,
     stage: input.stage ?? 'build',
+    autoPlay: input.autoPlay,
   })
   const task = store.transition(created.id, 'provisioning')
   return { home, cfg, store, task }
@@ -477,6 +478,94 @@ describe('makeLauncher', () => {
     await launch.reattach(store.get(task.id)!)
     expect(store.get(task.id)?.state).toBe('paused-limit')
     expect(store.get(task.id)?.error).toBe('timeout')
+  })
+})
+
+describe('AUTO-PLAY', () => {
+  const writer = (home: string, id: string, body: string) => {
+    process.env.WD = join(home, 'work', id)
+    process.env.FAKE_CONTAINER_EXEC = JSON.stringify([process.execPath, '-e',
+      `const fs=require('fs');${body}console.log(JSON.stringify({type:'result',subtype:'success',result:'r'}))`])
+  }
+  const launcherFor = (cfg: PetreeConfig, store: TaskStore, scenario: string, pr: string[]) =>
+    makeLauncher(cfg, store, {
+      buildCommands: (t) => shimCommands(scenario, `petree-${t.id}`),
+      openPr: async (_s, _c, _t, repo, target) => { pr.push(`${repo}:${target}`); return { ok: true, output: '' } },
+    })
+
+  it('moves investigate -> spec -> build, then opens one PR per repo with commits, never beyond', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'investigate', autoPlay: true })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const pr: string[] = []
+    const launch = launcherFor(cfg, store, 'ok', pr)
+    try {
+      await launch(task)
+      expect(store.get(task.id)).toMatchObject({ state: 'queued', stage: 'spec' })
+      await launch(store.transition(task.id, 'provisioning'))
+      expect(store.get(task.id)).toMatchObject({ state: 'queued', stage: 'build' })
+      expect(pr).toEqual([])
+      writer(home, task.id, "fs.writeFileSync(process.env.WD+'/demo/a.txt','x');")
+      await launch(store.transition(task.id, 'provisioning'))
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    expect(store.get(task.id)).toMatchObject({ state: 'done', stage: 'build' })
+    expect(pr).toEqual([`demo:petree/${task.id}`])
+  })
+
+  it('does not advance past a failed turn', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'investigate', autoPlay: true })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const pr: string[] = []
+    await launcherFor(cfg, store, 'crash', pr)(task)
+    expect(store.get(task.id)).toMatchObject({ state: 'failed', stage: 'investigate' })
+    expect(pr).toEqual([])
+  })
+
+  it('does not advance past an out-of-tokens turn', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'spec', autoPlay: true, tokenBudget: 1000 })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('big-usage', `petree-${t.id}`) })(task)
+    expect(store.get(task.id)).toMatchObject({ state: 'paused-limit', stage: 'spec' })
+  })
+
+  it('stops at the gate when the agent set needs-you', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'investigate', autoPlay: true })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    writer(home, task.id, "fs.mkdirSync(process.env.WD+'/_thread',{recursive:true});fs.writeFileSync(process.env.WD+'/_thread/status.txt','needs-you: pick a db\\n');")
+    try {
+      await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })(task)
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    expect(store.get(task.id)).toMatchObject({ state: 'waiting-for-you', stage: 'investigate' })
+  })
+
+  it('records a failed PR step on the thread instead of throwing', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'build', autoPlay: true })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    const pr: string[] = []
+    writer(home, task.id, "fs.writeFileSync(process.env.WD+'/demo/a.txt','x');")
+    try {
+      await makeLauncher(cfg, store, {
+        buildCommands: (t) => shimCommands('ok', `petree-${t.id}`),
+        openPr: async () => { pr.push('x'); return { ok: false, output: 'push rejected' } },
+      })(task)
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    expect(pr).toHaveLength(1)
+    expect(store.get(task.id)).toMatchObject({ state: 'done', error: 'auto PR failed: demo: push rejected' })
+  })
+
+  it('leaves a thread without AUTO-PLAY at the gate', async () => {
+    const { home, cfg, store, task } = setup({ stage: 'investigate' })
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })(task)
+    expect(store.get(task.id)?.state).toBe('waiting-for-you')
   })
 })
 

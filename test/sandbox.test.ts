@@ -17,7 +17,7 @@ const task: TaskRecord = {
   id: 'abc123', prompt: 'fix the bug', repos: ['demo'], mode: 'unattended',
   state: 'provisioning', sessionId: null, tokensUsed: 0, tokenBudget: 500000,
   timeoutMinutes: 30, error: null, result: null, model: null, turns: [], createdAt: '', updatedAt: '',
-  restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'build', comments: [], delivery: {},
+  restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'build', comments: [], delivery: {}, party: true, autoPlay: false,
 }
 
 describe('buildSandboxCommands', () => {
@@ -112,6 +112,15 @@ describe('buildSandboxCommands', () => {
     const prompt = cmds.create[cmds.create.indexOf('-p') + 1]
     expect(prompt.startsWith('fix the bug')).toBe(true)
     expect(prompt).toContain('## Stage: build')
+  })
+
+  it('disallows the subagent tools only when PARTY MODE is off', () => {
+    const on = buildSandboxCommands(task, cfg, '/w', 't').create
+    expect(on).not.toContain('--disallowedTools')
+    const off = buildSandboxCommands({ ...task, party: false }, cfg, '/w', 't').create
+    const i = off.indexOf('--disallowedTools')
+    expect(off.slice(i, i + 3)).toEqual(['--disallowedTools', 'Task', 'Agent'])
+    expect(off[i + 3]).toBe('--output-format')
   })
 
   it('omits --model when the task model is null', () => {

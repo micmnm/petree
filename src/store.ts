@@ -46,6 +46,8 @@ export interface TaskRecord {
   stage: Stage
   comments: Comment[]
   delivery: Record<string, Delivery>
+  party: boolean
+  autoPlay: boolean
 }
 
 // Per-repo ship state (spec §5.4); ahead/head are set at turn end, the rest by /push, /pr and PR polling.
@@ -121,6 +123,7 @@ function rowToTask(r: any): TaskRecord {
     turns: (JSON.parse(r.turns ?? '[]') as Turn[]).map((t) => ({ ...t, stage: t.stage ?? 'build' })),
     stage: r.stage, comments: JSON.parse(r.comments ?? '[]'),
     delivery: JSON.parse(r.delivery ?? '{}'),
+    party: r.party !== 0, autoPlay: r.auto_play === 1,
     createdAt: r.created_at, updatedAt: r.updated_at,
     restarts: r.restarts ?? 0, retryAt: r.retry_at ?? null,
     startedAt: r.started_at ?? null, logOffset: r.log_offset ?? 0,
@@ -150,6 +153,8 @@ export class TaskStore {
     if (!cols.includes('stage')) this.db.exec("ALTER TABLE tasks ADD COLUMN stage TEXT NOT NULL DEFAULT 'build'")
     if (!cols.includes('comments')) this.db.exec('ALTER TABLE tasks ADD COLUMN comments TEXT')
     if (!cols.includes('delivery')) this.db.exec('ALTER TABLE tasks ADD COLUMN delivery TEXT')
+    if (!cols.includes('party')) this.db.exec('ALTER TABLE tasks ADD COLUMN party INTEGER NOT NULL DEFAULT 1')
+    if (!cols.includes('auto_play')) this.db.exec('ALTER TABLE tasks ADD COLUMN auto_play INTEGER NOT NULL DEFAULT 0')
 
     this.db.exec(`CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -160,14 +165,14 @@ export class TaskStore {
       VALUES (1, 3, 5, ?)`).run(new Date().toISOString())
   }
 
-  create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number; model?: string | null; stage?: Stage }): TaskRecord {
+  create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number; model?: string | null; stage?: Stage; party?: boolean; autoPlay?: boolean }): TaskRecord {
     const now = new Date().toISOString()
     const id = randomUUID().slice(0, 8)
     this.db.prepare(`INSERT INTO tasks
-      (id, prompt, repos, mode, state, token_budget, timeout_minutes, model, stage, created_at, updated_at)
-      VALUES (?, ?, ?, 'unattended', 'queued', ?, ?, ?, ?, ?, ?)`)
+      (id, prompt, repos, mode, state, token_budget, timeout_minutes, model, stage, party, auto_play, created_at, updated_at)
+      VALUES (?, ?, ?, 'unattended', 'queued', ?, ?, ?, ?, ?, ?, ?, ?)`)
       .run(id, input.prompt, JSON.stringify(input.repos), input.tokenBudget, input.timeoutMinutes, input.model ?? null,
-        input.stage ?? 'investigate', now, now)
+        input.stage ?? 'investigate', input.party === false ? 0 : 1, input.autoPlay ? 1 : 0, now, now)
     return this.get(id)!
   }
 

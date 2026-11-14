@@ -65,6 +65,7 @@ export function buildSandboxCommands(
     image,
     'claude', '-p', composePrompt(task, cfg),
     ...(task.model ? ['--model', task.model] : []),
+    ...(task.party ? [] : ['--disallowedTools', 'Task', 'Agent']),
     '--output-format', 'stream-json', '--verbose',
     '--dangerously-skip-permissions',
   ]

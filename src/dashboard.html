@@ -692,6 +692,8 @@
     .th-move, .th-move > .cart-in { display: contents; }
     .th-move .strip { display: none; }
     .th-note { order: 2; gap: 8px; }
+    /* a waiting questionnaire keeps the note right under the answers (interview spec §5.1c) */
+    #thDoc:has(.ask) ~ #thMove .th-note { order: 0; }
     #thNote { min-height: 0; height: 124px; resize: none; }
     /* the negative margins cancel the page's 16 px gutter and bottom padding */
     .th-bar { order: 3; position: sticky; bottom: 0; z-index: 5; margin: 0 -16px -24px; padding: 10px 16px calc(8px + env(safe-area-inset-bottom)); background: var(--shell); border-top: 2px solid var(--line-strong); }

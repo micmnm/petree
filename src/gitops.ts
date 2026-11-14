@@ -1,5 +1,5 @@
 import { execFile, execFileSync } from 'node:child_process'
-import { copyFileSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -31,6 +31,19 @@ export function saveGitConfig(repoDir: string): void {
   const dest = hostConfig(repoDir)
   mkdirSync(dirname(dest), { recursive: true })
   copyFileSync(join(repoDir, '.git', 'config'), dest)
+}
+
+// Repos cloned before host copies existed get one built from trusted data only, never from the
+// agent-written config. SHA-1 only: a SHA-256 repo can't be read under version 0, so git fails closed.
+export function ensureGitConfig(repoDir: string, url: string): void {
+  const dest = hostConfig(repoDir)
+  if (existsSync(dest)) return
+  if (/[\r\n\0]/.test(url)) throw new Error('repo url contains a line break')
+  mkdirSync(dirname(dest), { recursive: true })
+  writeFileSync(dest, [
+    '[core]', '\trepositoryformatversion = 0', '\tfilemode = true', '\tbare = false', '\tlogallrefupdates = true',
+    '[remote "origin"]', `\turl = "${url.replace(/[\\"]/g, '\\$&')}"`, '\tfetch = +refs/heads/*:refs/remotes/origin/*', '',
+  ].join('\n'), { flag: 'wx' })
 }
 
 // The agent owns the work repo, .git included, and git config can run commands (filters, gpg, ssh, credential

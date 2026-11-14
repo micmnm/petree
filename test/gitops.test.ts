@@ -1,10 +1,11 @@
 import { execFileSync } from 'node:child_process'
-import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   taskBranch, createTaskBranch, commitChanges, commitStat, repoStatus, diffBranch, pushBranch, saveGitConfig,
+  ensureGitConfig,
 } from '../src/gitops.js'
 
 // a clone-shaped fixture in the work layout (<root>/work/<id>/<repo>): a bare "origin" + a clone on main
@@ -64,6 +65,23 @@ describe('an agent-written .git', () => {
     expect(pushBranch(repoDir, 'abc123', 'petree/abc123', 'ssh://127.0.0.1:9/x.git').ok).toBe(false)
     expect(Object.entries(markers).filter(([, m]) => existsSync(m)).map(([k]) => k)).toEqual([])
     expect(execFileSync('git', ['-C', bare, 'branch', '--list', 'petree/abc123'], { encoding: 'utf8' })).toContain('petree/abc123')
+  })
+
+  it('seals a pre-upgrade repo with a config built from trusted data, never from the agent-written one', () => {
+    const { repoDir, bare, root } = fixture()
+    createTaskBranch(repoDir, 'abc123')
+    rmSync(join(root, 'gitconfig'), { recursive: true })
+    const markers = arm(root, repoDir, bare)
+    ensureGitConfig(repoDir, bare)
+    const copy = readFileSync(join(root, 'gitconfig', 'abc123', 'demo'), 'utf8')
+    expect(copy).toContain(`url = "${bare}"`)
+    expect(copy).not.toMatch(/evil|fsmonitor|gpg|ext::/)
+    writeFileSync(join(repoDir, 'README.md'), 'base\nchanged\n')
+    expect(commitChanges(repoDir, 'abc123', 'petree abc123: x')).toBe(true)
+    expect(repoStatus(repoDir, 'main').ahead).toBe(1)
+    expect(pushBranch(repoDir, 'abc123', 'petree/abc123', bare).ok).toBe(true)
+    expect(Object.entries(markers).filter(([, m]) => existsSync(m)).map(([k]) => k)).toEqual([])
+    expect(readFileSync(join(repoDir, '.git', 'config'), 'utf8')).toBe(copy)
   })
 
   it('refuses a .git that points elsewhere or a work repo without a host copy of its config', () => {

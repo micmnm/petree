@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -352,6 +352,24 @@ describe('makeLauncher', () => {
     await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })(task)
     expect(store.get(task.id)).toMatchObject({ state: 'done', bin: null, delivery: {} })
     expect(store.get(task.id)!.error).toMatch(/could not read demo/)
+  })
+
+  it('still commits in a work dir cloned before host config copies existed', async () => {
+    const { home, cfg, store, task } = setup()
+    mkdirSync(join(home, 'logs'), { recursive: true })
+    await prepareWorkspace(cfg, ['demo'], join(home, 'work', task.id), task.id)
+    rmSync(join(home, 'gitconfig'), { recursive: true })
+    process.env.WD = join(home, 'work', task.id)
+    process.env.FAKE_CONTAINER_EXEC = JSON.stringify([process.execPath, '-e',
+      `require('fs').writeFileSync(process.env.WD+'/demo/a.txt','x');` +
+      `console.log(JSON.stringify({type:'result',subtype:'success',result:'r'}))`])
+    try {
+      await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })(task)
+    } finally {
+      delete process.env.FAKE_CONTAINER_EXEC
+      delete process.env.WD
+    }
+    expect(store.get(task.id)).toMatchObject({ state: 'done', error: null, delivery: { demo: { ahead: 1 } } })
   })
 
   it('does not bin a failed turn', async () => {

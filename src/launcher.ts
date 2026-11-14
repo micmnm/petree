@@ -3,7 +3,7 @@ import { closeSync, createWriteStream, existsSync, mkdirSync, openSync, readSync
 import { join } from 'node:path'
 import type { PetreeConfig } from './config.js'
 import { prepareWorkspace } from './git.js'
-import { aheadCount, commitChanges, commitStat, headSha, taskBranch } from './gitops.js'
+import { aheadCount, commitChanges, commitStat, ensureGitConfig, headSha, taskBranch } from './gitops.js'
 import { readThreadStatus } from './notes.js'
 import { openPr } from './prs.js'
 import { CliRunner } from './runner.js'
@@ -133,6 +133,7 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
     const files: TurnStats['files'] = []
     for (const repo of task.repos) {
       try {
+        ensureGitConfig(join(workDir, repo), cfg.repos[repo]?.url ?? '')
         const committed = commitChanges(join(workDir, repo), task.id, `petree ${task.id}: ${title}`)
         if (committed) files.push({ repo, ...commitStat(join(workDir, repo)) })
         if (committed && latest.stage !== 'build') {

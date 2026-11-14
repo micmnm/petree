@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import express from 'express'
 import { parseConfigText, resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
-import { localCheckout, repoStatus, diffBranch, pushBranch, taskBranch, headSha } from './gitops.js'
+import { ensureGitConfig, localCheckout, repoStatus, diffBranch, pushBranch, taskBranch, headSha } from './gitops.js'
 import { openPr, pollPrs } from './prs.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
@@ -309,6 +309,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       if (!existsSync(repoDir)) {
         return { repo, branch, baseBranch, hasChanges: false, stat: '', patch: '', reviewCommand: '', folder, run }
       }
+      ensureGitConfig(repoDir, cfg.repos[repo]?.url ?? '')
       const st = repoStatus(repoDir, baseBranch)
       const d = st.hasChanges ? diffBranch(repoDir, baseBranch) : { stat: '', patch: '' }
       const reviewCommand = `git -C <your-repo> fetch ${repoDir} ${branch} && git checkout ${branch}`
@@ -326,6 +327,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (!norm) return
     const repoDir = join(cfg.home, 'work', t.id, repo as string)
     if (!existsSync(repoDir)) { res.status(400).json({ error: 'no work dir for task' }); return }
+    ensureGitConfig(repoDir, cfg.repos[repo as string]?.url ?? '')
     const pushed = pushBranch(repoDir, t.id, norm, cfg.repos[repo as string]?.url ?? '')
     if (pushed.ok) {
       store.setDelivery(t.id, repo as string, { target: norm, prHead: headSha(repoDir) })

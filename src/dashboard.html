@@ -250,24 +250,141 @@
     .t-title { font-size: 20px; }
   }
 
+  /* New quest (spec §5.1f) */
+  #newView { max-width: 960px; }
+  #newView .ptitle { font-size: 50px; line-height: .9; letter-spacing: 1px; }
+  .nq-head { display: flex; flex-direction: column; gap: 6px; }
+  .nq-head p { margin: 0; color: var(--muted); }
+  .nq { display: flex; flex-direction: column; gap: 32px; }
+  .nq .cart-in { gap: 16px; padding: 20px 18px 12px; }
+  .nq-h { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .nq-h h2 { margin: 0; font: 400 40px/1 var(--px); }
+  .nq-k { font: 20px/1 var(--px); color: var(--label); }
+  .nq-lbl { font-weight: 700; }
+  #nqPrompt { display: block; height: 228px; min-height: 0; padding: 12px 16px; border: 2px solid var(--line-strong); font: 16px/1.5 var(--sans); overflow-y: auto; }
+  .nq-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; font-size: 14px; color: var(--muted); }
+  .nq-meta b { margin-right: 4px; font: 400 20px/1 var(--px); color: var(--ink); }
+  .nq kbd { padding: 0 5px; border: 2px solid var(--line-strong); background: var(--inset); color: var(--ink); font: 13px var(--mono); }
+  .nq-err { margin: 0; color: var(--need); font-weight: 700; }
+  .nq-err:empty { display: none; }
+  .nq-line { margin: 0; font-size: 14px; line-height: 1.4; color: var(--muted); }
+  .nq-col { display: flex; flex-direction: column; gap: 8px; }
+  .nq-col:empty { display: none; }
+  .nq-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .nq-chip { display: inline-flex; align-items: center; gap: 10px; max-width: 100%; padding-left: 12px; background: var(--ink); color: var(--screen); }
+  .nq-chip i { flex: none; width: 14px; height: 14px; }
+  .nq-chip b { min-width: 0; overflow-wrap: anywhere; }
+  .nq-chip small { font-size: 13px; color: var(--shell); }
+  .nq-chip button { flex: none; width: 44px; height: 44px; padding: 0; border: 0; border-left: 2px solid var(--muted); background: transparent; color: inherit; display: inline-flex; align-items: center; justify-content: center; }
+  .nq-yaml { padding: 0 12px; background: var(--inset); border-left: 4px solid var(--line-strong); font: 13px/1.5 var(--mono); color: var(--muted); }
+  .nq-yaml summary { padding: 12px 0; cursor: pointer; }
+  .nq-yaml div { display: flex; flex-wrap: wrap; gap: 4px 14px; padding-bottom: 10px; overflow-wrap: anywhere; }
+  .nq-yaml b { font-weight: 400; color: var(--ink); }
+  .nq-warn { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px 14px 12px; background: var(--gold-tint); border-left: 4px solid var(--gold-fill); }
+  .nq-warn svg { flex: none; margin-top: 2px; }
+  .nq-warn div { min-width: 0; display: flex; flex-direction: column; gap: 4px; line-height: 1.4; }
+  .nq-warn .nq-k { color: var(--gold); }
+  .nq-warn span:last-child { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+  .nq-warn code { font: 13px var(--mono); }
+  .nq-find { display: flex; flex-direction: column; gap: 10px; padding-top: 16px; border-top: 2px dotted var(--line); }
+  .nq-findh { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+  .nq-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .nq-box { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 14px; background: var(--inset); border: 2px solid var(--ink); color: var(--muted); }
+  .nq-box:focus-within { outline: 3px solid var(--gold); outline-offset: 3px; }
+  .nq-box svg { flex: none; }
+  #nqSearch { flex: 1 1 auto; min-width: 0; min-height: 48px; padding: 0; border: 0; outline: none; background: transparent; color: var(--ink); font: 16px var(--sans); }
+  .nq-found { font-size: 13px; white-space: nowrap; }
+  #nqDrop { background: var(--screen); border: 2px solid var(--ink); border-top: 0; }
+  #nqList { max-height: 320px; overflow-y: auto; }
+  .nq-opt { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 52px; padding: 8px 14px 8px 10px; border-left: 4px solid transparent; border-bottom: 2px dotted var(--line); cursor: pointer; }
+  .nq-opt:hover, .nq-opt.on { background: var(--inset); }
+  .nq-opt.on { border-left-color: var(--ink); }
+  .nq-opt .box { margin-top: 0; }
+  .nq-opt > i { flex: none; width: 18px; height: 18px; }
+  .nq-opt b { overflow-wrap: anywhere; }
+  .nq-opt u { text-decoration-thickness: 2px; text-underline-offset: 3px; }
+  .nq-opt .mono { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+  .nq-tag { padding: 3px 9px; background: var(--ink); color: var(--screen); font-size: 13px; font-weight: 700; }
+  .nq-last { margin-left: auto; font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .nq-none { padding: 14px; color: var(--muted); }
+  .nq-keys { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 14px; font-size: 13px; color: var(--muted); }
+  /* Selection tile (design §4.6): the input stays focusable, the frame shows its state */
+  .pick { position: relative; display: flex; cursor: pointer; }
+  .pick input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; }
+  .pk-f { flex: 1 1 auto; min-width: 0; display: flex; padding: 2px; background: var(--line-strong); clip-path: var(--step); }
+  .pk-in { flex: 1 1 auto; min-width: 0; display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: var(--screen); clip-path: var(--step); }
+  :checked + .pk-f { background: var(--gold); }
+  :checked + .pk-f > .pk-in { background: var(--gold-tint); }
+  :focus-visible + .pk-f { clip-path: none; outline: 3px solid var(--gold); outline-offset: 3px; }
+  .box { flex: none; margin-top: 6px; }
+  .box .fr { fill: var(--line-strong); }
+  .box .ck { display: none; fill: var(--gold); }
+  :checked + .pk-f .box .fr, [aria-selected="true"] > .box .fr { fill: var(--gold); }
+  :checked + .pk-f .box .ck, [aria-selected="true"] > .box .ck { display: inline; }
+  .pk-t { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .pk-h { display: flex; align-items: baseline; gap: 8px; }
+  .pk-h b { font: 400 30px/.9 var(--px); }
+  .pk-t small { font-size: 14px; line-height: 1.4; color: var(--muted); }
+  .nq-lv { font: 20px/1 var(--px); color: var(--label); }
+  :checked + .pk-f .nq-lv { color: var(--gold); }
+  .nq-def { padding: 1px 6px; border: 2px dotted var(--line-strong); font-size: 13px; font-weight: 700; font-style: normal; color: var(--muted); }
+  .nq-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; }
+  .nq-tags .pk-in { align-items: center; gap: 8px; min-height: 40px; padding: 0 12px 0 10px; }
+  .nq-tags .box { margin-top: 0; }
+  .nq-tags b { font: 400 20px/1 var(--px); }
+  .nq-recent { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 150px), 1fr)); gap: 10px; }
+  .nq-recent .pk-in { gap: 10px; padding: 10px 12px; }
+  .nq-recent .box { margin-top: 2px; }
+  .nq-recent .pk-t { gap: 3px; max-width: 100%; }
+  .nq-recent small { font-size: 13px; }
+  .pk-n { display: flex; align-items: center; gap: 6px; max-width: 100%; font-weight: 700; }
+  .pk-n i { flex: none; width: 12px; height: 12px; }
+  .pk-n span { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Pixel switch (design §4.7) */
+  .nq-sws { display: flex; flex-direction: column; border-bottom: 2px dotted var(--line); }
+  .nq-sw { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; min-height: 68px; padding: 12px 4px; border: 0; border-top: 2px dotted var(--line); background: transparent; color: var(--ink); text-align: left; }
+  .nq-sw:focus-visible { outline-offset: -3px; }
+  .nq-sw > span:first-child { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .nq-sw b { font: 400 30px/.9 var(--px); }
+  .nq-sw small { font-size: 14px; line-height: 1.4; color: var(--muted); }
+  .sw { flex: none; display: inline-flex; align-items: center; gap: 10px; font: 20px/1 var(--px); color: var(--muted); }
+  .sw-w { width: 32px; text-align: right; }
+  .sw-t { display: flex; gap: 2px; padding: 2px; background: var(--inset); border: 2px solid var(--line-strong); }
+  .sw-t span { width: 22px; height: 22px; }
+  [aria-checked="false"] .sw-t span:first-child { background: var(--screen); border: 2px solid var(--line-strong); }
+  [aria-checked="true"] .sw { color: var(--go); }
+  [aria-checked="true"] .sw-t span:last-child { background: var(--go-fill); }
+  .nq-foot { display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: space-between; gap: 16px 24px; }
+  .nq-end { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 12px 18px; }
+  .nq-end .nq-err { flex-basis: 100%; text-align: right; }
+  .nq-sum { font-size: 14px; color: var(--muted); }
+  .nq-go { gap: 12px; min-height: 60px; padding: 6px 24px 6px 18px; border: 0; cursor: pointer; }
+  .nq-go b { font: 400 40px/.8 var(--px); }
+  .nq-go:disabled { opacity: .6; cursor: wait; }
+  @media (max-width: 600px) {
+    #newView .ptitle { font-size: 40px; }
+    .nq { gap: 20px; }
+    .nq .cart-in { gap: 14px; padding: 16px 14px 10px; }
+    .nq-h h2 { font-size: 30px; }
+    .nq-h .hint { font-size: 14px; }
+    #nqPrompt { height: 180px; }
+    .nq-keys { display: none; }
+    .nq-last { margin-left: 0; }
+    /* sticky start bar; the negative margins cancel the page's 16 px gutter and bottom padding */
+    .nq-foot { position: sticky; bottom: 0; z-index: 5; margin: 0 -16px -24px; padding: 10px 16px; background: var(--screen); border-top: 2px solid var(--line-strong); }
+    .nq-back { display: none; }
+    .nq-end { flex: 1 1 auto; flex-direction: column; align-items: stretch; gap: 8px; }
+    .nq-end .nq-err { flex-basis: auto; text-align: left; }
+    .nq-sum { font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nq-go { justify-content: center; min-height: 56px; }
+  }
+
   /* Thread panel, create form and options: kept from the old dashboard until PRs 10–13 */
   .card { background: var(--surface); border: 2px solid var(--line-strong); }
-  form.create { padding: calc(var(--sp)*2); display: flex; flex-direction: column; gap: var(--sp); }
   textarea { width: 100%; padding: var(--sp); font: inherit; border: 1px solid var(--line); resize: none; overflow: hidden; min-height: 3rem; }
   textarea, input, select { background: var(--inset); color: var(--ink); }
   .field { display: flex; gap: var(--sp); align-items: center; flex-wrap: wrap; font-size: .9rem; }
   .field > label.k { color: var(--muted); min-width: 3.5rem; }
-  .field.repos-field { align-items: flex-start; }
-  .combo { position: relative; flex: 1 1 auto; min-width: 220px; }
-  .combo-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
-  .combo-tags .tag { display: inline-flex; align-items: center; gap: 4px; background: var(--gold-tint); border: 1px solid var(--line); padding: 2px 6px 2px 10px; font-size: .82rem; }
-  .combo-tags .tag button { border: none; background: none; padding: 0; margin: 0; cursor: pointer; color: var(--muted); font-size: 1rem; line-height: 1; }
-  .combo input { width: 100%; padding: 6px 10px; border: 1px solid var(--line); font: inherit; }
-  .combo-menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 10; background: var(--surface); border: 1px solid var(--line); margin-top: 4px; max-height: 220px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
-  .combo-menu .opt { padding: 6px 10px; cursor: pointer; font-size: .9rem; }
-  .combo-menu .opt:hover, .combo-menu .opt.active { background: var(--gold-tint); }
-  .combo-menu .opt.sel { color: var(--muted); }
-  .combo-menu .empty { padding: 6px 10px; color: var(--muted); font-size: .85rem; }
   select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
   button.primary { background: var(--gold-fill); color: var(--on-fill); border-color: var(--gold-fill); }
   table { border-collapse: collapse; width: 100%; font-size: .9rem; }
@@ -293,10 +410,6 @@
   .copy { font-size: .72rem; padding: 2px 8px; margin-left: 6px; }
   .cmd { display: flex; align-items: center; gap: 6px; background: var(--inset); border: 1px solid var(--line); padding: 6px 8px; font-family: var(--mono); font-size: .8rem; overflow-x: auto; }
   .muted { color: var(--muted); } .small { font-size: .75rem; }
-  #conventions { border-top: 1px dashed var(--line); padding-top: var(--sp); }
-  .conv { margin-top: 6px; } .conv-name { font-family: var(--mono); color: var(--ink); }
-  .conv-text { white-space: pre-wrap; }
-  .conv code { background: var(--inset); padding: 0 .25rem; font-family: var(--mono); }
   /* Log tab — activity view */
   .logbar { display: flex; align-items: center; gap: var(--sp); margin-bottom: 10px; }
   .seg-ctl { display: inline-flex; border: 1px solid var(--line); overflow: hidden; }
@@ -396,29 +509,70 @@
 
 <main class="page sub-page" id="newView" hidden>
   <a class="btn2 back" href="#/"><span><b>BACK</b><small>to the inbox, draft kept</small></span></a>
-  <h1 class="ptitle">NEW QUEST</h1>
-  <form class="create card" id="create">
-    <textarea name="prompt" id="prompt" placeholder="thread prompt — Cmd/Ctrl+Enter to start" required></textarea>
-    <div class="field repos-field">
-      <label class="k">repos</label>
-      <div class="seg-ctl" id="tagFilter" hidden></div>
-      <div class="combo" id="repoCombo">
-        <div class="combo-tags" id="repoTags"></div>
-        <input type="text" id="repoSearch" placeholder="search repos…" autocomplete="off">
-        <div class="combo-menu" id="repoMenu" hidden></div>
+  <div class="nq-head"><h1 class="ptitle">NEW QUEST</h1><p>Say what to do, pick the repos and the model, then press start.</p></div>
+  <form class="nq" id="create" aria-label="Start a new thread" novalidate>
+    <section class="cart-frame" aria-labelledby="nqQuestH"><div class="cart-in">
+      <div class="nq-h"><span class="nq-k">STEP 1/4</span><h2 id="nqQuestH">THE QUEST</h2></div>
+      <label class="nq-lbl" for="nqPrompt">What should Claude do?</label>
+      <textarea id="nqPrompt" aria-describedby="nqPromptErr nqCount" placeholder="e.g. Add tags to repos.yaml and a tag filter above the repo picker. Keep the search box. Add tests."></textarea>
+      <p class="nq-err" id="nqPromptErr" role="alert"></p>
+      <div class="nq-meta">
+        <span id="nqCount"><b id="nqCountN">0</b> characters · draft kept on this device</span>
+        <span class="desk"><kbd>Cmd/Ctrl</kbd> + <kbd>Enter</kbd> starts the quest</span>
       </div>
-    </div>
-    <div class="small muted" id="conventions" hidden></div>
-    <div class="field"><label class="k">model</label>
-      <select id="model">
-        <option value="default">default</option><option value="haiku">haiku</option>
-        <option value="sonnet">sonnet</option><option value="opus">opus</option>
-      </select>
-      <label class="k" for="stage">stage</label>
-      <select id="stage">
-        <option value="investigate" selected>investigate</option><option value="spec">spec</option><option value="build">build</option>
-      </select>
-      <button class="primary" type="submit" style="margin-left:auto">Start thread</button>
+      <div class="strip" aria-hidden="true"></div>
+    </div></section>
+
+    <section class="cart-frame" aria-labelledby="nqPartyH"><div class="cart-in">
+      <div class="nq-h"><span class="nq-k">STEP 2/4</span><h2 id="nqPartyH">CHOOSE YOUR PARTY</h2><span class="hint">The repos Claude works in. Pick one or more.</span></div>
+      <div class="nq-col" id="nqParty"></div>
+      <p class="nq-err" id="nqRepoErr" role="alert"></p>
+      <div class="nq-find" id="nqFind">
+        <div class="nq-findh">
+          <label class="nq-k" for="nqSearch" id="nqAddL">ADD A REPO</label>
+          <div class="nq-tags" id="nqTags" role="radiogroup" aria-label="Narrow the search by tag"></div>
+        </div>
+        <div>
+          <div class="nq-box">
+            <svg aria-hidden="true" width="18" height="18" viewBox="0 0 9 9" shape-rendering="crispEdges" fill="currentColor"><rect x="2" y="0" width="3" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="5" y="1" width="1" height="1"/><rect x="0" y="2" width="1" height="3"/><rect x="6" y="2" width="1" height="3"/><rect x="1" y="5" width="1" height="1"/><rect x="5" y="5" width="1" height="1"/><rect x="2" y="6" width="3" height="1"/><rect x="6" y="6" width="1" height="1"/><rect x="7" y="7" width="1" height="1"/><rect x="8" y="8" width="1" height="1"/></svg>
+            <input id="nqSearch" type="text" role="combobox" aria-expanded="false" aria-controls="nqList" aria-autocomplete="list" autocomplete="off" placeholder="find a repo…">
+            <span class="nq-found" id="nqFound"></span>
+          </div>
+          <div id="nqDrop" hidden>
+            <div id="nqList" role="listbox" aria-label="Matching repos" aria-multiselectable="true"></div>
+            <div class="nq-keys" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> move</span><span><kbd>enter</kbd> add to party</span><span><kbd>esc</kbd> close</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="nq-col" id="nqRecent"></div>
+      <div class="strip" aria-hidden="true"></div>
+    </div></section>
+
+    <section class="cart-frame" aria-labelledby="nqClassH"><div class="cart-in">
+      <div class="nq-h"><span class="nq-k">STEP 3/4</span><h2 id="nqClassH">CHOOSE YOUR CLASS</h2><span class="hint">The Claude model that leads the quest.</span></div>
+      <div class="nq-tiles" id="nqClass" role="radiogroup" aria-labelledby="nqClassH"></div>
+      <div class="strip" aria-hidden="true"></div>
+    </div></section>
+
+    <section class="cart-frame" aria-labelledby="nqRulesH"><div class="cart-in">
+      <div class="nq-h"><span class="nq-k">STEP 4/4</span><h2 id="nqRulesH">RULES OF PLAY</h2><span class="hint">Where the quest begins and how far it goes on its own.</span></div>
+      <span class="nq-k" id="nqLevelH">STARTING LEVEL</span>
+      <div class="nq-tiles" id="nqStage" role="radiogroup" aria-labelledby="nqLevelH"></div>
+      <div class="nq-sws" id="nqSwitches"></div>
+      <p class="nq-line" id="nqAuto"></p>
+      <div class="strip" aria-hidden="true"></div>
+    </div></section>
+
+    <div class="nq-foot">
+      <a class="btn2 nq-back" href="#/"><span><b>BACK</b><small>to the inbox, draft kept</small></span></a>
+      <div class="nq-end">
+        <p class="nq-err" id="nqServerErr" role="alert"></p>
+        <span class="nq-sum" id="nqSum"></span>
+        <button type="submit" class="btn-start nq-go" id="nqGo">
+          <svg aria-hidden="true" width="8" height="14" viewBox="0 0 4 7" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="1" height="7"/><rect x="1" y="1" width="1" height="5"/><rect x="2" y="2" width="1" height="3"/><rect x="3" y="3" width="1" height="1"/></svg>
+          <span class="stack"><b>PRESS START</b><span class="sub">start the thread</span></span>
+        </button>
+      </div>
     </div>
   </form>
 </main>
@@ -643,7 +797,7 @@
       renderBody().catch(() => {})
     } else selected = null
     if (view === 'options') { loadSettings(); loadReposYaml() }
-    if (view === 'new') autosize()
+    if (view === 'new') renderNew()
     const anchor = h.length > 1 && !h.startsWith('#/') && document.getElementById(h.slice(1))
     if (anchor) anchor.scrollIntoView(); else window.scrollTo(0, 0)
   }
@@ -677,77 +831,198 @@
     try { await navigator.clipboard.writeText(decodeURIComponent(b.dataset.copy)); const o = b.textContent; b.textContent = 'copied'; setTimeout(() => (b.textContent = o), 1200) } catch {}
   })
 
-  // create form — repo combo: searchable, multiselect
-  let selectedRepos = []
-  const repoSearch = $('repoSearch')
-  const repoMenu = $('repoMenu')
-  const repoTags = $('repoTags')
-  const conventions = $('conventions')
-  const loadRepos = () => fetch('/api/repos').then((r) => r.json()).then((repos) => {
-    allRepos = repos; reposLoaded = true; renderRepoMenu(); renderConventions(); renderInbox()
-  }).catch(() => {})
-  loadRepos()
+  // ---- new quest (#/new, spec §5.1f) ----
+  const CLASSES = [['SAGE', 'Opus', 'opus', 'deep thinking, slower'], ['KNIGHT', 'Sonnet', 'sonnet', 'balanced, all-round'], ['ROGUE', 'Haiku', 'haiku', 'quick and cheap']]
+  const LEVELS = [['SCOUT', 'investigate', 'look around, write findings, stop for you'], ['PLAN', 'spec', 'write a spec, stop for approval'], ['CRAFT', 'build', 'make the change, test, report back']]
+  const BOX = '<svg class="box" aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges"><rect class="fr" width="8" height="8"/><rect x="1" y="1" width="6" height="6" style="fill:var(--screen)"/>'
+    + '<g class="ck"><rect x="2" y="3" width="1" height="2"/><rect x="3" y="4" width="1" height="2"/><rect x="4" y="3" width="1" height="2"/><rect x="5" y="2" width="1" height="2"/></g></svg>'
+  const CROSS = '<svg aria-hidden="true" width="12" height="12" viewBox="0 0 6 6" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="2" height="1"/><rect x="4" y="0" width="2" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="4" y="1" width="1" height="1"/><rect x="2" y="2" width="2" height="2"/><rect x="1" y="4" width="1" height="1"/><rect x="4" y="4" width="1" height="1"/><rect x="0" y="5" width="2" height="1"/><rect x="4" y="5" width="2" height="1"/></svg>'
+  const WARN = '<svg aria-hidden="true" width="21" height="18" viewBox="0 0 7 6" shape-rendering="crispEdges"><g style="fill:var(--gold)"><rect x="3" y="0" width="1" height="1"/><rect x="2" y="1" width="3" height="2"/><rect x="1" y="3" width="5" height="2"/><rect x="0" y="5" width="7" height="1"/></g><rect x="3" y="2" width="1" height="2" style="fill:var(--gold-tint)"/></svg>'
+  const nq = { repos: [], tag: '', open: false, active: 0, model: null, stage: 'investigate', party: true, autoPlay: false, yamlOpen: new Set(), err: {} }
+  const nqPrompt = $('nqPrompt'), nqSearch = $('nqSearch')
+  const repoOf = (name) => allRepos.find((r) => r.name === name)
+  // Preselects the first repo's default_model like the server's resolveModel; anything else sends 'default'.
+  const repoClass = () => CLASSES.find((c) => c[2] === repoOf(nq.repos[0])?.defaultModel)
+  const pickedClass = () => CLASSES.find((c) => c[2] === nq.model) ?? repoClass()
+  // Rewriting a role="alert" with the same text would announce it again.
+  const setText = (el, s) => { if (el.textContent !== s) el.textContent = s }
+  const tile = (type, name, value, on, body) => `<label class="pick"><input type="${type}" name="${name}" value="${esc(value)}" data-key="${name}:${esc(value)}"${on ? ' checked' : ''}>
+    <span class="pk-f"><span class="pk-in">${BOX}<span class="pk-t">${body}</span></span></span></label>`
+  const matches = () => {
+    const q = nqSearch.value.trim().toLowerCase()
+    return allRepos.filter((r) => r.name.toLowerCase().includes(q) && (!nq.tag || r.tags.includes(nq.tag)))
+  }
+  const mark = (name, q) => {
+    const i = q ? name.toLowerCase().indexOf(q) : -1
+    return i < 0 ? esc(name) : `${esc(name.slice(0, i))}<u>${esc(name.slice(i, i + q.length))}</u>${esc(name.slice(i + q.length))}`
+  }
+  const chip = (r) => `<span class="nq-chip"><i style="background:${hue(r.name)}"></i><b>${esc(r.name)}</b>${r.tags.length ? `<small>${esc(r.tags.join(' · '))}</small>` : ''}
+    <button type="button" data-drop="${esc(r.name)}" aria-label="${esc(`Remove ${r.name} from the party`)}">${CROSS}</button></span>`
+  const cmds = (k, list) => list.length ? `<span>${k} <b>${esc(list.join(' && '))}</b></span>` : ''
+  const yaml = (r) => `<details class="nq-yaml" data-repo="${esc(r.name)}"${nq.yamlOpen.has(r.name) ? ' open' : ''}><summary class="nq-k">REPOS.YAML · ${esc(r.name)}</summary>
+    <div><span>branch <b>${esc(r.defaultBranch)}</b></span><span>image <b>${esc(r.image)}</b></span>${cmds('setup', r.setup)}${cmds('test', r.test)}<span>model <b>${esc(r.defaultModel ?? 'default')}</b></span></div></details>`
+  // Spec §5.5: the party clones the remote, so local work is invisible to it. No PUSH FIRST: petree never pushes your checkout.
+  function warn(r) {
+    const l = r.local
+    if (!l || !(l.unpushed > 0 || l.dirty)) return ''
+    const what = [l.unpushed > 0 && `${l.unpushed} unpushed commit${l.unpushed === 1 ? '' : 's'}`, l.dirty && 'uncommitted changes'].filter(Boolean).join(' and ')
+    return `<div class="nq-warn" role="note">${WARN}<div><span class="nq-k">${esc(r.name.toUpperCase())} · LOCAL WORK</span>
+      <b>${what[0].toUpperCase() + what.slice(1)} on your machine. The party starts from the pushed code and won't see them.</b>
+      <span>In <code>${esc(r.path)}</code>. Push first if the quest needs them.</span></div></div>`
+  }
 
-  function renderRepoTags() {
-    repoTags.innerHTML = selectedRepos.map((name) => `<span class="tag">${esc(name)}<button type="button" data-remove="${esc(name)}" aria-label="remove ${esc(name)}">×</button></span>`).join('')
-    renderConventions()
+  function renderNew() {
+    const none = reposLoaded && !allRepos.length
+    const chosen = nq.repos.map(repoOf).filter(Boolean)
+    paint($('nqParty'), none ? '<p class="nq-line">No repos yet — open <a href="#/options">OPTIONS</a> to recruit one.</p>'
+      : `<span class="nq-k">IN YOUR PARTY · ${chosen.length}</span>` + (chosen.length
+        ? `<div class="nq-chips">${chosen.map(chip).join('')}</div>${chosen.map((r) => yaml(r) + warn(r)).join('')}`
+        : '<p class="nq-line">Nobody yet. Search below or tap a recent repo.</p>'))
+    $('nqFind').hidden = none
+
+    const tags = [...new Set(allRepos.flatMap((r) => r.tags))].sort()
+    if (!tags.includes(nq.tag)) nq.tag = ''
+    $('nqTags').hidden = !tags.length
+    paint($('nqTags'), ['', ...tags].map((t) => tile('radio', 'nq-tag', t, t === nq.tag, `<b>${esc(t ? t.toUpperCase() : 'ALL')}</b>`)).join(''))
+
+    const q = nqSearch.value.trim().toLowerCase(), list = matches()
+    nq.active = Math.max(0, Math.min(nq.active, list.length - 1))
+    setText($('nqAddL'), `ADD A REPO · ${allRepos.length} IN REPOS.YAML`)
+    setText($('nqFound'), `${list.length} found`)
+    $('nqDrop').hidden = !nq.open
+    nqSearch.setAttribute('aria-expanded', String(nq.open))
+    if (nq.open && list.length) nqSearch.setAttribute('aria-activedescendant', 'nq-opt-' + nq.active)
+    else nqSearch.removeAttribute('aria-activedescendant')
+    paint($('nqList'), list.map((r, i) => `<div class="nq-opt${i === nq.active ? ' on' : ''}" id="nq-opt-${i}" role="option" aria-selected="${nq.repos.includes(r.name)}" data-repo="${esc(r.name)}">
+      ${BOX}<i style="background:${hue(r.name)}"></i><b>${mark(r.name, q)}</b>${r.tags.map((t) => `<span class="nq-tag">${esc(t)}</span>`).join('')}
+      <span class="mono">${esc(r.defaultBranch)} · ${esc(r.image)}</span><span class="nq-last">${r.usage?.lastQuestAt ? 'last quest ' + age(r.usage.lastQuestAt) : 'no quests yet'}</span></div>`).join('')
+      || '<div class="nq-none">No repo matches.</div>')
+    if (nq.open) $('nqList').querySelector('.on')?.scrollIntoView({ block: 'nearest' })
+
+    const recent = allRepos.filter((r) => r.usage?.lastQuestAt).sort((a, b) => b.usage.lastQuestAt.localeCompare(a.usage.lastQuestAt)).slice(0, 5)
+    paint($('nqRecent'), recent.length ? '<span class="nq-k" id="nqRecentH">RECENT · ONE TAP TO ADD</span><div class="nq-recent" role="group" aria-labelledby="nqRecentH">'
+      + recent.map((r) => tile('checkbox', 'nq-repo', r.name, nq.repos.includes(r.name),
+        `<span class="pk-n"><i style="background:${hue(r.name)}"></i><span>${esc(r.name)}</span></span><small>${esc([...r.tags, age(r.usage.lastQuestAt)].join(' · '))}</small>`)).join('') + '</div>' : '')
+
+    const def = repoClass(), cls = pickedClass()
+    paint($('nqClass'), CLASSES.map((c) => tile('radio', 'nq-model', c[2], c === cls,
+      `<span class="pk-h"><b>${c[0]}</b><strong>· ${c[1]}</strong></span><small>${c[3]}</small>${c === def ? `<em class="nq-def">default for ${esc(nq.repos[0])}</em>` : ''}`)).join(''))
+    paint($('nqStage'), LEVELS.map(([n, v, line], i) => tile('radio', 'nq-stage', v, v === nq.stage,
+      `<span class="pk-h"><b>${n}</b><span class="nq-lv">LV ${i + 1}</span></span><small>${line}</small>`)).join(''))
+    const sw = (k, name, line) => `<button type="button" class="nq-sw" role="switch" aria-checked="${nq[k]}" data-sw="${k}" data-key="sw:${k}">
+      <span><b>${name}</b><small>${line}</small></span><span class="sw" aria-hidden="true"><span class="sw-w">${nq[k] ? 'ON' : 'OFF'}</span><span class="sw-t"><span></span><span></span></span></span></button>`
+    paint($('nqSwitches'), sw('party', 'PARTY MODE', 'let it spawn subagents for parallel work')
+      + sw('autoPlay', 'AUTO-PLAY', 'go all the way to an open PR without stopping at gates; you still merge'))
+    const start = LEVELS.find((l) => l[1] === nq.stage)[0]
+    setText($('nqAuto'), nq.autoPlay ? `AUTO-PLAY is on, so the quest starts at ${start} and runs on to an open PR. It never merges; you do.`
+      : `AUTO-PLAY is off, so the quest starts at ${start} and stops at every gate for your OK.`)
+    const n = chosen.length
+    setText($('nqSum'), `${n ? `${n} repo${n === 1 ? '' : 's'}` : 'no party yet'} · ${cls ? `${cls[0]} · ${cls[1]}` : 'default model'} · starts at ${start}`)
+    setText($('nqPromptErr'), nq.err.prompt ?? '')
+    setText($('nqRepoErr'), nq.err.repos ?? '')
+    setText($('nqServerErr'), nq.err.server ?? '')
+    nqPrompt.setAttribute('aria-invalid', String(!!nq.err.prompt))
   }
-  // Mirrors composePrompt() in src/prompt.ts: what repos.yaml will append to the
-  // prompt for the repos currently selected.
-  const cmdLine = (label, list) =>
-    list && list.length ? `<div>${label}: ${list.map((c) => `<code>${esc(c)}</code>`).join(' ')}</div>` : ''
-  function renderConventions() {
-    const active = allRepos.filter((r) => selectedRepos.includes(r.name) &&
-      (r.instructions || r.setup?.length || r.build?.length || r.test?.length))
-    conventions.hidden = active.length === 0
-    conventions.innerHTML = active.length
-      ? 'repo conventions appended to this prompt:' + active.map((r) => `<div class="conv">
-          <span class="conv-name">${esc(r.name)}</span>
-          ${r.instructions ? `<div class="conv-text">${esc(r.instructions)}</div>` : ''}
-          ${cmdLine('setup', r.setup)}${cmdLine('build', r.build)}${cmdLine('test', r.test)}</div>`).join('')
-      : ''
-  }
-  let activeTag = ''
-  const tagFilter = $('tagFilter')
-  function renderRepoMenu() {
-    const tags = [...new Set(allRepos.flatMap((r) => r.tags || []))].sort()
-    if (!tags.includes(activeTag)) activeTag = ''
-    tagFilter.hidden = tags.length === 0
-    tagFilter.innerHTML = ['', ...tags].map((t) => `<button type="button" class="${t === activeTag ? 'on' : ''}" data-tag="${esc(t)}">${esc(t || 'all')}</button>`).join('')
-    const q = repoSearch.value.trim().toLowerCase()
-    const matches = allRepos.filter((r) => r.name.toLowerCase().includes(q) && (!activeTag || (r.tags || []).includes(activeTag)))
-    repoMenu.innerHTML = matches.length
-      ? matches.map((r) => `<div class="opt ${selectedRepos.includes(r.name) ? 'sel' : ''}" data-repo="${esc(r.name)}">${selectedRepos.includes(r.name) ? '✓ ' : ''}${esc(r.name)}${(r.tags || []).map((t) => ` <span class="badge">${esc(t)}</span>`).join('')}</div>`).join('')
-      : '<div class="empty">no matching repos</div>'
-  }
-  tagFilter.addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-tag]'); if (!b) return
-    activeTag = b.dataset.tag; renderRepoMenu(); repoMenu.hidden = false
-  })
+
   function toggleRepo(name) {
-    const i = selectedRepos.indexOf(name)
-    if (i === -1) selectedRepos.push(name); else selectedRepos.splice(i, 1)
-    renderRepoTags(); renderRepoMenu()
+    nq.repos = nq.repos.includes(name) ? nq.repos.filter((r) => r !== name) : [...nq.repos, name]
+    nq.err.repos = ''; renderNew()
   }
-  repoSearch.addEventListener('input', () => { renderRepoMenu(); repoMenu.hidden = false })
-  repoSearch.addEventListener('focus', () => { renderRepoMenu(); repoMenu.hidden = false })
-  repoSearch.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { repoMenu.hidden = true; return }
-    if (e.key !== 'Enter') return
+  const newView = $('newView')
+  newView.addEventListener('change', (e) => {
+    const { name, value } = e.target
+    if (name === 'nq-repo') return toggleRepo(value)
+    if (name === 'nq-tag') { nq.tag = value; nq.active = 0 }
+    else if (name === 'nq-model') nq.model = value
+    else if (name === 'nq-stage') nq.stage = value
+    else return
+    renderNew()
+  })
+  newView.addEventListener('click', (e) => {
+    const drop = e.target.closest('[data-drop]'), sw = e.target.closest('[data-sw]')
+    if (drop) { toggleRepo(drop.dataset.drop); nqSearch.focus() }
+    if (sw) { nq[sw.dataset.sw] = !nq[sw.dataset.sw]; renderNew() }
+  })
+  newView.addEventListener('toggle', (e) => {
+    const d = e.target
+    if (d.classList?.contains('nq-yaml')) nq.yamlOpen[d.open ? 'add' : 'delete'](d.dataset.repo)
+  }, true)
+  newView.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); $('create').requestSubmit() }
+  })
+
+  // ARIA combobox: focus stays in the input; aria-activedescendant names the active option.
+  nqSearch.addEventListener('focus', () => { nq.open = true; renderNew() })
+  // Blur comes at mousedown; closing then would shift the page under a click that hasn't landed yet.
+  let pressing = false
+  addEventListener('pointerdown', () => { pressing = true }, true)
+  addEventListener('pointerup', () => { pressing = false }, true)
+  const closeList = () => { if (nq.open && document.activeElement !== nqSearch) { nq.open = false; renderNew() } }
+  nqSearch.addEventListener('blur', () => { if (pressing) addEventListener('click', closeList, { once: true }); else closeList() })
+  nqSearch.addEventListener('input', () => { nq.open = true; nq.active = 0; renderNew() })
+  nqSearch.addEventListener('keydown', (e) => {
+    if (e.metaKey || e.ctrlKey) return
+    const list = matches()
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (nq.open && list.length) nq.active = (nq.active + (e.key === 'ArrowDown' ? 1 : list.length - 1)) % list.length
+      nq.open = true
+    } else if (e.key === 'Enter') {
+      e.preventDefault() // never submits the form
+      const r = nq.open && list[nq.active]
+      if (!r) return
+      nqSearch.value = ''; nq.active = 0
+      return toggleRepo(r.name)
+    } else if (e.key === 'Escape' && nq.open) { e.preventDefault(); nq.open = false }
+    else return
+    renderNew()
+  })
+  // mousedown, not click: keeps focus (and the open list) on the combobox, also while dragging its scrollbar
+  $('nqDrop').addEventListener('mousedown', (e) => {
     e.preventDefault()
-    const first = repoMenu.querySelector('.opt[data-repo]')
-    if (first) { toggleRepo(first.dataset.repo); repoSearch.value = '' }
+    const o = e.target.closest('[data-repo]')
+    if (o) toggleRepo(o.dataset.repo)
   })
-  document.addEventListener('click', (e) => { if (!e.target.closest('#repoCombo')) repoMenu.hidden = true })
-  repoMenu.addEventListener('click', (e) => {
-    const opt = e.target.closest('.opt[data-repo]'); if (!opt) return
-    toggleRepo(opt.dataset.repo); repoSearch.value = ''; repoSearch.focus()
+
+  nqPrompt.value = localStorage.getItem('petree-draft') || ''
+  $('nqCountN').textContent = nqPrompt.value.length
+  nqPrompt.addEventListener('input', () => {
+    localStorage.setItem('petree-draft', nqPrompt.value)
+    $('nqCountN').textContent = nqPrompt.value.length
+    if (nq.err.prompt && nqPrompt.value.trim()) { nq.err.prompt = ''; renderNew() }
   })
-  repoTags.addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-remove]'); if (!b) return
-    selectedRepos = selectedRepos.filter((n) => n !== b.dataset.remove)
-    renderRepoTags(); renderRepoMenu()
+  $('create').addEventListener('submit', async (e) => {
+    e.preventDefault()
+    nq.err = {
+      prompt: nqPrompt.value.trim() ? '' : 'Write the quest first: say what Claude should do.',
+      repos: nq.repos.length ? '' : 'Pick at least one repo for the party.',
+    }
+    renderNew()
+    if (nq.err.prompt || nq.err.repos) return (nq.err.prompt ? nqPrompt : nqSearch).focus()
+    const go = $('nqGo')
+    go.disabled = true
+    try {
+      const res = await fetch('/api/tasks', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ prompt: nqPrompt.value, repos: nq.repos, model: pickedClass()?.[2] ?? 'default', stage: nq.stage, party: nq.party, autoPlay: nq.autoPlay }),
+      })
+      const out = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(out.error || `petree answered ${res.status}`)
+      localStorage.removeItem('petree-draft'); nqPrompt.value = ''; $('nqCountN').textContent = 0
+      Object.assign(nq, { repos: [], model: null, stage: 'investigate', party: true, autoPlay: false })
+      location.hash = '#/t/' + encodeURIComponent(out.id)
+    } catch (err) {
+      nq.err.server = err instanceof TypeError ? 'petree not reachable — try again' : err.message
+      renderNew()
+    } finally { go.disabled = false }
   })
+
+  const loadRepos = () => fetch('/api/repos').then((r) => r.json()).then((repos) => {
+    allRepos = repos; reposLoaded = true
+    nq.repos = nq.repos.filter(repoOf) // a repos.yaml save may have removed one
+    renderNew(); renderInbox()
+  }).catch(() => {})
+  renderNew(); loadRepos()
 
   // options: bin retention plus a raw repos.yaml editor (see /api/repos-yaml — cfg is
   // mutated in place server-side, so a save here applies to new tasks immediately)
@@ -808,22 +1083,6 @@
     flashReposYamlMsg('saved')
     // repos may have been added/removed/renamed or retagged
     loadRepos()
-  })
-
-  const prompt = $('prompt')
-  function autosize() { prompt.style.height = 'auto'; prompt.style.height = prompt.scrollHeight + 'px' }
-  prompt.value = localStorage.getItem('petree-draft') || ''
-  prompt.addEventListener('input', () => { localStorage.setItem('petree-draft', prompt.value); autosize() })
-  prompt.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); $('create').requestSubmit() } })
-  $('create').addEventListener('submit', async (e) => {
-    e.preventDefault()
-    if (!selectedRepos.length) { alert('select at least one repo'); return }
-    const res = await fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: prompt.value, repos: selectedRepos, model: $('model').value, stage: $('stage').value }) })
-    if (!res.ok) { alert((await res.json().catch(() => ({}))).error || 'failed to start'); return }
-    const created = await res.json()
-    prompt.value = ''; localStorage.removeItem('petree-draft'); autosize()
-    selectedRepos = []; renderRepoTags(); renderRepoMenu()
-    location.hash = '#/t/' + encodeURIComponent(created.id)
   })
 
   function renderTabs() {

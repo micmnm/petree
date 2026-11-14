@@ -1,100 +1,329 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Petree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=IBM+Plex+Mono&family=Jersey+10&display=swap">
 <style>
+  /* Tokens: docs/design/handheld-arcade.md §2 */
   :root {
-    --bg: #f6f6f3; --surface: #fff; --ink: #1e1e1c; --muted: #6b6b66;
-    --line: #e3e3de; --accent: #3b7; --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
-    --sans: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; --sp: 8px; --radius: 8px;
-    /* activity view: sequential blue + its light track, and the reserved status
-       steps (good/warning/critical) — always paired with a word, never color alone */
-    --viz-blue: #2a78d6; --viz-track: #cde2fb;
+    color-scheme: light;
+    --shell: #E4E5DF; --screen: #F6F6F1; --inset: #ECEDE6; --line: #C9CBC1; --line-strong: #A9AC9F;
+    --ink: #363B47; --muted: #5E6472; --label: #6B7180;
+    --need: #B8327A; --need-tint: #F7E3EE; --need-frame: #B8327A;
+    --go: #3D7A2A; --go-fill: #7DB84A; --go-tint: #E3EFD9;
+    --gold: #9A5B00; --gold-fill: #F2A93B; --gold-tint: #FBEBD0;
+    --on-fill: #363B47;
+    /* needs-you label and count chip: inverted block in light, soft tint in dark */
+    --tag-bg: var(--need); --tag-ink: var(--screen);
+    --chip-bg: var(--need); --chip-ink: var(--screen); --chip-num: var(--screen); --chip-frame: var(--need);
+    --sp-armour: var(--line-strong); --sp-visor: var(--ink);
+    --strip: rgba(242,169,59,.45);
+    --tex: url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%223%22 height=%223%22%3E%3Cpath d=%22M0 2.5H3M2.5 0V2.5%22 stroke=%22%23363B47%22 stroke-opacity=%220.05%22/%3E%3C/svg%3E');
+    --h0: #5B6CC9; --h1: #C2582E; --h2: #2E8C86; --h3: #8A55B8; --h4: #6E8A1F; --h5: #4F7FA8; --h6: #7A6A3A; --h7: #3E86B5;
+    --px: 'Jersey 10', ui-monospace, monospace;
+    --sans: 'Atkinson Hyperlegible', system-ui, sans-serif;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --step: polygon(0 4px,4px 4px,4px 0,calc(100% - 4px) 0,calc(100% - 4px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px));
+    --cart: polygon(0 4px,4px 4px,4px 0,calc(100% - 18px) 0,calc(100% - 18px) 6px,calc(100% - 12px) 6px,calc(100% - 12px) 12px,calc(100% - 6px) 12px,calc(100% - 6px) 18px,100% 18px,100% calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px));
+    /* the thread/new/options panels below still use these names until their own PRs */
+    --bg: var(--shell); --surface: var(--screen); --accent: var(--go-fill); --sp: 8px; --radius: 0;
+    --viz-blue: #2a78d6; --viz-track: var(--line);
     --st-good: #0ca30c; --st-warning: #fab219; --st-critical: #d03b3b;
   }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --shell: #2A2E38; --screen: #343946; --inset: #2F3440; --line: #4A5062; --line-strong: #5C6378;
+      --ink: #E4E2D8; --muted: #B3B7C4; --label: #9DA2B2;
+      --need: #F28CC0; --need-tint: #4A3445; --need-frame: #B5608F;
+      --go: #A8D877; --go-tint: #36452F;
+      --gold: #F5B95E; --gold-fill: #E0A64E; --gold-tint: #4A4030;
+      --on-fill: #2A2E38;
+      --tag-bg: var(--shell); --tag-ink: var(--need);
+      --chip-bg: var(--need-tint); --chip-ink: var(--need); --chip-num: var(--shell); --chip-frame: var(--need-frame);
+      --sp-armour: #E4E2D8; --sp-visor: #2A2E38;
+      --strip: rgba(224,166,78,.35);
+      --tex: repeating-linear-gradient(180deg, rgba(228,226,216,.03) 0 1px, transparent 1px 3px);
+      --h0: #8F9BE6; --h1: #E88A63; --h2: #5EC2BB; --h3: #B98BE0; --h4: #A3C25A; --h5: #8DB4D9; --h6: #C2AE78; --h7: #7FBCE3;
+    }
+  }
   * { box-sizing: border-box; }
-  /* viewport-bounded: header + create form keep their height, .layout takes the rest and its panes scroll */
-  body { font-family: var(--sans); margin: 0; background: var(--bg); color: var(--ink); line-height: 1.5; height: 100vh; height: 100dvh; display: flex; flex-direction: column; }
-  header { padding: calc(var(--sp)*2) calc(var(--sp)*3); border-bottom: 1px solid var(--line); background: var(--surface); }
-  header h1 { margin: 0; font-size: 1.15rem; letter-spacing: .5px; }
-  .wrap { padding: calc(var(--sp)*2) calc(var(--sp)*3); flex: 1; min-height: 0; display: flex; flex-direction: column; }
-  /* floor so a tall create form can't squash the panes to nothing; the page scrolls instead */
-  .layout { display: flex; gap: calc(var(--sp)*3); flex: 1; min-height: 20rem; }
-  .left { flex: 1 1 42%; min-width: 0; overflow-y: auto; }
-  .right { flex: 1 1 58%; min-width: 0; display: flex; flex-direction: column; }
-  .left thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; box-shadow: 0 1px 0 var(--line); }
-  .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
-  form.create { padding: calc(var(--sp)*2); display: flex; flex-direction: column; gap: var(--sp); margin-bottom: calc(var(--sp)*2); }
-  textarea { width: 100%; padding: var(--sp); font: inherit; border: 1px solid var(--line); border-radius: 6px; resize: none; overflow: hidden; min-height: 3rem; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--shell); color: var(--ink); font: 16px/1.5 var(--sans); }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+  /* clip-path would cut the focus ring off */
+  .btn-start:focus-visible, .ym-chip:focus-visible, .btn2:focus-visible { clip-path: none; }
+  @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+
+  /* HUD header (§4.10) */
+  .hud { background-color: var(--screen); background-image: var(--tex); border-bottom: 2px solid var(--line-strong); }
+  .hud-in { max-width: 1160px; margin: 0 auto; padding: 12px 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
+  .brand { flex: 1 1 auto; display: flex; align-items: flex-end; gap: 10px; min-height: 44px; text-decoration: none; }
+  .brand .word { font: 40px/1 var(--px); letter-spacing: 1px; }
+  .sprout { flex: none; width: 48px; height: 51px; }
+  .ym-chip { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 6px; background: var(--chip-bg); color: var(--chip-ink); box-shadow: inset 0 0 0 2px var(--chip-frame); clip-path: var(--step); text-decoration: none; font: 20px/1 var(--px); }
+  .ym-chip .num { min-width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; background: var(--chip-num); color: var(--need); font-size: 30px; }
+  .tags { display: flex; gap: 2px; padding: 2px; background: var(--inset); border: 2px solid var(--line-strong); }
+  .tags button { flex: none; border: 0; border-radius: 0; background: transparent; color: var(--ink); font: 20px/1 var(--px); padding: 0 16px; min-height: 44px; cursor: pointer; }
+  .tags button[aria-pressed="true"] { background: var(--ink); color: var(--screen); }
+  .tags button:focus-visible { outline-offset: -5px; outline-color: var(--gold-fill); }
+  .btn-start { display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 4px 18px 4px 14px; background: var(--gold-fill); color: var(--on-fill); text-decoration: none; clip-path: var(--step); }
+  .btn-start:active, .btn2:active { transform: translateY(1px); }
+  .stack { display: flex; flex-direction: column; gap: 1px; text-align: left; }
+  .w30 { font: 30px/.8 var(--px); }
+  .sub { font-size: 13px; font-weight: 700; line-height: 1.1; }
+  .gear { flex: none; width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--line-strong); background: var(--inset); color: var(--ink); }
+  .offline { width: calc(100% - 48px); max-width: 1112px; margin: 16px auto 0; padding: 10px 14px; background: var(--inset); border: 2px solid var(--line-strong); font-weight: 700; }
+  .offline b { font: 400 20px/1 var(--px); margin-right: 8px; }
+
+  /* Pages */
+  .page { max-width: 1160px; margin: 0 auto; padding: 32px 24px 64px; display: flex; flex-direction: column; gap: 48px; }
+  .page.sub-page { gap: 20px; }
+  .ptitle { margin: 0; font: 400 40px/1 var(--px); letter-spacing: .5px; }
+  .back { align-self: flex-start; text-decoration: none; }
+  .t-id { display: flex; align-items: center; gap: 12px; }
+  .q40 { font: 40px/1 var(--px); }
+  .t-title { margin: 8px 0 0; font-size: 24px; line-height: 1.3; overflow-wrap: anywhere; }
+
+  /* Inbox sections */
+  .sec { display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 16px; }
+  .sec-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; }
+  .sec h2, .bin h2 { margin: 0; display: inline-flex; align-items: center; gap: 10px; font: 400 40px/1 var(--px); letter-spacing: .5px; }
+  .hint { font-size: 15px; color: var(--muted); }
+  .count { min-width: 36px; height: 36px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; font: 30px/1 var(--px); clip-path: var(--step); }
+  .count.need { background: var(--chip-bg); color: var(--chip-ink); box-shadow: inset 0 0 0 2px var(--chip-frame); }
+  .count.go { background: var(--go-fill); color: var(--on-fill); }
+  .count.gold { background: var(--gold-fill); color: var(--on-fill); }
+  .count.none { background: var(--inset); color: var(--ink); box-shadow: inset 0 0 0 2px var(--line-strong); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 24px 22px; }
+  .calm { display: flex; align-items: center; gap: 16px; padding: 18px 22px; background: var(--screen); border: 2px dashed var(--line-strong); }
+  .calm p { margin: 0; font-size: 17px; color: var(--muted); }
+  .calm.big { flex-direction: column; padding: 48px 24px; text-align: center; }
+  .calm.big .sprout { width: 96px; height: 102px; }
+  .calm.big p { font: 40px/1 var(--px); color: var(--ink); }
+
+  /* Cartridge card (§4.1) */
+  .cart { display: flex; min-width: 0; color: var(--ink); text-decoration: none; }
+  .cart-frame { flex: 1; min-width: 0; display: flex; padding: 2px; background: var(--line-strong); clip-path: var(--cart); transition: transform .12s steps(2); }
+  .cart.need .cart-frame { background: var(--need-frame); }
+  .cart:hover .cart-frame { transform: translateY(-2px); }
+  .cart-in { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; padding: 14px 18px 8px; background-color: var(--screen); background-image: var(--tex); clip-path: var(--cart); }
+  .c-top { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "emb id" "title title" "sum sum"; align-items: center; column-gap: 12px; }
+  .c-top .emb { grid-area: emb; }
+  .c-id { grid-area: id; display: flex; align-items: baseline; gap: 8px; min-width: 0; padding-right: 20px; }
+  .c-id .q { font: 30px/1 var(--px); letter-spacing: .5px; }
+  .c-meta { display: none; min-width: 0; font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-title { grid-area: title; min-width: 0; margin: 14px 0 0; font-size: 19px; font-weight: 700; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .c-sum { grid-area: sum; margin: 4px 0 0; font-size: 15px; line-height: 1.5; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .emb { flex: none; padding: 4px; background: var(--inset); border: 2px solid var(--line); display: grid; grid-template-columns: repeat(5, 6px); grid-auto-rows: 6px; }
+  .emb i { background: var(--shell); }
+  .ym { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 10px 12px 12px; background: var(--need-tint); border-left: 4px solid var(--need-frame); }
+  .ym-tag { display: inline-flex; align-items: center; gap: 7px; padding: 4px 8px 3px; background: var(--tag-bg); color: var(--tag-ink); font: 20px/1 var(--px); }
+  .cursor { width: 7px; height: 13px; background: currentColor; }
+  .cursor.hollow { background: none; border: 2px solid currentColor; }
+  .ym-act { font-size: 16px; font-weight: 700; line-height: 1.35; }
+  .ym-det { font-size: 14px; line-height: 1.4; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .qs { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border: 2px solid var(--line); border-left: 4px solid var(--go-fill); }
+  .qs-tag, .qs-time { display: inline-flex; align-items: center; gap: 7px; color: var(--go); font: 20px/1 var(--px); white-space: nowrap; }
+
+  /* Level track (§4.3) */
+  .prog { display: flex; flex-direction: column; gap: 8px; margin-top: auto; }
+  .lvline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+  .lv { font: 20px/1 var(--px); color: var(--label); }
+  .stg { font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .track { display: flex; align-items: flex-start; padding: 2px 18px 0; }
+  .node { flex: 0 0 32px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+  .node i { width: 20px; height: 20px; margin: 6px 0; display: flex; align-items: center; justify-content: center; font: normal 20px/1 var(--px); }
+  .node.done i { background: var(--go-fill); color: var(--on-fill); }
+  .node.todo i, .node.skipped i { border: 2px dashed var(--line-strong); }
+  .node.skipped i { color: var(--label); text-decoration: line-through; }
+  .node.current i { width: 24px; height: 24px; margin: 4px 0; outline: 1px solid; outline-offset: 2px; }
+  .node.need i { background: var(--need); outline-color: var(--need); color: var(--screen); }
+  .node.run i { background: var(--gold-fill); outline-color: var(--gold); color: var(--on-fill); }
+  .node b { font: 400 20px/1 var(--px); color: var(--label); white-space: nowrap; }
+  .node.need b { color: var(--need); }
+  .node.run b { color: var(--gold); }
+  .seg { flex: 1 1 auto; height: 4px; margin: 14px 3px 0; background: repeating-linear-gradient(90deg, var(--line-strong) 0 4px, transparent 4px 8px); }
+  .seg.done { margin: 14px 0 0; background: var(--go-fill); }
+  .c-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 10px; border-top: 2px dotted var(--line); }
+  .rchip { display: inline-flex; align-items: center; gap: 6px; min-width: 0; padding: 1px 7px; border: 2px solid var(--line-strong); font-size: 13px; font-weight: 700; overflow-wrap: anywhere; }
+  .rchip i { flex: none; width: 8px; height: 8px; }
+  .age { margin-left: auto; font: 20px/1 var(--px); color: var(--label); }
+  .strip { height: 5px; margin: 0 22px 0 38px; background: repeating-linear-gradient(90deg, var(--strip) 0 7px, transparent 7px 11px); }
+
+  /* Bins (§4.12) */
+  .bin-frame { padding: 2px; background: var(--line); clip-path: var(--step); scroll-margin-top: 16px; }
+  .bin-frame.fame { background: var(--line-strong); }
+  .bin { padding: 16px 24px 8px; background-color: var(--screen); background-image: var(--tex); clip-path: var(--step); }
+  .bin summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; min-height: 44px; padding-bottom: 14px; cursor: pointer; list-style: none; }
+  .bin summary::-webkit-details-marker { display: none; }
+  .bin-t { flex: 1 1 260px; display: flex; flex-direction: column; gap: 4px; }
+  .toggle { display: inline-flex; align-items: center; gap: 8px; font: 20px/1 var(--px); color: var(--muted); }
+  .bin:not([open]) .toggle svg { transform: rotate(180deg); }
+  .bin[open] .shut-w, .bin:not([open]) .open-w { display: none; }
+  .trophies { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 20px 56px; padding: 16px 12px 0 20px; border-top: 2px dotted var(--line); }
+  .trophy { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px 16px; min-height: 44px; color: var(--ink); text-decoration: none; }
+  .tr-txt { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; padding-bottom: 2px; }
+  .tr-top { display: inline-flex; align-items: center; gap: 10px; font: 20px/1 var(--px); }
+  .victory { padding: 3px 8px 2px; background: var(--gold-fill); color: var(--on-fill); }
+  .tr-title { font-size: 16px; font-weight: 700; line-height: 1.3; }
+  .tr-out, .dead-sub { font-size: 14px; color: var(--muted); }
+  .board { height: 10px; margin: 4px 0 8px; background: var(--line); box-shadow: inset 0 2px 0 var(--line-strong); }
+  .dead-list { border-top: 2px dotted var(--line); }
+  .dead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 14px 0; border-bottom: 2px dotted var(--line); }
+  .dead:last-child { border-bottom: 0; }
+  .dead .emb { filter: grayscale(1); opacity: .55; }
+  .dead-txt { flex: 1 1 240px; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .dead-top { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  .dead-top .q { font: 20px/1 var(--px); color: var(--label); }
+  .dead-title { min-width: 0; font-size: 16px; font-weight: 700; color: var(--muted); text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dead-title:hover { text-decoration: underline; }
+  .btn2 { flex: none; display: inline-block; border: 0; border-radius: 0; padding: 2px; background: var(--line-strong); color: var(--ink); font: inherit; text-decoration: none; cursor: pointer; clip-path: var(--step); }
+  .btn2 > span { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; min-height: 44px; padding: 6px 16px 6px 14px; background: var(--screen); clip-path: var(--step); }
+  .btn2 b { font: 400 30px/.8 var(--px); }
+  .btn2 small { font-size: 13px; font-weight: 700; line-height: 1.1; }
+  .btn2:disabled { opacity: .6; cursor: wait; }
+
+  /* Phone (§5) */
+  @media (max-width: 600px) {
+    .hud-in { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "brand chip gear" "tags start start"; gap: 8px 10px; padding: 8px 16px 10px; }
+    .brand { grid-area: brand; min-width: 0; gap: 8px; }
+    .brand .word { font-size: 30px; }
+    .hud .sprout { width: 32px; height: 34px; }
+    .ym-chip { grid-area: chip; gap: 6px; padding: 0 10px 0 6px; }
+    .ym-chip .num { min-width: 28px; height: 30px; }
+    .gear { grid-area: gear; width: 44px; height: 44px; }
+    .tags { grid-area: tags; justify-self: start; max-width: 100%; overflow-x: auto; }
+    .tags button { padding: 0 12px; }
+    .btn-start { grid-area: start; justify-self: end; padding: 4px 12px 4px 10px; }
+    .offline { width: calc(100% - 32px); }
+    .page { padding: 18px 16px 24px; gap: 28px; }
+    .sec { gap: 12px; }
+    .sec h2, .bin h2 { font-size: 30px; gap: 8px; }
+    .count { min-width: 28px; height: 28px; padding: 0 6px; font-size: 20px; }
+    .sec .hint { display: none; }
+    .grid { gap: 14px; }
+    .cart-in { gap: 10px; padding: 12px 14px 6px; }
+    .c-top { grid-template-areas: "emb id" "emb title" "sum sum"; }
+    .c-id { padding-right: 14px; }
+    .c-id .q { font-size: 20px; }
+    .c-meta { display: block; }
+    .c-title { margin-top: 3px; font-size: 17px; }
+    .c-sum { margin-top: 10px; line-height: 1.45; }
+    .ym { gap: 6px; padding: 8px 10px 10px; }
+    .ym-tag { padding: 3px 7px 2px; }
+    .ym-act { font-size: 15px; }
+    .qs { padding: 8px 10px; }
+    .prog { flex-direction: row; align-items: center; gap: 12px; margin-top: 0; }
+    .prog .track { order: -1; flex: 0 0 120px; height: 20px; padding: 0; align-items: center; }
+    .lv, .node b, .c-foot, .desk, .board, .trophy > svg, .toggle span { display: none; }
+    .node { flex: none; gap: 0; }
+    .node i { width: 10px; height: 10px; margin: 0; font-size: 0; }
+    .node i svg { display: none; }
+    .node.current i { width: 12px; height: 12px; margin: 0 3px; }
+    .seg { height: 2px; margin: 0 2px; background: repeating-linear-gradient(90deg, var(--line-strong) 0 2px, transparent 2px 4px); }
+    .seg.done { margin: 0; }
+    .sname { font: 20px/1 var(--px); }
+    .prog.need .sname { color: var(--need); }
+    .prog.run .sname { color: var(--gold); }
+    .bin { padding: 4px 14px; }
+    .bin summary { flex-wrap: nowrap; gap: 10px; min-height: 52px; padding: 4px 0; }
+    .bin summary .hint { font-size: 13px; }
+    .bin summary .ico-t { width: 28px; height: 24px; }
+    .bin summary .ico-b { width: 24px; height: 28px; }
+    .bin-t { flex: 1 1 auto; min-width: 0; }
+    .trophies { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 0 12px; }
+    .trophy { flex-wrap: nowrap; align-items: center; }
+    .tr-txt { flex: 1 1 auto; }
+    .tr-title { max-width: 100%; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tr-out, .dead-sub { font-size: 13px; }
+    .dead { flex-wrap: nowrap; gap: 10px; padding: 10px 0; }
+    .dead-txt { flex: 1 1 auto; }
+    .dead-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dead-title { font-size: 15px; }
+    .btn2 > span { padding: 5px 10px; }
+    .btn2 b { font-size: 20px; line-height: 1; }
+    .t-title { font-size: 20px; }
+  }
+
+  /* Thread panel, create form and options: kept from the old dashboard until PRs 10–13 */
+  .card { background: var(--surface); border: 2px solid var(--line-strong); }
+  form.create { padding: calc(var(--sp)*2); display: flex; flex-direction: column; gap: var(--sp); }
+  textarea { width: 100%; padding: var(--sp); font: inherit; border: 1px solid var(--line); resize: none; overflow: hidden; min-height: 3rem; }
+  textarea, input, select { background: var(--inset); color: var(--ink); }
   .field { display: flex; gap: var(--sp); align-items: center; flex-wrap: wrap; font-size: .9rem; }
   .field > label.k { color: var(--muted); min-width: 3.5rem; }
   .field.repos-field { align-items: flex-start; }
   .combo { position: relative; flex: 1 1 auto; min-width: 220px; }
   .combo-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 4px; }
-  .combo-tags .tag { display: inline-flex; align-items: center; gap: 4px; background: #eef6ff; border: 1px solid var(--line); border-radius: 20px; padding: 2px 6px 2px 10px; font-size: .82rem; }
+  .combo-tags .tag { display: inline-flex; align-items: center; gap: 4px; background: var(--gold-tint); border: 1px solid var(--line); padding: 2px 6px 2px 10px; font-size: .82rem; }
   .combo-tags .tag button { border: none; background: none; padding: 0; margin: 0; cursor: pointer; color: var(--muted); font-size: 1rem; line-height: 1; }
-  .combo input { width: 100%; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; font: inherit; }
-  .combo-menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 10; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; margin-top: 4px; max-height: 220px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+  .combo input { width: 100%; padding: 6px 10px; border: 1px solid var(--line); font: inherit; }
+  .combo-menu { position: absolute; top: 100%; left: 0; right: 0; z-index: 10; background: var(--surface); border: 1px solid var(--line); margin-top: 4px; max-height: 220px; overflow-y: auto; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
   .combo-menu .opt { padding: 6px 10px; cursor: pointer; font-size: .9rem; }
-  .combo-menu .opt:hover, .combo-menu .opt.active { background: #eef6ff; }
+  .combo-menu .opt:hover, .combo-menu .opt.active { background: var(--gold-tint); }
   .combo-menu .opt.sel { color: var(--muted); }
   .combo-menu .empty { padding: 6px 10px; color: var(--muted); font-size: .85rem; }
-  select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); cursor: pointer; }
-  button.primary { background: var(--ink); color: #fff; border-color: var(--ink); }
+  select, button { font: inherit; padding: 6px 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--gold-fill); color: var(--on-fill); border-color: var(--gold-fill); }
   table { border-collapse: collapse; width: 100%; font-size: .9rem; }
   th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
   th { color: var(--muted); font-weight: 600; font-size: .8rem; }
-  tbody tr { cursor: pointer; } tbody tr:hover { background: #faf8f2; } tr.sel { background: #eef6ff; }
-  .badge { padding: 2px 8px; border-radius: 20px; font-size: .78rem; background: #eee; white-space: nowrap; }
-  .badge.running { background: #cfe8ff; } .badge.done { background: #d4f3d4; } .badge.failed { background: #ffd7d7; }
-  .badge[class*="paused"], .badge.waiting-for-you { background: #ffe9b8; }
-  .badge.cancelled { background: #e3e3de; } .badge.stage { background: #eef6ff; border: 1px solid var(--line); }
+  .badge { padding: 2px 8px; font-size: .78rem; background: var(--inset); white-space: nowrap; }
+  .badge.running, .badge.done { background: var(--go-tint); } .badge.failed { background: var(--need-tint); }
+  .badge[class*="paused"], .badge.waiting-for-you { background: var(--gold-tint); }
   .comment { margin: 4px 0; white-space: pre-wrap; } .comment.pending { border-left: 3px solid var(--st-warning); padding-left: 8px; }
   .mono { font-family: var(--mono); }
-  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); padding: 0 var(--sp); }
-  .tabs button { border: none; background: none; border-radius: 0; padding: 10px 12px; color: var(--muted); border-bottom: 2px solid transparent; }
+  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); padding: 0 var(--sp); overflow-x: auto; }
+  .tabs button { flex: none; border: none; background: none; padding: 10px 12px; color: var(--muted); border-bottom: 2px solid transparent; }
   .tabs button.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
-  .tabbody { padding: calc(var(--sp)*2); flex: 1; min-height: 0; overflow-y: auto; }
+  .tabbody { padding: calc(var(--sp)*2); overflow-wrap: anywhere; }
   dl { margin: 0; } dt { color: var(--muted); font-size: .78rem; margin-top: 10px; } dd { margin: 2px 0 0; }
   .result h1,.result h2,.result h3 { font-size: 1rem; margin: .7rem 0 .3rem; }
-  .result pre, pre.diff, pre.log { background: #16160f; color: #e6e6d8; padding: 12px; border-radius: 6px; overflow: auto; font-family: var(--mono); font-size: .82rem; }
+  .result table { display: block; overflow-x: auto; } .result img { max-width: 100%; }
+  .result pre, pre.diff, pre.log { background: #16160f; color: #e6e6d8; padding: 12px; overflow: auto; font-family: var(--mono); font-size: .82rem; }
   pre.log, pre.diff { max-height: 46vh; }
-  .result code { background: #eee; padding: 0 .25rem; border-radius: 3px; font-family: var(--mono); }
-  .result pre code { background: none; color: inherit; padding: 0; border-radius: 0; }
-  .err { color: #b00020; white-space: pre-wrap; font-family: var(--mono); }
+  .result code { background: var(--inset); padding: 0 .25rem; font-family: var(--mono); }
+  .result pre code { background: none; color: inherit; padding: 0; }
+  .err { color: var(--need); white-space: pre-wrap; font-family: var(--mono); }
   .copy { font-size: .72rem; padding: 2px 8px; margin-left: 6px; }
-  .cmd { display: flex; align-items: center; gap: 6px; background: #f0efe9; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-family: var(--mono); font-size: .8rem; overflow-x: auto; }
+  .cmd { display: flex; align-items: center; gap: 6px; background: var(--inset); border: 1px solid var(--line); padding: 6px 8px; font-family: var(--mono); font-size: .8rem; overflow-x: auto; }
   .muted { color: var(--muted); } .small { font-size: .75rem; }
-  /* create form: standing repo conventions that will be appended to the prompt */
   #conventions { border-top: 1px dashed var(--line); padding-top: var(--sp); }
   .conv { margin-top: 6px; } .conv-name { font-family: var(--mono); color: var(--ink); }
   .conv-text { white-space: pre-wrap; }
-  .conv code { background: #f0efe9; border-radius: 3px; padding: 0 .25rem; font-family: var(--mono); }
+  .conv code { background: var(--inset); padding: 0 .25rem; font-family: var(--mono); }
   /* Log tab — activity view */
   .logbar { display: flex; align-items: center; gap: var(--sp); margin-bottom: 10px; }
-  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; }
-  .seg button { border: none; border-radius: 0; padding: 4px 12px; font-size: .82rem; color: var(--muted); }
-  .seg button.on { background: var(--ink); color: #fff; }
+  .seg-ctl { display: inline-flex; border: 1px solid var(--line); overflow: hidden; }
+  .seg-ctl button { border: none; padding: 4px 12px; font-size: .82rem; color: var(--muted); }
+  .seg-ctl button.on { background: var(--ink); color: var(--screen); }
   .follow { margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: .78rem; color: var(--muted); }
   .logscroll { max-height: 56vh; overflow: auto; }
   .logscroll pre.log { max-height: none; }
-  .now { display: flex; gap: var(--sp); align-items: baseline; padding: 8px 10px; background: #fbfbf8;
-         border: 1px solid var(--line); border-left: 3px solid var(--viz-blue); border-radius: 6px; }
+  .now { display: flex; gap: var(--sp); align-items: baseline; padding: 8px 10px; background: var(--inset);
+         border: 1px solid var(--line); border-left: 3px solid var(--viz-blue); }
   .now.bad { border-left-color: var(--st-critical); }
   .now-l { font-size: .72rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); flex: none; }
   .now.live .now-l::before { content: '●'; color: var(--st-good); margin-right: 4px; animation: pulse 1.6s ease-in-out infinite; }
   .now-t { font-size: .88rem; overflow-wrap: anywhere; }
   @keyframes pulse { 50% { opacity: .25 } }
-  @media (prefers-reduced-motion: reduce) { .now.live .now-l::before { animation: none } }
   .tiles { display: flex; flex-wrap: wrap; gap: var(--sp); margin: 10px 0; }
-  .tile { flex: 1 1 88px; border: 1px solid var(--line); border-radius: 6px; padding: 6px 10px; }
+  .tile { flex: 1 1 88px; border: 1px solid var(--line); padding: 6px 10px; }
   .tile-l { color: var(--muted); font-size: .72rem; }
   .tile-v { font-size: 1.15rem; font-weight: 600; }
   .tile-v.bad { color: var(--st-critical); }
   .meter-top { display: flex; justify-content: space-between; gap: var(--sp); font-size: .75rem; color: var(--muted); }
-  .meter { height: 8px; margin-top: 3px; border-radius: 4px; background: var(--viz-track); overflow: hidden; }
-  .meter-fill { height: 100%; border-radius: 4px; background: var(--viz-blue); }
+  .meter { height: 8px; margin-top: 3px; background: var(--viz-track); overflow: hidden; }
+  .meter-fill { height: 100%; background: var(--viz-blue); }
   .meter-fill.warn { background: var(--st-warning); } .meter-fill.critical { background: var(--st-critical); }
   .chips, .files { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; font-size: .76rem; }
-  .chip { border: 1px solid var(--line); border-radius: 20px; padding: 1px 9px; background: #faf9f5; }
-  .plan { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 10px 0; background: #fbfbf8; }
+  .chip { border: 1px solid var(--line); padding: 1px 9px; background: var(--inset); }
+  .plan { border: 1px solid var(--line); padding: 8px 10px; margin: 10px 0; background: var(--inset); }
   .plan-h { font-size: .78rem; font-weight: 600; margin-bottom: 4px; }
   .todos { list-style: none; margin: 0; padding: 0; font-size: .85rem; }
   .todo { display: flex; gap: 6px; align-items: baseline; padding: 1px 0; }
@@ -107,88 +336,72 @@
   .ev-main { flex: 1; min-width: 0; }
   .ev-head { font-size: .85rem; overflow-wrap: anywhere; }
   .ev-name { font-weight: 600; }
-  .ev-sum { font-family: var(--mono); font-size: .8rem; color: #3d3d38; }
-  .ev-text .ev-sum { font-family: var(--sans); font-size: .88rem; color: var(--ink); }
+  .ev-sum { font-family: var(--mono); font-size: .8rem; color: var(--ink); }
+  .ev-text .ev-sum { font-family: var(--sans); font-size: .88rem; }
   .ev-thinking .ev-sum { font-family: var(--sans); font-style: italic; color: var(--muted); }
   .ev-raw { color: var(--muted); } .ev-raw .ev-sum { font-size: .75rem; }
   .ev-result { border-left-color: var(--st-good); } .ev-error { border-left-color: var(--st-critical); }
-  .ev-tag { font-size: .7rem; border-radius: 20px; padding: 0 6px; background: #eee; color: var(--muted); }
-  .ev-tag.good { background: #e3f6e3; color: #0a6b0a; } .ev-tag.bad { background: #fde3e3; color: #a32020; }
+  .ev-tag { font-size: .7rem; padding: 0 6px; background: var(--inset); color: var(--muted); }
+  .ev-tag.good { background: var(--go-tint); color: var(--go); } .ev-tag.bad { background: var(--need-tint); color: var(--need); }
   .ev-more { margin-top: 3px; }
   .ev-more summary { font-size: .72rem; color: var(--muted); cursor: pointer; }
-  .ev-more pre { background: #16160f; color: #e6e6d8; padding: 8px; border-radius: 6px; margin: 4px 0 0;
+  .ev-more pre { background: #16160f; color: #e6e6d8; padding: 8px; margin: 4px 0 0;
                  max-height: 30vh; overflow: auto; font-family: var(--mono); font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-  @media (max-width: 820px) {
-    body { height: auto; display: block; }
-    .wrap { display: block; }
-    .layout { flex-direction: column; }
-    .left, .right { flex: 1 1 100%; overflow-y: visible; }
-    .tabbody { overflow-y: visible; }
-  }
-  /* settings: popup modal, not an inline panel */
   .modal-overlay { position: fixed; inset: 0; background: rgba(20,20,16,.35); display: flex; align-items: center; justify-content: center; padding: calc(var(--sp)*2); z-index: 100; }
-  /* display:flex above beats the UA's [hidden]{display:none} — restore it explicitly */
-  .modal-overlay[hidden] { display: none; }
-  .modal { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); width: min(640px, 100%); max-height: 88vh; overflow: auto; padding: calc(var(--sp)*2.5); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
+  .modal { background: var(--surface); border: 2px solid var(--line-strong); width: min(640px, 100%); max-height: 88vh; overflow: auto; padding: calc(var(--sp)*2.5); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
   .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: calc(var(--sp)*1.5); }
   .modal-head h2 { margin: 0; font-size: 1rem; }
   .modal-close { border: none; background: none; font-size: 1.2rem; line-height: 1; padding: 2px 6px; color: var(--muted); }
-  .modal-section { border-top: 1px dashed var(--line); padding-top: calc(var(--sp)*1.5); margin-top: calc(var(--sp)*1.5); }
-  .modal-section h3 { margin: 0 0 8px; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .opt-sec { padding: calc(var(--sp)*2); }
+  .opt-sec + .opt-sec { border-top: 1px dashed var(--line); }
+  .opt-sec h3 { margin: 0 0 8px; font-size: .85rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   #reposYamlText { min-height: 40vh; font-family: var(--mono); font-size: .82rem; resize: vertical; overflow: auto; white-space: pre; }
 </style>
-<header style="display:flex;align-items:center;justify-content:space-between">
-  <h1>🧫 Petree <span class="badge waiting-for-you" id="needsYou" hidden></span></h1>
-  <button type="button" id="settingsBtn">⚙ settings</button>
+
+<header class="hud">
+  <div class="hud-in">
+    <a class="brand" href="#/" aria-label="Petree inbox">
+      <svg class="sprout" role="img" aria-label="Sprout, the Petree knight, standing guard" viewBox="0 0 16 17" shape-rendering="crispEdges">
+        <rect x="3" y="16" width="10" height="1" style="fill:var(--line)"/>
+        <g style="fill:var(--go-fill)"><rect x="4" y="0" width="3" height="1"/><rect x="9" y="0" width="3" height="1"/><rect x="3" y="1" width="4" height="1"/><rect x="9" y="1" width="4" height="1"/></g>
+        <g style="fill:var(--go)"><rect x="7" y="1" width="2" height="1"/><rect x="5" y="2" width="6" height="1"/><rect x="7" y="3" width="2" height="1"/></g>
+        <g style="fill:var(--sp-armour)"><rect x="5" y="4" width="6" height="1"/><rect x="4" y="5" width="8" height="1"/><rect x="4" y="6" width="1" height="1"/><rect x="11" y="6" width="1" height="1"/><rect x="4" y="7" width="6" height="1"/><rect x="5" y="10" width="6" height="1"/><rect x="5" y="11" width="4" height="1"/><rect x="12" y="11" width="1" height="4"/></g>
+        <rect x="5" y="6" width="6" height="1" style="fill:var(--sp-visor)"/>
+        <g style="fill:var(--muted)"><rect x="10" y="7" width="2" height="1"/><rect x="5" y="8" width="6" height="1"/><rect x="9" y="11" width="2" height="1"/><rect x="5" y="13" width="2" height="2"/><rect x="9" y="13" width="2" height="2"/><rect x="4" y="15" width="3" height="1"/><rect x="9" y="15" width="3" height="1"/></g>
+        <g style="fill:var(--gold)"><rect x="3" y="9" width="8" height="1"/><rect x="2" y="10" width="2" height="1"/></g>
+        <g style="fill:var(--gold-fill)"><rect x="6" y="6" width="1" height="1"/><rect x="9" y="6" width="1" height="1"/><rect x="5" y="12" width="6" height="1"/><rect x="12" y="9" width="1" height="1"/><rect x="11" y="10" width="3" height="1"/></g>
+      </svg>
+      <span class="word">PETREE</span>
+    </a>
+    <a class="ym-chip" id="ymChip" href="#your-move" hidden><span class="num" id="ymCount">0</span>YOUR MOVE</a>
+    <div class="tags" id="tagBar" role="group" aria-label="Filter quests by tag" hidden></div>
+    <a class="btn-start" href="#/new">
+      <svg aria-hidden="true" width="8" height="14" viewBox="0 0 4 7" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="1" height="7"/><rect x="1" y="1" width="1" height="5"/><rect x="2" y="2" width="1" height="3"/><rect x="3" y="3" width="1" height="1"/></svg>
+      <span class="stack"><span class="w30">PRESS START</span><span class="sub">start a new thread</span></span>
+    </a>
+    <a class="gear" href="#/options" aria-label="Settings">
+      <svg aria-hidden="true" width="24" height="24" viewBox="0 0 12 12" shape-rendering="crispEdges" fill="currentColor">
+        <rect x="4" y="0" width="4" height="1"/><rect x="1" y="1" width="2" height="1"/><rect x="4" y="1" width="4" height="1"/><rect x="9" y="1" width="2" height="1"/>
+        <rect x="1" y="2" width="10" height="1"/><rect x="2" y="3" width="8" height="1"/>
+        <rect x="0" y="4" width="5" height="1"/><rect x="7" y="4" width="5" height="1"/><rect x="0" y="5" width="4" height="2"/><rect x="8" y="5" width="4" height="2"/><rect x="0" y="7" width="5" height="1"/><rect x="7" y="7" width="5" height="1"/>
+        <rect x="2" y="8" width="8" height="1"/><rect x="1" y="9" width="10" height="1"/>
+        <rect x="1" y="10" width="2" height="1"/><rect x="4" y="10" width="4" height="1"/><rect x="9" y="10" width="2" height="1"/><rect x="4" y="11" width="4" height="1"/>
+      </svg>
+    </a>
+  </div>
 </header>
-<div class="modal-overlay" id="settingsOverlay" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-    <div class="modal-head">
-      <h2 id="settingsTitle">⚙ Settings</h2>
-      <button type="button" class="modal-close" id="settingsClose" aria-label="close">×</button>
-    </div>
-    <p class="muted small" style="margin:0 0 8px">Finished threads (done/failed/cancelled) are cleared automatically. Active threads are never cleared.</p>
-    <div class="field">
-      <label class="k" for="maxAgeDays">clear after</label>
-      <input type="number" id="maxAgeDays" min="1" step="1" style="width:5rem">
-      <span class="muted">days</span>
-    </div>
-    <div class="field">
-      <label class="k" for="maxPerRepoGroup">keep per repo group</label>
-      <input type="number" id="maxPerRepoGroup" min="1" step="1" style="width:5rem">
-      <span class="muted">threads (oldest finished ones beyond this are cleared)</span>
-    </div>
-    <div class="field">
-      <button class="primary" type="button" id="saveSettings">Save</button>
-      <button type="button" id="clearNowBtn">Clear now</button>
-      <span class="muted small" id="settingsMsg"></span>
-    </div>
-    <div class="modal-section">
-      <h3>repos.yaml</h3>
-      <p class="muted small" style="margin:0 0 8px">Edits apply immediately to new threads — no restart required.</p>
-      <textarea id="reposYamlText" spellcheck="false"></textarea>
-      <div class="field" style="margin-top:8px">
-        <button class="primary" type="button" id="saveReposYaml">Save repos.yaml</button>
-        <span class="muted small" id="reposYamlMsg"></span>
-      </div>
-    </div>
-  </div>
-</div>
-<div class="modal-overlay" id="viewerOverlay" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
-    <div class="modal-head">
-      <h2 id="viewerTitle"></h2>
-      <button type="button" class="modal-close" id="viewerClose" aria-label="close">×</button>
-    </div>
-    <div class="result" id="viewerBody"></div>
-  </div>
-</div>
-<div class="wrap">
+<div class="offline" id="offline" role="status" hidden><b>NO SIGNAL</b>petree not reachable — retrying</div>
+
+<main class="page" id="inbox"></main>
+
+<main class="page sub-page" id="newView" hidden>
+  <a class="btn2 back" href="#/"><span><b>BACK</b><small>to the inbox, draft kept</small></span></a>
+  <h1 class="ptitle">NEW QUEST</h1>
   <form class="create card" id="create">
     <textarea name="prompt" id="prompt" placeholder="thread prompt — Cmd/Ctrl+Enter to start" required></textarea>
     <div class="field repos-field">
       <label class="k">repos</label>
-      <div class="seg" id="tagFilter" hidden></div>
+      <div class="seg-ctl" id="tagFilter" hidden></div>
       <div class="combo" id="repoCombo">
         <div class="combo-tags" id="repoTags"></div>
         <input type="text" id="repoSearch" placeholder="search repos…" autocomplete="off">
@@ -208,18 +421,235 @@
       <button class="primary" type="submit" style="margin-left:auto">Start thread</button>
     </div>
   </form>
-  <div class="layout">
-    <div class="left card"><table><thead><tr><th>id</th><th>thread</th><th>stage</th><th>state</th><th>repos</th><th>tokens</th></tr></thead><tbody id="tasks"></tbody></table></div>
-    <div class="right card">
-      <div class="tabs" id="tabs"></div>
-      <div class="tabbody" id="tabbody"><p class="muted">Select a thread to see details.</p></div>
+</main>
+
+<main class="page sub-page" id="threadView" hidden>
+  <a class="btn2 back" href="#/"><span><b>BACK</b><small>to the inbox</small></span></a>
+  <div id="threadHead"></div>
+  <div class="card">
+    <div class="tabs" id="tabs"></div>
+    <div class="tabbody" id="tabbody"></div>
+  </div>
+</main>
+
+<main class="page sub-page" id="optionsView" hidden>
+  <a class="btn2 back" href="#/"><span><b>BACK</b><small>to the inbox</small></span></a>
+  <h1 class="ptitle">OPTIONS</h1>
+  <div class="card">
+    <div class="opt-sec">
+      <h3>bins</h3>
+      <p class="muted small" style="margin:0 0 8px">Binned quests leave the inbox after these many days and stay reachable by link. Live quests are never cleared.</p>
+      <div class="field">
+        <label class="k" for="binDays">GAME OVER</label>
+        <input type="number" id="binDays" min="1" step="1" style="width:5rem">
+        <span class="muted">days</span>
+      </div>
+      <div class="field">
+        <label class="k" for="hallOfFameDays">HALL OF FAME</label>
+        <input type="number" id="hallOfFameDays" min="1" step="1" style="width:5rem">
+        <span class="muted">days</span>
+      </div>
+      <div class="field">
+        <button class="primary" type="button" id="saveSettings">Save</button>
+        <button type="button" id="clearNowBtn">Clear now</button>
+        <span class="muted small" id="settingsMsg"></span>
+      </div>
     </div>
+    <div class="opt-sec">
+      <h3>repos.yaml</h3>
+      <p class="muted small" style="margin:0 0 8px">Edits apply immediately to new threads — no restart required.</p>
+      <textarea id="reposYamlText" spellcheck="false"></textarea>
+      <div class="field" style="margin-top:8px">
+        <button class="primary" type="button" id="saveReposYaml">Save repos.yaml</button>
+        <span class="muted small" id="reposYamlMsg"></span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="modal-overlay" id="viewerOverlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
+    <div class="modal-head">
+      <h2 id="viewerTitle"></h2>
+      <button type="button" class="modal-close" id="viewerClose" aria-label="close">×</button>
+    </div>
+    <div class="result" id="viewerBody"></div>
   </div>
 </div>
 <script type="module">
   import { renderMarkdown } from './markdown.js'
   import { renderActivity } from './activity.js'
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+  const $ = (id) => document.getElementById(id)
+
+  // ---- quest identity (design §4.2) ----
+  // FNV-1a + murmur3 fmix32
+  const hash = (s) => {
+    let h = 2166136261
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619) }
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b); h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35); h ^= h >>> 16
+    return h >>> 0
+  }
+  // 15 bits → 5 rows × 3 columns, mirrored to 5 columns. true = lit pixel.
+  const emblem = (threadId) => {
+    const h = hash(threadId)
+    let bits = h & 0x7fff, count = 0
+    for (let b = bits; b; b >>>= 1) count += b & 1
+    if (count < 8) bits |= (h >>> 15) & 0x7fff // sparse glyphs don't read at a glance
+    const cells = []
+    for (let y = 0; y < 5; y++) for (let x = 0; x < 5; x++) cells.push(((bits >>> (y * 3 + Math.min(x, 4 - x))) & 1) === 1)
+    return cells
+  }
+  const HUES = { petree: 0, 'druid-connector': 1, kubtru: 2, flowengine: 3, popplank: 4 }
+  const hue = (repo) => `var(--h${HUES[repo] ?? hash(repo) % 8})`
+  const emblemHtml = (t) => `<span class="emb" aria-hidden="true">${emblem(t.id).map((on) => on ? `<i style="background:${hue(t.repos[0] ?? '')}"></i>` : '<i></i>').join('')}</span>`
+  const qnum = (n) => 'Q-' + String(n ?? '?').padStart(3, '0')
+
+  const mins = (s) => Math.max(0, Math.floor((Date.now() - Date.parse(s)) / 60000))
+  const age = (s) => {
+    const m = mins(s)
+    return m < 1 ? 'just now' : m < 60 ? `${m} min ago` : m < 1440 ? `${Math.floor(m / 60)}h ago` : m < 2880 ? 'yesterday' : `${Math.floor(m / 1440)} days ago`
+  }
+  const elapsed = (s) => { const m = mins(s); return m < 60 ? `${m} MIN` : `${Math.floor(m / 60)}H ${m % 60}M` }
+
+  // ---- pixel bits ----
+  const SPROUT = document.querySelector('.brand .sprout').outerHTML
+  const PLAY = '<svg aria-hidden="true" width="6" height="11" viewBox="0 0 4 7" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="1" height="7"/><rect x="1" y="1" width="1" height="5"/><rect x="2" y="2" width="1" height="3"/><rect x="3" y="3" width="1" height="1"/></svg>'
+  const CHECK = '<svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="2" width="1" height="2"/><rect x="1" y="3" width="1" height="2"/><rect x="2" y="4" width="1" height="2"/><rect x="3" y="3" width="1" height="2"/><rect x="4" y="2" width="1" height="2"/><rect x="5" y="1" width="1" height="2"/><rect x="6" y="0" width="1" height="2"/></svg>'
+  const CARET = '<svg aria-hidden="true" width="14" height="8" viewBox="0 0 7 4" shape-rendering="crispEdges" fill="currentColor"><rect x="3" y="0" width="1" height="1"/><rect x="2" y="1" width="3" height="1"/><rect x="1" y="2" width="5" height="1"/><rect x="0" y="3" width="7" height="1"/></svg>'
+  const TROPHY = '<svg class="ico-t" aria-hidden="true" width="56" height="48" viewBox="0 0 14 12" shape-rendering="crispEdges">'
+    + '<g style="fill:var(--gold-fill)"><rect x="2" y="0" width="10" height="1"/><rect x="0" y="1" width="2" height="1"/><rect x="12" y="1" width="2" height="1"/><rect x="0" y="2" width="1" height="2"/><rect x="13" y="2" width="1" height="2"/><rect x="1" y="4" width="1" height="1"/><rect x="12" y="4" width="1" height="1"/><rect x="2" y="1" width="10" height="3"/><rect x="3" y="4" width="8" height="1"/><rect x="4" y="5" width="6" height="1"/><rect x="6" y="6" width="2" height="2"/><rect x="4" y="8" width="6" height="1"/></g>'
+    + '<g style="fill:var(--gold)"><rect x="9" y="1" width="2" height="3"/><rect x="8" y="4" width="2" height="1"/><rect x="8" y="5" width="1" height="1"/><rect x="3" y="9" width="8" height="3"/></g>'
+    + '<rect x="3" y="1" width="1" height="3" style="fill:var(--screen)"/><rect x="6" y="2" width="2" height="2" style="fill:var(--go-fill)"/></svg>'
+  const BIN = '<svg class="ico-b" aria-hidden="true" width="48" height="56" viewBox="0 0 12 14" shape-rendering="crispEdges">'
+    + '<g style="fill:var(--label)"><rect x="4" y="0" width="4" height="1"/><rect x="3" y="1" width="1" height="1"/><rect x="8" y="1" width="1" height="1"/><rect x="0" y="2" width="12" height="2"/></g>'
+    + '<g style="fill:var(--muted)"><rect x="2" y="4" width="8" height="9"/><rect x="3" y="13" width="6" height="1"/></g>'
+    + '<g style="fill:var(--line-strong)"><rect x="4" y="6" width="1" height="5"/><rect x="7" y="6" width="1" height="5"/></g></svg>'
+
+  // ---- cartridge card ----
+  const STEPS = [['SCOUT', 'investigate'], ['PLAN', 'spec'], ['CRAFT', 'build'], ['SHIP', 'PR'], ['VICTORY', 'merge']]
+  function progress(c) {
+    const p = c.progress
+    let at = p.findIndex((s) => s.mark === 'current')
+    if (at < 0) at = Math.max(0, p.map((s) => s.mark).lastIndexOf('done'))
+    const tone = p[at].mark !== 'current' ? '' : p[at].tone === 'running' ? 'run' : 'need'
+    const [name, word] = STEPS[at]
+    const label = `Level ${at + 1} of 5: ${name}, the ${word} stage${tone === 'need' ? ', waiting for you' : tone === 'run' ? ', running' : ''}`
+    const nodes = p.map((s, i) => `<span class="node ${s.mark}${s.mark === 'current' ? ' ' + tone : ''}"><i>${s.mark === 'done' ? CHECK : s.mark === 'todo' ? '' : i + 1}</i><b>${STEPS[i][0]}</b></span>`
+      + (i < 4 ? `<span class="seg${s.mark === 'done' ? ' done' : ''}"></span>` : '')).join('')
+    return `<div class="prog ${tone}"><div class="lvline"><span class="lv">LV ${at + 1}/5</span><span class="stg"><span class="sname">${name}</span> · ${word}</span></div>
+      <div class="track" role="img" aria-label="${label}">${nodes}</div></div>`
+  }
+  const chips = (repos) => repos.map((r) => `<span class="rchip"><i style="background:${hue(r.name)}"></i>${esc([r.name, ...r.tags].join(' · '))}</span>`).join('')
+
+  function card(t) {
+    const c = t.card, need = c.group === 'your-move'
+    const move = need
+      ? `<div class="ym"><span class="ym-tag">${PLAY}YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
+          <span class="ym-act">${esc(c.action?.label ?? c.line)}</span>${c.action?.detail ? `<span class="ym-det">${esc(c.action.detail)}</span>` : ''}</div>`
+      : `<div class="qs"><span class="qs-tag">QUESTING…<span class="cursor hollow" aria-hidden="true"></span></span>
+          <span class="qs-time">${t.state === 'running' && t.startedAt ? elapsed(t.startedAt) : esc(c.line.toUpperCase())}</span></div>`
+    return `<a class="cart ${need ? 'need' : 'run'}" href="#/t/${encodeURIComponent(t.id)}" data-key="${esc(t.id)}"><div class="cart-frame"><div class="cart-in">
+      <div class="c-top">${emblemHtml(t)}<span class="c-id"><span class="q">${qnum(c.q)}</span><span class="c-meta">${esc(t.repos.join(', '))} · ${age(t.updatedAt)}</span></span>
+        <h3 class="c-title">${esc(c.topic)}</h3><p class="c-sum">${esc(c.summary)}</p></div>
+      ${move}${progress(c)}
+      <div class="c-foot">${chips(c.repos)}<span class="age">${age(t.updatedAt)}</span></div>
+      <div class="strip" aria-hidden="true"></div></div></div></a>`
+  }
+
+  const trophy = (t) => `<a class="trophy" href="#/t/${encodeURIComponent(t.id)}" data-key="${esc(t.id)}">${TROPHY}${emblemHtml(t)}
+    <span class="tr-txt"><span class="tr-top"><span class="victory">VICTORY!</span>${qnum(t.card.q)}</span>
+    <span class="tr-title">${esc(t.card.topic)}</span><span class="tr-out">${esc(t.card.reason ?? '')} · ${age(t.updatedAt)}</span></span></a>`
+
+  const dead = (t) => `<div class="dead">${emblemHtml(t)}
+    <div class="dead-txt"><span class="dead-top"><span class="q">${qnum(t.card.q)}</span><a class="dead-title" href="#/t/${encodeURIComponent(t.id)}">${esc(t.card.topic)}</a></span>
+    <span class="dead-sub">${esc(t.card.reason ?? '')} · ${age(t.updatedAt)}<span class="desk"> · ${esc(t.repos.join(', '))}</span></span></div>
+    <button type="button" class="btn2" data-restore="${esc(t.id)}" data-key="restore:${esc(t.id)}" aria-label="${esc(`Continue? Restore ${qnum(t.card.q)}, ${t.card.topic}, from the bin`)}">
+      <span><b>CONTINUE?</b><small>restore<span class="desk"> from the bin</span></small></span></button></div>`
+
+  const count = (n, cls) => `<span class="count ${cls}">${n}</span>`
+  const head = (title, n, cls, hint) => `<div class="sec-head"><h2>${title} <span aria-hidden="true">·</span> ${count(n, cls)}</h2>${hint ? `<span class="hint">${hint}</span>` : ''}</div>`
+  const bin = (id, cls, icon, title, n, hint, body) => `<section class="bin-frame ${cls}"><details class="bin" id="${id}"${open[id] ? ' open' : ''}>
+    <summary data-key="bin:${id}">${icon}<span class="bin-t"><h2>${title} <span aria-hidden="true">·</span> ${count(n, cls === 'fame' ? 'gold' : 'none')}</h2><span class="hint">${hint}</span></span>
+    <span class="toggle"><span class="shut-w">SHOW</span><span class="open-w">HIDE</span>${CARET}</span></summary>${body}</details></section>`
+
+  // ---- inbox ----
+  let tasks = null, allRepos = [], reposLoaded = false
+  let filter = localStorage.getItem('petree-tag') || ''
+  let days = { binDays: 14, hallOfFameDays: 3 }
+  // bins keep their open state across the 3 s re-render; the shelf starts open on desktop
+  const open = { 'hall-of-fame': matchMedia('(min-width: 601px)').matches, 'game-over': false }
+  document.addEventListener('toggle', (e) => { if (e.target.id in open) open[e.target.id] = e.target.open }, true)
+
+  // Re-renders only on change and keeps keyboard focus on the same card/button.
+  function paint(el, html) {
+    if (el._html === html) return
+    const key = el.contains(document.activeElement) && document.activeElement.dataset.key
+    el.innerHTML = html; el._html = html
+    if (key) el.querySelector(`[data-key="${CSS.escape(key)}"]`)?.focus()
+  }
+
+  function renderInbox() {
+    if (!tasks) return
+    const tags = [...new Set(allRepos.flatMap((r) => r.tags || []))].sort()
+    if (reposLoaded && filter && !tags.includes(filter)) filter = ''
+    $('tagBar').hidden = !tags.length
+    paint($('tagBar'), ['', ...tags].map((t) => `<button type="button" data-tag="${esc(t)}" data-key="tag:${esc(t)}" aria-pressed="${t === filter}">${esc(t ? t.toUpperCase() : 'ALL')}</button>`).join(''))
+
+    const needAll = tasks.filter((t) => t.card.group === 'your-move').length
+    document.title = needAll ? `(${needAll}) Petree` : 'Petree'
+    $('ymChip').hidden = !needAll
+    $('ymCount').textContent = needAll
+    $('ymChip').setAttribute('aria-label', `${needAll} quest${needAll === 1 ? '' : 's'} need your move`)
+
+    const shown = (t) => !filter || t.card.repos.some((r) => r.tags.includes(filter))
+    const [mine, run, fame, gone] = ['your-move', 'questing', 'hall-of-fame', 'game-over'].map((g) =>
+      tasks.filter((t) => t.card.group === g && shown(t)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)))
+    paint($('inbox'), !tasks.length
+      ? `<div class="calm big">${SPROUT}<p>No quests yet.</p>${document.querySelector('.btn-start').outerHTML}</div>`
+      : `<section class="sec" id="your-move">${head('YOUR MOVE', mine.length, mine.length ? 'need' : 'none', mine.length ? 'Paused until you weigh in.' : '')}
+          ${mine.length ? `<div class="grid">${mine.map(card).join('')}</div>` : `<div class="calm">${SPROUT}<p>Nothing needs you.</p></div>`}</section>`
+        + (run.length ? `<section class="sec" id="questing">${head('QUESTING', run.length, 'go', 'Out on the road. Nothing for you yet.')}<div class="grid">${run.map(card).join('')}</div></section>` : '')
+        + (fame.length ? bin('hall-of-fame', 'fame', TROPHY, 'HALL OF FAME', fame.length, `Merged quests rest here for ${days.hallOfFameDays} days, then move to history.`,
+          `<div class="trophies">${fame.map(trophy).join('')}</div><div class="board" aria-hidden="true"></div>`) : '')
+        + (gone.length ? bin('game-over', 'over', BIN, 'GAME OVER', gone.length, `Dropped quests. Cleared after ${days.binDays} days.`,
+          `<div class="dead-list">${gone.map(dead).join('')}</div>`) : ''))
+  }
+
+  $('tagBar').addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-tag]'); if (!b) return
+    filter = b.dataset.tag; localStorage.setItem('petree-tag', filter); renderInbox()
+  })
+  $('inbox').addEventListener('click', async (e) => {
+    const b = e.target.closest('[data-restore]'); if (!b) return
+    b.disabled = true
+    const res = await fetch('/api/tasks/' + encodeURIComponent(b.dataset.restore) + '/restore', { method: 'POST' })
+    if (!res.ok) alert((await res.json().catch(() => ({}))).error || 'restore failed')
+    refresh()
+  })
+
+  // ---- router: #/ inbox, #/new, #/t/<id>, #/options; any other #anchor is an inbox section ----
+  let view = 'inbox'
+  const views = { inbox: $('inbox'), new: $('newView'), thread: $('threadView'), options: $('optionsView') }
+  function route() {
+    const h = location.hash
+    const m = /^#\/t\/(.+)$/.exec(h)
+    view = m ? 'thread' : h === '#/new' ? 'new' : h === '#/options' ? 'options' : 'inbox'
+    for (const [k, el] of Object.entries(views)) el.hidden = k !== view
+    if (m) {
+      selected = decodeURIComponent(m[1]); tab = 'Overview'; resultShownFor = null
+      threadInfo = { spec: '', findings: '', suggestions: [] }
+      $('threadHead').innerHTML = ''; $('tabs').innerHTML = ''; $('tabbody').innerHTML = '<p class="muted">loading…</p>'
+      renderBody().catch(() => {})
+    } else selected = null
+    if (view === 'options') { loadSettings(); loadReposYaml() }
+    if (view === 'new') autosize()
+    const anchor = h.length > 1 && !h.startsWith('#/') && document.getElementById(h.slice(1))
+    if (anchor) anchor.scrollIntoView(); else window.scrollTo(0, 0)
+  }
+  addEventListener('hashchange', route)
+
+  // ---- thread panel (old tabs, full width until the thread page lands) ----
   let selected = null, tab = 'Overview', resultShownFor = null
   // Spec/Findings/Notes tabs appear only when the thread has that content
   let threadInfo = { spec: '', findings: '', suggestions: [] }
@@ -248,12 +678,15 @@
   })
 
   // create form — repo combo: searchable, multiselect
-  let allRepos = [], selectedRepos = []
-  const repoSearch = document.getElementById('repoSearch')
-  const repoMenu = document.getElementById('repoMenu')
-  const repoTags = document.getElementById('repoTags')
-  const conventions = document.getElementById('conventions')
-  fetch('/api/repos').then((r) => r.json()).then((repos) => { allRepos = repos; renderRepoMenu(); renderConventions() })
+  let selectedRepos = []
+  const repoSearch = $('repoSearch')
+  const repoMenu = $('repoMenu')
+  const repoTags = $('repoTags')
+  const conventions = $('conventions')
+  const loadRepos = () => fetch('/api/repos').then((r) => r.json()).then((repos) => {
+    allRepos = repos; reposLoaded = true; renderRepoMenu(); renderConventions(); renderInbox()
+  }).catch(() => {})
+  loadRepos()
 
   function renderRepoTags() {
     repoTags.innerHTML = selectedRepos.map((name) => `<span class="tag">${esc(name)}<button type="button" data-remove="${esc(name)}" aria-label="remove ${esc(name)}">×</button></span>`).join('')
@@ -275,7 +708,7 @@
       : ''
   }
   let activeTag = ''
-  const tagFilter = document.getElementById('tagFilter')
+  const tagFilter = $('tagFilter')
   function renderRepoMenu() {
     const tags = [...new Set(allRepos.flatMap((r) => r.tags || []))].sort()
     if (!tags.includes(activeTag)) activeTag = ''
@@ -316,113 +749,88 @@
     renderRepoTags(); renderRepoMenu()
   })
 
-  // settings modal: retention config for automatic task clearing, plus a raw
-  // repos.yaml editor (see /api/repos-yaml — cfg is mutated in place server-side,
-  // so a save here applies to new tasks immediately, no restart needed)
-  const settingsBtn = document.getElementById('settingsBtn')
-  const settingsOverlay = document.getElementById('settingsOverlay')
-  const maxAgeDaysInput = document.getElementById('maxAgeDays')
-  const maxPerRepoGroupInput = document.getElementById('maxPerRepoGroup')
-  const settingsMsg = document.getElementById('settingsMsg')
+  // options: bin retention plus a raw repos.yaml editor (see /api/repos-yaml — cfg is
+  // mutated in place server-side, so a save here applies to new tasks immediately)
+  const binDaysInput = $('binDays')
+  const hallOfFameDaysInput = $('hallOfFameDays')
+  const settingsMsg = $('settingsMsg')
   const flashSettingsMsg = (text) => { settingsMsg.textContent = text; setTimeout(() => (settingsMsg.textContent = ''), 1500) }
-  const reposYamlText = document.getElementById('reposYamlText')
-  const reposYamlMsg = document.getElementById('reposYamlMsg')
+  const reposYamlText = $('reposYamlText')
+  const reposYamlMsg = $('reposYamlMsg')
   const flashReposYamlMsg = (text) => { reposYamlMsg.textContent = text; setTimeout(() => (reposYamlMsg.textContent = ''), 2500) }
   async function loadSettings() {
-    const s = await (await fetch('/api/settings')).json()
-    maxAgeDaysInput.value = s.maxAgeDays
-    maxPerRepoGroupInput.value = s.maxPerRepoGroup
+    try { days = await (await fetch('/api/settings')).json() } catch { return }
+    binDaysInput.value = days.binDays
+    hallOfFameDaysInput.value = days.hallOfFameDays
+    renderInbox()
   }
+  loadSettings()
   async function loadReposYaml() {
     const { content } = await (await fetch('/api/repos-yaml')).json()
     reposYamlText.value = content
   }
-  function openSettings() {
-    settingsOverlay.hidden = false
-    loadSettings()
-    loadReposYaml()
-  }
-  function closeSettings() { settingsOverlay.hidden = true }
-  settingsBtn.addEventListener('click', openSettings)
-  document.getElementById('settingsClose').addEventListener('click', closeSettings)
-  settingsOverlay.addEventListener('click', (e) => { if (e.target === settingsOverlay) closeSettings() })
 
   // full-document viewer, opened from the Spec/Findings summaries. It lives outside
   // #tabbody, so the 3s poll re-render doesn't touch it.
-  const viewerOverlay = document.getElementById('viewerOverlay')
+  const viewerOverlay = $('viewerOverlay')
   function openViewer(title, md) {
-    document.getElementById('viewerTitle').textContent = title
-    document.getElementById('viewerBody').innerHTML = renderMarkdown(md)
+    $('viewerTitle').textContent = title
+    $('viewerBody').innerHTML = renderMarkdown(md)
     viewerOverlay.hidden = false
   }
   const closeViewer = () => { viewerOverlay.hidden = true }
-  document.getElementById('viewerClose').addEventListener('click', closeViewer)
+  $('viewerClose').addEventListener('click', closeViewer)
   viewerOverlay.addEventListener('click', (e) => { if (e.target === viewerOverlay) closeViewer() })
-  document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return
-    if (!viewerOverlay.hidden) closeViewer()
-    else if (!settingsOverlay.hidden) closeSettings()
-  })
-  document.getElementById('tabbody').addEventListener('click', (e) => {
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !viewerOverlay.hidden) closeViewer() })
+  $('tabbody').addEventListener('click', (e) => {
     if (e.target.closest('[data-open-full]')) openViewer(tab, tab === 'Spec' ? threadInfo.spec : threadInfo.findings)
   })
-  document.getElementById('saveSettings').addEventListener('click', async () => {
+  $('saveSettings').addEventListener('click', async () => {
     const res = await fetch('/api/settings', {
       method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ maxAgeDays: Number(maxAgeDaysInput.value), maxPerRepoGroup: Number(maxPerRepoGroupInput.value) }),
+      body: JSON.stringify({ binDays: Number(binDaysInput.value), hallOfFameDays: Number(hallOfFameDaysInput.value) }),
     })
     if (!res.ok) { flashSettingsMsg((await res.json()).error || 'failed to save'); return }
     flashSettingsMsg('saved')
-    refresh()
+    loadSettings(); refresh()
   })
-  document.getElementById('clearNowBtn').addEventListener('click', async () => {
+  $('clearNowBtn').addEventListener('click', async () => {
     await fetch('/api/prune', { method: 'POST' })
     flashSettingsMsg('cleared')
     refresh()
   })
-  document.getElementById('saveReposYaml').addEventListener('click', async () => {
+  $('saveReposYaml').addEventListener('click', async () => {
     const res = await fetch('/api/repos-yaml', {
       method: 'PUT', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ content: reposYamlText.value }),
     })
     if (!res.ok) { flashReposYamlMsg((await res.json()).error || 'failed to save'); return }
     flashReposYamlMsg('saved')
-    // repos may have been added/removed/renamed — refresh the create-form's repo list
-    fetch('/api/repos').then((r) => r.json()).then((repos) => { allRepos = repos; renderRepoMenu(); renderConventions() })
+    // repos may have been added/removed/renamed or retagged
+    loadRepos()
   })
 
-  const prompt = document.getElementById('prompt')
-  const autosize = () => { prompt.style.height = 'auto'; prompt.style.height = prompt.scrollHeight + 'px' }
-  prompt.value = localStorage.getItem('petree-draft') || ''; autosize()
+  const prompt = $('prompt')
+  function autosize() { prompt.style.height = 'auto'; prompt.style.height = prompt.scrollHeight + 'px' }
+  prompt.value = localStorage.getItem('petree-draft') || ''
   prompt.addEventListener('input', () => { localStorage.setItem('petree-draft', prompt.value); autosize() })
-  prompt.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); document.getElementById('create').requestSubmit() } })
-  document.getElementById('create').addEventListener('submit', async (e) => {
+  prompt.addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); $('create').requestSubmit() } })
+  $('create').addEventListener('submit', async (e) => {
     e.preventDefault()
     if (!selectedRepos.length) { alert('select at least one repo'); return }
-    await fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: prompt.value, repos: selectedRepos, model: document.getElementById('model').value, stage: document.getElementById('stage').value }) })
+    const res = await fetch('/api/tasks', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: prompt.value, repos: selectedRepos, model: $('model').value, stage: $('stage').value }) })
+    if (!res.ok) { alert((await res.json().catch(() => ({}))).error || 'failed to start'); return }
+    const created = await res.json()
     prompt.value = ''; localStorage.removeItem('petree-draft'); autosize()
     selectedRepos = []; renderRepoTags(); renderRepoMenu()
-    refresh()
-  })
-
-  // Mirrors threadTitle() in src/store.ts.
-  const threadTitle = (t) => ((t.turns || [])[0]?.prompt ?? t.prompt).split('\n')[0].slice(0, 72)
-
-  function taskRow(t) {
-    return `<tr class="${t.id === selected ? 'sel' : ''}" data-id="${esc(t.id)}">
-      <td class="mono">${esc(t.id)}</td><td>${esc(threadTitle(t))}</td><td><span class="badge stage">${esc(t.stage)}</span></td><td><span class="badge ${esc(t.state)}">${esc(t.state)}</span></td>
-      <td>${esc(t.repos.join(', '))}</td><td>${esc(t.tokensUsed)}</td></tr>`
-  }
-  document.getElementById('tasks').addEventListener('click', (e) => {
-    const tr = e.target.closest('tr[data-id]'); if (!tr) return
-    selected = tr.dataset.id; tab = 'Overview'; threadInfo = { spec: '', findings: '', suggestions: [] }; refresh(true)
+    location.hash = '#/t/' + encodeURIComponent(created.id)
   })
 
   function renderTabs() {
-    document.getElementById('tabs').innerHTML = selected
+    $('tabs').innerHTML = selected
       ? tabsFor().map((n) => `<button class="${n === tab ? 'active' : ''}" data-tab="${n}">${n}</button>`).join('') : ''
   }
-  document.getElementById('tabs').addEventListener('click', (e) => {
+  $('tabs').addEventListener('click', (e) => {
     const b = e.target.closest('button[data-tab]'); if (!b) return; tab = b.dataset.tab; renderBody()
   })
 
@@ -431,9 +839,16 @@
     md.length <= max ? md : md.slice(0, max).replace(/\s+\S*$/, '') + '…'
 
   async function renderBody() {
-    const body = document.getElementById('tabbody')
-    if (!selected) { body.innerHTML = '<p class="muted">Select a thread to see details.</p>'; return }
-    const t = await (await fetch('/api/tasks/' + selected)).json()
+    const body = $('tabbody')
+    if (!selected) return
+    const res = await fetch('/api/tasks/' + encodeURIComponent(selected))
+    if (!res.ok) {
+      $('threadHead').innerHTML = '<h1 class="ptitle">Quest not found</h1>'
+      $('tabs').innerHTML = ''; body.innerHTML = '<p class="muted">No quest has this id. It may have been removed.</p>'
+      return
+    }
+    const t = await res.json()
+    $('threadHead').innerHTML = `<div class="t-id">${emblemHtml(t)}<span class="q40">${qnum(t.card.q)}</span></div><h1 class="t-title">${esc(t.card.topic)}</h1>`
     const th = await fetch('/api/tasks/' + selected + '/thread')
     if (th.ok) threadInfo = await th.json()
     if (!tabsFor().includes(tab)) tab = 'Overview'
@@ -448,8 +863,8 @@
         const summary = (s.text.split('\n').find((l) => l.trim()) || '').replace(/^#+\s*/, '').slice(0, 100)
         return `<div class="card note" style="margin-bottom:8px;padding:12px" data-repo="${esc(s.repo)}" data-exists="${s.exists}" data-orig="${esc(s.topic)}">
           <div><strong>${esc(s.repo)}</strong>${s.exists ? ' <span class="badge waiting-for-you">replaces existing note</span>' : ''}</div>
-          <dt>topic</dt><input class="note-topic mono" value="${esc(s.topic)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px">
-          <dt>summary (one line)</dt><input class="note-summary" value="${esc(summary)}" style="width:100%;padding:6px;border:1px solid var(--line);border-radius:6px">
+          <dt>topic</dt><input class="note-topic mono" value="${esc(s.topic)}" style="width:100%;padding:6px;border:1px solid var(--line)">
+          <dt>summary (one line)</dt><input class="note-summary" value="${esc(summary)}" style="width:100%;padding:6px;border:1px solid var(--line)">
           <dt>text</dt><textarea class="note-text" style="min-height:8rem">${esc(s.text)}</textarea>
           <div class="field" style="margin-top:8px"><button class="primary" data-note-accept>Accept</button><button data-note-drop>Drop</button></div>
         </div>`
@@ -488,7 +903,6 @@
       body.innerHTML = `<dl>
         <dt>stage / state</dt><dd><span class="badge stage">${esc(t.stage)}</span> <span class="badge ${esc(t.state)}">${esc(t.state)}</span> ${resume} ${stop}</dd>
         <dt>id</dt><dd class="mono">${esc(t.id)} ${copyBtn(t.id)}</dd>
-        <dt>thread</dt><dd>${esc(threadTitle(t))}</dd>
         <dt>current turn</dt><dd>${esc(t.prompt)}</dd>
         <dt>repos</dt><dd>${esc(t.repos.join(', '))}</dd>
         <dt>model</dt><dd>${esc(t.model || 'default')}</dd>
@@ -545,10 +959,10 @@
           <div class="result">${renderMarkdown(t.result)}</div>
           <div class="card" id="prSection" style="margin-top:16px;padding:12px"><p class="muted">loading repos…</p></div>`
         const repos = await (await fetch('/api/tasks/' + selected + '/diff')).json()
-            const prSection = document.getElementById('prSection')
+        const prSection = $('prSection')
         prSection.innerHTML = repos.map((r) => `<div style="margin-bottom:10px"><strong>${esc(r.repo)}</strong>${localBlock(r)}
             ${r.hasChanges ? `<div class="field" style="margin:6px 0">
-              <input class="mono" data-pr-target="${esc(r.repo)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line);border-radius:6px">
+              <input class="mono" data-pr-target="${esc(r.repo)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line)">
               <button data-pr="${esc(r.repo)}">Create PR</button>
               <span class="prout muted" data-prout="${esc(r.repo)}"></span>
             </div>` : '<p class="muted small">No changes to open a PR for.</p>'}</div>`).join('')
@@ -576,7 +990,7 @@
       const atEnd = prev ? prev.scrollHeight - prev.scrollTop - prev.clientHeight < 40 : true
       const wasOpen = new Set([...body.querySelectorAll('.ev-more[open]')].map(detailKey))
       body.innerHTML = `<div class="logbar">
-          <div class="seg">${['Activity', 'Raw'].map((v) => `<button class="${v === logView ? 'on' : ''}" data-logview="${v}">${v}</button>`).join('')}</div>
+          <div class="seg-ctl">${['Activity', 'Raw'].map((v) => `<button class="${v === logView ? 'on' : ''}" data-logview="${v}">${v}</button>`).join('')}</div>
           <label class="follow"><input type="checkbox" id="followLog" ${followLog ? 'checked' : ''}> follow</label>
         </div>
         <div class="logscroll">${logView === 'Raw' ? `<pre class="log">${esc(logs)}</pre>` : renderActivity(logs, t)}</div>`
@@ -586,7 +1000,7 @@
       body.querySelectorAll('[data-logview]').forEach((b) => b.addEventListener('click', () => {
         logView = b.dataset.logview; localStorage.setItem('petree-logview', logView); renderBody()
       }))
-      document.getElementById('followLog').addEventListener('change', (e) => {
+      $('followLog').addEventListener('change', (e) => {
         followLog = e.target.checked
         localStorage.setItem('petree-logfollow', followLog ? 'on' : 'off')
         if (followLog) scroller.scrollTop = scroller.scrollHeight
@@ -608,7 +1022,7 @@
           <pre class="diff">${esc(r.patch)}</pre>
           <dt>push</dt>
           <div class="field">
-            <input class="mono" data-target="${esc(r.repo)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line);border-radius:6px">
+            <input class="mono" data-target="${esc(r.repo)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line)">
             <button data-push="${esc(r.repo)}">Push branch</button>
             <span class="pushout muted" data-out="${esc(r.repo)}"></span>
           </div>
@@ -631,7 +1045,7 @@
     document.querySelectorAll('[data-resume]').forEach((b) => b.addEventListener('click', async () => {
       await fetch('/api/tasks/' + b.dataset.resume + '/resume', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: document.getElementById('resumeModel').value }),
+        body: JSON.stringify({ model: $('resumeModel').value }),
       }); refresh(true)
     }))
     document.querySelectorAll('[data-stop]').forEach((b) => b.addEventListener('click', async () => {
@@ -640,7 +1054,7 @@
       await fetch('/api/tasks/' + b.dataset.stop + '/stop', { method: 'POST' }); refresh(true)
     }))
     document.querySelectorAll('[data-comment]').forEach((b) => b.addEventListener('click', async () => {
-      const ta = document.getElementById('commentText')
+      const ta = $('commentText')
       if (!ta.value.trim()) return
       const res = await fetch('/api/tasks/' + b.dataset.comment + '/comments', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: ta.value }),
@@ -649,7 +1063,7 @@
       refresh(true)
     }))
     document.querySelectorAll('[data-gate]').forEach((b) => b.addEventListener('click', async () => {
-      const body = { prompt: document.getElementById('gatePrompt').value }
+      const body = { prompt: $('gatePrompt').value }
       if (b.dataset.gate) body.stage = b.dataset.gate
       const res = await fetch('/api/tasks/' + b.dataset.id + '/next', {
         method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
@@ -659,48 +1073,44 @@
       refresh(true)
     }))
     document.querySelectorAll('[data-next]').forEach((b) => b.addEventListener('click', async () => {
-      const ta = document.getElementById('nextPrompt')
+      const ta = $('nextPrompt')
       if (!ta.value.trim()) { alert('enter a follow-up prompt'); return }
       const res = await fetch('/api/tasks/' + b.dataset.next + '/next', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt: ta.value, model: document.getElementById('nextModel').value }),
+        body: JSON.stringify({ prompt: ta.value, model: $('nextModel').value }),
       })
       if (!res.ok) { alert((await res.json()).error || 'follow-up failed'); return }
       resultShownFor = null
       refresh(true)
     }))
-    const nextTa = document.getElementById('nextPrompt')
+    const nextTa = $('nextPrompt')
     if (nextTa) nextTa.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); document.querySelector('[data-next]').click() }
     })
   }
 
   async function refresh(switched = false) {
-    const tasks = await (await fetch('/api/tasks')).json()
-    // waiting-for-you first; Array.sort is stable so the server order holds within each group
-    const waiting = (t) => (t.state === 'waiting-for-you' ? 0 : 1)
-    tasks.sort((a, b) => waiting(a) - waiting(b))
-    const needs = tasks.filter((t) => t.state === 'waiting-for-you').length
-    const badge = document.getElementById('needsYou')
-    badge.hidden = !needs; badge.textContent = `needs you: ${needs}`
-    document.title = needs ? `(${needs}) petree` : 'Petree'
-    document.getElementById('tasks').innerHTML = tasks.map(taskRow).join('')
-    renderTabs()
-    // Only auto-refresh live tabs; Changes renders on tab entry only so the 3s
-    // poll can't reset the push-target input, re-run git diff, or detach the
-    // push-result node mid-push. Result is live only until its done-result (with
-    // PR controls) has been rendered once for this task — after that it's frozen
-    // for the same reason as Changes (the PR target input, once shown, must survive
-    // the poll; the underlying result can't change post-done anyway).
+    try {
+      const res = await fetch('/api/tasks')
+      if (!res.ok) throw new Error(String(res.status))
+      tasks = await res.json()
+      $('offline').hidden = true
+    } catch {
+      $('offline').hidden = false // the last list stays on screen
+      return
+    }
+    renderInbox()
+    if (view !== 'thread' || !selected) return
+    // Result is live only until its done-result (with PR controls) has been rendered
+    // once; Changes renders on tab entry only. Both keep inputs from resetting under the user.
     const resultLive = tab === 'Result' && resultShownFor !== selected
-    // Don't re-render under the user's caret: the Overview next-prompt form (and
-    // any other input in the detail panel) must survive the 3s poll while focused.
+    // Don't re-render under the user's caret, or over unsent drafts.
     const active = document.activeElement
-    const typing = active && document.getElementById('tabbody').contains(active) &&
-      ['TEXTAREA', 'INPUT', 'SELECT'].includes(active.tagName)
-    // Unsent drafts in the Overview forms must survive the poll even after focus moves away.
+    const typing = active && $('tabbody').contains(active) && ['TEXTAREA', 'INPUT', 'SELECT'].includes(active.tagName)
     const drafting = !switched && ['commentText', 'gatePrompt', 'nextPrompt'].some((id) => document.getElementById(id)?.value)
-    if (selected && !typing && !drafting && (['Overview', 'Spec', 'Findings', 'Log'].includes(tab) || resultLive)) await renderBody()
+    if (!typing && !drafting && (['Overview', 'Spec', 'Findings', 'Log'].includes(tab) || resultLive)) await renderBody()
   }
+  route()
   setInterval(refresh, 3000); refresh()
 </script>
+</html>

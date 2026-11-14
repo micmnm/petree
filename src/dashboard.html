@@ -85,9 +85,6 @@
   .page.sub-page { gap: 20px; }
   .ptitle { margin: 0; font: 400 40px/1 var(--px); letter-spacing: .5px; }
   .back { align-self: flex-start; text-decoration: none; }
-  .t-id { display: flex; align-items: center; gap: 12px; }
-  .q40 { font: 40px/1 var(--px); }
-  .t-title { margin: 8px 0 0; font-size: 24px; line-height: 1.3; overflow-wrap: anywhere; }
 
   /* Inbox sections */
   .sec { display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 16px; }
@@ -247,7 +244,6 @@
     .dead-title { font-size: 15px; }
     .btn2 > span { padding: 5px 10px; }
     .btn2 b { font-size: 20px; line-height: 1; }
-    .t-title { font-size: 20px; }
   }
 
   /* New quest (spec §5.1f) */
@@ -379,6 +375,186 @@
     .nq-go { justify-content: center; min-height: 56px; }
   }
 
+  /* Thread page (spec §5.1b–d) */
+  #threadView { max-width: 960px; gap: 32px; }
+  .th-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+  .th-id { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; min-width: 0; font-size: 13px; color: var(--muted); }
+  .th-id code { font: 13px var(--mono); color: var(--ink); overflow-wrap: anywhere; }
+  .th-id .copy { width: 44px; height: 44px; margin: 0; padding: 0; border: 0; background: transparent; color: var(--muted); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; }
+  .th-live { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .th-head .cart-in { gap: 16px; padding: 22px 26px 12px; }
+  .cart-frame.need { background: var(--need-frame); }
+  .th-title { display: flex; align-items: flex-end; gap: 14px 18px; padding-right: 12px; }
+  .th-name { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+  .th-q { font: 30px/.9 var(--px); color: var(--label); }
+  .th-h1 { margin: 0; font-size: 30px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .th-title .sprout { width: 64px; height: 68px; }
+  .th-sum { margin: 0; max-width: 680px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .th-head .prog { max-width: 560px; margin-top: 0; }
+  .th-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; padding-top: 10px; border-top: 2px dotted var(--line); font-size: 13px; color: var(--muted); }
+  .th-pr { color: var(--ink); font-weight: 700; overflow-wrap: anywhere; }
+  /* stepped panel: frame colour outside, surface inside */
+  .frame { padding: 2px; background: var(--line-strong); clip-path: var(--step); }
+  .frame > div { display: flex; flex-direction: column; gap: 12px; padding: 18px 22px 20px; background: var(--screen); clip-path: var(--step); }
+  .frame.need { background: var(--need-frame); }
+  .frame.need > div { background: var(--need-tint); }
+  .frame.go { background: var(--go-fill); }
+  .frame.over > div { background: var(--inset); }
+  .frame.fame { background: var(--gold); }
+  .frame.fame > div { background: var(--gold-tint); }
+  .frame.doc > div { padding: 12px; }
+  .frame .btn2 { align-self: flex-start; }
+  .th-big { align-self: flex-start; font-size: 30px; }
+  .ym-tag.th-big { padding: 5px 10px 4px; }
+  .th-big .cursor { width: 9px; height: 20px; }
+  .th-act { margin: 0; max-width: 720px; font-size: 20px; font-weight: 700; line-height: 1.4; }
+  .th-say { margin: 0; max-width: 720px; color: var(--muted); overflow-wrap: anywhere; }
+  .th-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 20px; font-size: 14px; color: var(--muted); }
+  .th-link { display: inline-flex; align-items: center; min-height: 44px; padding: 0; border: 0; background: none; color: var(--ink); font: 700 14px var(--sans); text-decoration: underline; cursor: pointer; }
+  .th-qs > div { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 18px 24px; }
+  .th-qs-main { flex: 1 1 420px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+  .th-qs-t { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; }
+  .th-tag { align-self: flex-start; font: 30px/1 var(--px); color: var(--label); }
+  .fame .th-tag { color: var(--gold); }
+  .th-sec { display: flex; flex-direction: column; gap: 12px; }
+  .th-old { gap: 8px; }
+  .th-old:empty { display: none; }
+  .th-doch { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
+  .th-h { margin: 0; font: 400 40px/1 var(--px); }
+  .th-doch code { font: 13px var(--mono); color: var(--muted); overflow-wrap: anywhere; }
+  .th-doch.was .th-h { color: var(--muted); }
+  .th-run { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; padding: 12px 16px; background: var(--go-tint); }
+  .th-run span { font-size: 15px; color: var(--muted); }
+  .th-none { margin: 0; padding: 8px 4px; color: var(--muted); }
+  /* Long-text clamp (design §4.8); thMeasure marks .over and shows READ ALL */
+  .clamp { position: relative; max-height: 260px; overflow: hidden; --fade: var(--screen); }
+  .clamp.over::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 48px; background: linear-gradient(transparent, var(--fade)); }
+  .md-box { padding: 26px 30px 30px; background-color: var(--inset); background-image: var(--tex); box-shadow: inset 0 2px 0 var(--line); --fade: var(--inset); }
+  .rd-open { align-self: flex-start; }
+  .rd-open b svg { margin-left: 8px; }
+  .md { font-size: 17px; line-height: 1.6; overflow-wrap: anywhere; }
+  .md > * { max-width: 680px; }
+  .md h1, .md h2, .md h3 { margin: 18px 0 6px; line-height: 1.25; }
+  .md h1 { font-size: 24px; } .md h2 { font-size: 20px; } .md h3 { font-size: 18px; }
+  .md > :first-child { margin-top: 0; }
+  .md p, .md ul, .md ol { margin: 0 0 12px; }
+  .md ul, .md ol { padding-left: 22px; }
+  .md code { padding: 0 4px; background: var(--screen); border: 1px solid var(--line); font: 14px var(--mono); }
+  .md pre { margin: 0 0 12px; padding: 12px 16px; background: var(--screen); border-left: 4px solid var(--line-strong); font: 14px/1.55 var(--mono); white-space: pre-wrap; overflow-x: auto; }
+  .md pre code { padding: 0; border: 0; background: none; }
+  .th-pre { margin: 0; font: 13px/1.6 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .th-move .cart-in { gap: 12px; padding: 22px 26px 24px; }
+  .th-note { display: flex; flex-direction: column; gap: 12px; }
+  .th-h3 { font: 30px/1 var(--px); }
+  .th-note .hint { margin: 0; max-width: 680px; line-height: 1.5; }
+  #thNote { display: block; min-height: 128px; padding: 14px 16px; border: 2px solid var(--line-strong); background: var(--inset); color: var(--ink); font: 16px/1.5 var(--sans); resize: vertical; overflow: auto; }
+  .th-bar { display: flex; flex-direction: column; gap: 8px; }
+  .th-bar .nq-err { white-space: pre-line; }
+  .th-out { margin: 0; font-size: 14px; }
+  .th-out:empty { display: none; }
+  .th-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 16px; padding-top: 8px; }
+  .th-btns:empty { display: none; }
+  .th-go { min-height: 60px; padding: 8px 22px 8px 18px; border: 0; cursor: pointer; }
+  .th-go svg { margin-left: 8px; }
+  .th-quiet { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; min-height: 56px; padding: 6px 10px; border: 0; background: transparent; color: var(--muted); text-align: left; cursor: pointer; }
+  .th-quiet.push { margin-left: auto; }
+  .th-quiet b { font: 400 30px/.85 var(--px); }
+  .th-quiet small { font-size: 13px; font-weight: 700; line-height: 1.2; }
+  .th-btns .th-q { font-size: 14px; color: var(--muted); }
+  [data-act]:disabled { opacity: .6; cursor: wait; }
+  .th-det { background: var(--screen); border: 2px solid var(--line); }
+  .th-det > summary { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; min-height: 56px; padding: 6px 18px; cursor: pointer; list-style: none; }
+  .th-det > summary::-webkit-details-marker { display: none; }
+  /* the pixel ▶ of the mockups, as a 4×7 staircase */
+  .th-det > summary::before { content: ''; flex: none; width: 8px; height: 14px; background: var(--label); clip-path: polygon(0 0,25% 0,25% 14.3%,50% 14.3%,50% 28.6%,75% 28.6%,75% 42.9%,100% 42.9%,100% 57.1%,75% 57.1%,75% 71.4%,50% 71.4%,50% 85.7%,25% 85.7%,25% 100%,0 100%); }
+  .th-det[open] > summary::before { transform: rotate(90deg); }
+  .th-det > summary b { font: 400 30px/1 var(--px); }
+  .th-det > summary small { flex: 1 1 260px; min-width: 0; font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .th-k { font: 20px/1 var(--px); color: var(--label); }
+  .th-det-body { display: flex; flex-direction: column; gap: 12px; padding: 0 18px 18px; overflow-wrap: anywhere; }
+  .th-runs { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 2px dotted var(--line); }
+  .th-runh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+  .th-runh small { font-size: 14px; color: var(--muted); }
+  .th-info div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 9px 0; border-top: 2px dotted var(--line); }
+  .th-info dt { margin: 0; font: 20px/1 var(--px); color: var(--label); }
+  .th-info dd { margin: 0; min-width: 0; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+  .th-info dd.err { font-weight: 400; text-align: left; }
+  /* Reader popup (spec §5.1d): native modal dialog, so focus stays inside and Esc closes */
+  .rd { width: min(1100px, calc(100% - 64px)); max-width: none; max-height: calc(100vh - 64px); padding: 2px; border: 0; background: var(--line-strong); color: var(--ink); clip-path: var(--cart); overflow: hidden; }
+  .rd::backdrop { background: color-mix(in srgb, var(--shell) 85%, transparent); }
+  .rd-in { display: flex; flex-direction: column; max-height: calc(100vh - 68px); background: var(--screen); clip-path: var(--cart); }
+  .rd-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 14px 24px 14px 18px; border-bottom: 2px solid var(--line); }
+  .rd-t { flex: 1 1 200px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .rd-t h2 { margin: 0; font: 400 30px/1 var(--px); }
+  #viewerSub { font-size: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #viewerSub code { font: 13px var(--mono); }
+  .rd-len { font: 20px/1 var(--px); color: var(--label); white-space: nowrap; }
+  .rd-close { display: inline-flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 14px; border: 2px solid var(--line-strong); background: var(--screen); color: var(--ink); font: 30px/1 var(--px); cursor: pointer; }
+  .rd-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px 18px; padding: 14px 18px; align-items: start; }
+  .rd-body.toc { grid-template-columns: 190px minmax(0, 1fr); }
+  .rd-toc { position: sticky; top: 0; display: flex; flex-direction: column; gap: 4px; }
+  .rd-toc button { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 4px 10px; border: 2px solid var(--line); background: var(--inset); color: var(--ink); font: 700 15px/1.2 var(--sans); text-align: left; }
+  .rd-toc i { font: normal 20px/1 var(--px); color: var(--label); }
+  .rd-doc { min-width: 0; padding: 26px 30px 34px; background-color: var(--inset); background-image: var(--tex); border: 2px solid var(--line); }
+  .rd-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; padding: 14px 18px 16px; border-top: 2px solid var(--line); font-size: 14px; color: var(--muted); }
+  .rd-foot .th-btns { flex: 1 1 100%; padding-top: 0; }
+  @media (max-width: 600px) {
+    #threadView { gap: 22px; }
+    .th-head .cart-in { gap: 12px; padding: 14px 14px 6px; }
+    .th-title { align-items: center; gap: 12px; padding-right: 14px; }
+    .th-title .sprout { display: none; }
+    .th-q { font-size: 20px; }
+    .th-h1 { font-size: 20px; }
+    .th-sum { font-size: 15px; }
+    /* the thread head keeps a full-width track, unlike the compact card track */
+    .th-head .prog { flex-direction: column; align-items: stretch; gap: 8px; }
+    .th-head .prog .track { order: 0; flex: none; height: auto; padding: 4px 4px 0; }
+    .th-head .lv { display: inline; }
+    .th-head .node i { width: 20px; height: 20px; font-size: 20px; }
+    .th-head .node i svg { display: block; }
+    .th-head .node.current i { width: 24px; height: 24px; }
+    .th-head .seg { height: 4px; margin: 0 3px; background: repeating-linear-gradient(90deg, var(--line-strong) 0 4px, transparent 4px 8px); }
+    .th-head .seg.done { margin: 0; background: var(--go-fill); }
+    .frame > div { gap: 8px; padding: 12px 14px 14px; }
+    .th-big { font-size: 20px; }
+    .ym-tag.th-big { padding: 3px 7px 2px; }
+    .th-big .cursor { width: 6px; height: 12px; }
+    .th-act { font-size: 15px; line-height: 1.35; }
+    .th-meta .desk { display: none; }
+    .th-h { font-size: 30px; }
+    .clamp { max-height: 200px; }
+    .md-box { padding: 16px 18px 20px; }
+    .md { font-size: 16px; }
+    .th-det > summary { gap: 2px 10px; padding: 6px 14px; }
+    .th-det > summary b { font-size: 20px; }
+    .th-det-body { padding: 0 14px 14px; }
+    /* phone order (design §5): details and log, then stats, the note, the sticky decision bar */
+    .th-stats { order: 1; }
+    .th-move, .th-move > .cart-in { display: contents; }
+    .th-move .strip { display: none; }
+    .th-note { order: 2; gap: 8px; }
+    #thNote { min-height: 0; height: 124px; resize: none; }
+    /* the negative margins cancel the page's 16 px gutter and bottom padding */
+    .th-bar { order: 3; position: sticky; bottom: 0; z-index: 5; margin: 0 -16px -24px; padding: 10px 16px calc(8px + env(safe-area-inset-bottom)); background: var(--shell); border-top: 2px solid var(--line-strong); }
+    .th-btns { gap: 6px 8px; padding-top: 0; }
+    .th-go { flex: 1 1 100%; justify-content: center; }
+    .th-go .stack { align-items: center; text-align: center; }
+    .th-btns .btn2, .th-quiet { flex: 1 1 0; min-width: 0; }
+    .th-btns .btn2 { display: flex; }
+    .th-btns .btn2 > span { flex: 1 1 auto; align-items: center; justify-content: center; min-height: 48px; padding: 4px 8px; text-align: center; }
+    .th-quiet, .th-quiet.push { align-items: center; justify-content: center; min-height: 48px; margin: 0; padding: 4px; text-align: center; }
+    .th-quiet b { font-size: 20px; line-height: 1; }
+    .th-btns .th-link { order: 9; flex: 1 1 100%; justify-content: center; }
+    .rd { width: 100%; height: 100%; max-height: none; margin: 0; padding: 0; clip-path: none; }
+    .rd-in { height: 100%; max-height: none; clip-path: none; }
+    .rd-head { gap: 8px 12px; padding: 10px 16px; }
+    .rd-body.toc { grid-template-columns: minmax(0, 1fr); }
+    .rd-toc { position: static; flex-direction: row; flex-wrap: wrap; }
+    .rd-toc .th-k { flex: 1 1 100%; }
+    .rd-doc { padding: 16px 18px 24px; }
+    .rd-foot { padding: 10px 16px calc(8px + env(safe-area-inset-bottom)); }
+  }
+
   /* Thread panel, create form and options: kept from the old dashboard until PRs 10–13 */
   .card { background: var(--surface); border: 2px solid var(--line-strong); }
   textarea { width: 100%; padding: var(--sp); font: inherit; border: 1px solid var(--line); resize: none; overflow: hidden; min-height: 3rem; }
@@ -393,31 +569,15 @@
   .badge { padding: 2px 8px; font-size: .78rem; background: var(--inset); white-space: nowrap; }
   .badge.running, .badge.done { background: var(--go-tint); } .badge.failed { background: var(--need-tint); }
   .badge[class*="paused"], .badge.waiting-for-you { background: var(--gold-tint); }
-  .comment { margin: 4px 0; white-space: pre-wrap; } .comment.pending { border-left: 3px solid var(--st-warning); padding-left: 8px; }
   .mono { font-family: var(--mono); }
-  .tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); padding: 0 var(--sp); overflow-x: auto; }
-  .tabs button { flex: none; border: none; background: none; padding: 10px 12px; color: var(--muted); border-bottom: 2px solid transparent; }
-  .tabs button.active { color: var(--ink); border-bottom-color: var(--accent); font-weight: 600; }
-  .tabbody { padding: calc(var(--sp)*2); overflow-wrap: anywhere; }
   dl { margin: 0; } dt { color: var(--muted); font-size: .78rem; margin-top: 10px; } dd { margin: 2px 0 0; }
-  .result h1,.result h2,.result h3 { font-size: 1rem; margin: .7rem 0 .3rem; }
-  .result table { display: block; overflow-x: auto; } .result img { max-width: 100%; }
-  .result pre, pre.diff, pre.log { background: #16160f; color: #e6e6d8; padding: 12px; overflow: auto; font-family: var(--mono); font-size: .82rem; }
-  pre.log, pre.diff { max-height: 46vh; }
-  .result code { background: var(--inset); padding: 0 .25rem; font-family: var(--mono); }
-  .result pre code { background: none; color: inherit; padding: 0; }
+  pre.diff { max-height: 46vh; background: #16160f; color: #e6e6d8; padding: 12px; overflow: auto; font-family: var(--mono); font-size: .82rem; }
   .err { color: var(--need); white-space: pre-wrap; font-family: var(--mono); }
   .copy { font-size: .72rem; padding: 2px 8px; margin-left: 6px; }
   .cmd { display: flex; align-items: center; gap: 6px; background: var(--inset); border: 1px solid var(--line); padding: 6px 8px; font-family: var(--mono); font-size: .8rem; overflow-x: auto; }
   .muted { color: var(--muted); } .small { font-size: .75rem; }
-  /* Log tab — activity view */
-  .logbar { display: flex; align-items: center; gap: var(--sp); margin-bottom: 10px; }
-  .seg-ctl { display: inline-flex; border: 1px solid var(--line); overflow: hidden; }
-  .seg-ctl button { border: none; padding: 4px 12px; font-size: .82rem; color: var(--muted); }
-  .seg-ctl button.on { background: var(--ink); color: var(--screen); }
-  .follow { margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: .78rem; color: var(--muted); }
+  /* Details › Log — activity view */
   .logscroll { max-height: 56vh; overflow: auto; }
-  .logscroll pre.log { max-height: none; }
   .now { display: flex; gap: var(--sp); align-items: baseline; padding: 8px 10px; background: var(--inset);
          border: 1px solid var(--line); border-left: 3px solid var(--viz-blue); }
   .now.bad { border-left-color: var(--st-critical); }
@@ -460,12 +620,6 @@
   .ev-more summary { font-size: .72rem; color: var(--muted); cursor: pointer; }
   .ev-more pre { background: #16160f; color: #e6e6d8; padding: 8px; margin: 4px 0 0;
                  max-height: 30vh; overflow: auto; font-family: var(--mono); font-size: .75rem; white-space: pre-wrap; overflow-wrap: anywhere; }
-  .modal-overlay { position: fixed; inset: 0; background: rgba(20,20,16,.35); display: flex; align-items: center; justify-content: center; padding: calc(var(--sp)*2); z-index: 100; }
-  .modal { background: var(--surface); border: 2px solid var(--line-strong); width: min(640px, 100%); max-height: 88vh; overflow: auto; padding: calc(var(--sp)*2.5); box-shadow: 0 12px 32px rgba(0,0,0,.18); }
-  .modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: calc(var(--sp)*1.5); }
-  .modal-head h2 { margin: 0; font-size: 1rem; }
-  .modal-close { border: none; background: none; font-size: 1.2rem; line-height: 1; padding: 2px 6px; color: var(--muted); }
-
   /* Options (spec §5.1g) */
   #optionsView { gap: 32px; }
   .o-top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; }
@@ -679,12 +833,41 @@
 </main>
 
 <main class="page sub-page" id="threadView" hidden>
-  <a class="btn2 back" href="#/"><span><b>BACK</b><small>to the inbox</small></span></a>
-  <div id="threadHead"></div>
-  <div class="card">
-    <div class="tabs" id="tabs"></div>
-    <div class="tabbody" id="tabbody"></div>
+  <div class="th-top">
+    <a class="btn2 back" href="#/"><span><b>BACK</b><small>to the inbox</small></span></a>
+    <span class="th-id" id="thId"></span>
   </div>
+  <p class="th-live" id="thLive" role="status"></p>
+  <section class="th-head" id="thHead" aria-labelledby="thTitle"></section>
+  <section id="thPanel" aria-label="Where the quest stands"></section>
+  <section class="th-sec" id="thDoc" aria-labelledby="thDocH"></section>
+  <section class="th-sec th-old" id="thOld" aria-label="Earlier documents"></section>
+  <section class="cart-frame th-move" id="thMove" aria-label="Your note and your choice"><div class="cart-in">
+    <div class="th-note">
+      <label class="th-h3" for="thNote">YOUR NOTE TO THE PARTY</label>
+      <p class="hint" id="thHelp"></p>
+      <textarea id="thNote" rows="5" aria-describedby="thHelp" placeholder="e.g. Keep the change small, and add a test for the empty case."></textarea>
+    </div>
+    <div class="th-bar" role="group" aria-label="Your choice">
+      <div class="th-btns" id="thBtns"></div>
+      <p class="nq-err" id="thErr" role="alert"></p>
+      <p class="th-out" id="thOut" role="status"></p>
+    </div>
+    <div class="strip" aria-hidden="true"></div>
+  </div></section>
+  <!-- PR 12 placeholder: QUEST STATS (GET /api/tasks/:id/stats). Phone CSS orders it after the details. -->
+  <section class="th-sec th-stats" id="thStats" aria-label="Quest stats" hidden></section>
+  <!-- PR 12 placeholder: QUEST LOG (timeline of turns, approvals and comments). -->
+  <section class="th-sec th-log" id="thLog" aria-label="Quest log" hidden></section>
+  <section class="th-sec" id="thDetails" aria-labelledby="thDetH">
+    <h2 class="th-h" id="thDetH">DETAILS</h2>
+    <details class="th-det" data-det="prompt"><summary><b>ORIGINAL PROMPT</b><span class="th-k" id="thPromptN"></span><small id="thPromptQ"></small></summary><div class="th-det-body"></div></details>
+    <details class="th-det" data-det="changes"><summary><b>CHANGES</b><small>diff, local folder and run commands · loads when opened</small></summary><div class="th-det-body"></div></details>
+    <details class="th-det" data-det="runs"><summary><b>STAGE RUNS</b><span class="th-k" id="thRunsN"></span><small>each turn's prompt and result, oldest first</small></summary><div class="th-det-body"></div></details>
+    <details class="th-det" data-det="log"><summary><b>LOG</b><small>activity of the last turn · loads when opened</small></summary><div class="th-det-body"></div></details>
+    <details class="th-det" data-det="notes" id="thNotesDet" hidden><summary><b>NOTE SUGGESTIONS</b><span class="th-k" id="thNotesN"></span><small>notes the agent wants to keep for these repos</small></summary><div class="th-det-body"></div></details>
+    <details class="th-det" data-det="info"><summary><b>INFO</b><small>model, flags, tokens, session, last error</small></summary><div class="th-det-body"></div></details>
+  </section>
 </main>
 
 <main class="page sub-page" id="optionsView" hidden>
@@ -752,15 +935,26 @@
   </div></section>
 </main>
 
-<div class="modal-overlay" id="viewerOverlay" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="viewerTitle">
-    <div class="modal-head">
-      <h2 id="viewerTitle"></h2>
-      <button type="button" class="modal-close" id="viewerClose" aria-label="close">×</button>
+<dialog class="rd" id="viewerOverlay" aria-labelledby="viewerTitle" aria-describedby="viewerSub">
+  <div class="rd-in">
+    <div class="rd-head">
+      <span id="viewerEmb"></span>
+      <div class="rd-t"><h2 id="viewerTitle"></h2><span id="viewerSub"></span></div>
+      <span class="rd-len" id="viewerLen"></span>
+      <button type="button" class="rd-close" id="viewerClose" aria-label="Close the reader">CLOSE
+        <svg aria-hidden="true" width="14" height="12" viewBox="0 0 7 6" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="2" height="1"/><rect x="5" y="0" width="2" height="1"/><rect x="1" y="1" width="2" height="1"/><rect x="4" y="1" width="2" height="1"/><rect x="2" y="2" width="3" height="2"/><rect x="1" y="4" width="2" height="1"/><rect x="4" y="4" width="2" height="1"/><rect x="0" y="5" width="2" height="1"/><rect x="5" y="5" width="2" height="1"/></svg></button>
     </div>
-    <div class="result" id="viewerBody"></div>
+    <div class="rd-body" id="viewerScroll" tabindex="0" aria-label="Document text, scrolls">
+      <nav class="rd-toc" id="viewerToc" aria-label="Contents" hidden></nav>
+      <article class="rd-doc" id="viewerBody"></article>
+    </div>
+    <div class="rd-foot" id="viewerFoot" hidden>
+      <span>Decide from here. Your note on the thread page goes with the button you press.</span>
+      <div class="th-btns" id="viewerBtns" role="group" aria-label="Your choice"></div>
+      <p class="nq-err" id="viewerErr" role="alert"></p>
+    </div>
   </div>
-</div>
+</dialog>
 <script type="module">
   import { renderMarkdown } from './markdown.js'
   import { renderActivity } from './activity.js'
@@ -921,12 +1115,9 @@
     const m = /^#\/t\/(.+)$/.exec(h)
     view = m ? 'thread' : h === '#/new' ? 'new' : h === '#/options' ? 'options' : 'inbox'
     for (const [k, el] of Object.entries(views)) el.hidden = k !== view
-    if (m) {
-      selected = decodeURIComponent(m[1]); tab = 'Overview'; resultShownFor = null
-      threadInfo = { spec: '', findings: '', suggestions: [] }
-      $('threadHead').innerHTML = ''; $('tabs').innerHTML = ''; $('tabbody').innerHTML = '<p class="muted">loading…</p>'
-      renderBody().catch(() => {})
-    } else selected = null
+    if (thDialog.open) thDialog.close()
+    if (m) thOpen(decodeURIComponent(m[1]))
+    else selected = null
     // entering Options starts clean: BACK means "leave without saving"
     if (view === 'options') { drafts = {}; $('saveMsg').textContent = ''; loadSettings(); loadReposYaml(); renderOptions(); loadRepos().then(() => renderOptions()) }
     if (view === 'new') renderNew()
@@ -935,21 +1126,20 @@
   }
   addEventListener('hashchange', route)
 
-  // ---- thread panel (old tabs, full width until the thread page lands) ----
-  let selected = null, tab = 'Overview', resultShownFor = null
-  // Spec/Findings/Notes tabs appear only when the thread has that content
-  let threadInfo = { spec: '', findings: '', suggestions: [] }
-  const tabsFor = () => ['Overview', ...(threadInfo.spec ? ['Spec'] : []), ...(threadInfo.findings ? ['Findings'] : []),
-    ...(threadInfo.suggestions.length ? ['Notes'] : []), 'Result', 'Changes', 'Log']
-  // Log view preferences survive the 3s poll and page reloads
-  let logView = localStorage.getItem('petree-logview') || 'Activity'
-  let followLog = localStorage.getItem('petree-logfollow') !== 'off'
-
-  // Identifies an expanded log detail by its content (headline + section), not by
-  // position — the timeline is capped to the last N events, so indices shift as
-  // the run grows while the text of an event does not.
-  const detailKey = (d) =>
-    (d.closest('.ev')?.querySelector('.ev-head')?.textContent ?? '') + '¦' + (d.querySelector('summary')?.textContent ?? '')
+  // ---- thread page (#/t/<id>, spec §5.1b–d) ----
+  let selected = null, thTask = null, thInfo = { spec: '', findings: '', suggestions: [] }
+  let thMove = {}, thLiveKey = null, thReplied = false, thOpener = null
+  const thReads = {} // READ ALL key → what the reader shows
+  const thOldOpen = new Set() // earlier documents left open across the 3 s repaint
+  const thLv = { investigate: 'SCOUT', spec: 'PLAN', build: 'CRAFT' }
+  const thStages = ['investigate', 'spec', 'build']
+  const thNote = $('thNote'), thDialog = $('viewerOverlay')
+  const thDraftKey = () => 'petree-note:' + selected
+  const thNum = (n) => Number(n).toLocaleString('en-US')
+  const thWords = (s) => (String(s).match(/\S+/g) || []).length
+  const thFirst = (s) => (String(s).split('\n').find((l) => l.trim()) ?? '').replace(/^[#>*\-\s]+/, '').trim()
+  const thUrl = (u) => /^https:\/\//.test(u ?? '')
+  const thCopyIcon = '<svg aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="5" height="1"/><rect x="0" y="1" width="1" height="5"/><rect x="2" y="2" width="6" height="1"/><rect x="2" y="3" width="1" height="5"/><rect x="7" y="3" width="1" height="5"/><rect x="3" y="7" width="4" height="1"/></svg>'
 
   // copy button: returns HTML; clicking copies decodeURIComponent of data-copy
   function copyBtn(text) { return `<button class="copy" data-copy="${encodeURIComponent(text)}">copy</button>` }
@@ -960,8 +1150,399 @@
     ${(r.run || []).map((c) => `<div class="cmd" style="margin-top:4px"><span>run: ${esc(c)}</span>${copyBtn(c)}</div>`).join('')}</div>`
   document.addEventListener('click', async (e) => {
     const b = e.target.closest('.copy'); if (!b) return
-    try { await navigator.clipboard.writeText(decodeURIComponent(b.dataset.copy)); const o = b.textContent; b.textContent = 'copied'; setTimeout(() => (b.textContent = o), 1200) } catch {}
+    try { await navigator.clipboard.writeText(decodeURIComponent(b.dataset.copy)); const o = b.innerHTML; b.textContent = 'copied'; setTimeout(() => (b.innerHTML = o), 1200) } catch {}
   })
+
+  // A clamped block plus its READ ALL; thMeasure hides the button unless the block overflows.
+  function thBlock(key, title, path, text, md = true) {
+    const words = thWords(text)
+    const html = md ? renderMarkdown(text) : `<pre class="th-pre">${esc(text)}</pre>`
+    thReads[key] = { title, path, html, words, md }
+    const sub = `open in the reader · ${md ? '' : `${thNum(text.split('\n').length)} lines · `}${thNum(words)} words`
+    return `<div class="clamp${md ? ' md md-box' : ''}">${html}</div>
+      <button type="button" class="btn2 rd-open" data-read="${esc(key)}" data-key="read:${esc(key)}"><span><b>READ ALL${PLAY}</b><small>${sub}</small></span></button>`
+  }
+  const thMeasure = (root) => root.querySelectorAll('.clamp').forEach((c) => {
+    const over = c.scrollHeight > c.clientHeight + 1
+    c.classList.toggle('over', over)
+    const b = c.nextElementSibling
+    if (b?.dataset.read) b.hidden = !over
+  })
+
+  // investigate → FINDINGS, spec → SPEC (thread file, else that stage's turn result), build → RESULT
+  const thDocList = (t) => [['FINDINGS', '_thread/findings.md', thInfo.findings], ['SPEC', '_thread/spec.md', thInfo.spec], ['RESULT', null, '']]
+    .map(([name, file, text], i) => {
+      const stage = thStages[i]
+      const turn = stage === t.stage && t.result ? t.result : [...t.turns].reverse().find((x) => x.stage === stage)?.result
+      return { stage, name, path: text ? file : 'turn result', md: text || turn || '' }
+    })
+
+  function thHeadHtml(t, c) {
+    const prs = c.prs.length
+      ? c.prs.map((p) => thUrl(p.url) ? `<a class="th-pr" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">${esc(p.repo)} ↗ PR #${esc(p.number ?? '?')} ${esc(p.pr ?? '')}</a>` : '').join('')
+      : '<span>no PR yet</span>'
+    return `<div class="cart-frame${c.group === 'your-move' ? ' need' : ''}"><div class="cart-in">
+      <div class="th-title">${emblemHtml(t)}<div class="th-name"><span class="th-q">${qnum(c.q)}</span><h1 class="th-h1" id="thTitle">${esc(c.topic)}</h1></div>${SPROUT}</div>
+      <p class="th-sum">${esc(c.summary)}</p>
+      ${progress(c)}
+      <div class="th-foot">${chips(c.repos)}${prs}<span class="age">${age(t.updatedAt)}</span></div>
+      <div class="strip" aria-hidden="true"></div></div></div>`
+  }
+
+  function thPanelHtml(t, c) {
+    const lv = thLv[t.stage], pending = t.comments.filter((x) => !x.consumed).length
+    if (t.bin) {
+      const over = t.bin === 'game-over'
+      return `<div class="frame ${over ? 'over' : 'fame'}"><div><span class="th-tag">${over ? 'GAME OVER' : 'HALL OF FAME'}</span>
+        <p class="th-act">${esc(c.reason ?? '')}</p><span class="th-meta">binned ${age(t.binnedAt ?? t.updatedAt)}</span>
+        ${t.archivedAt ? '<span class="th-meta">Archived: it stays readable here but can no longer be restored.</span>'
+          : over ? '<button type="button" class="btn2" data-act="restore" data-key="act:restore"><span><b>CONTINUE?</b><small>restore from the bin</small></span></button>' : ''}</div></div>`
+    }
+    if (c.group === 'questing') {
+      const running = t.state === 'running' && t.startedAt
+      const at = running ? new Date(t.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
+      return `<div class="frame go th-qs"><div><div class="th-qs-main">
+        <div class="th-qs-t"><span class="qs-tag th-big">QUESTING…<span class="cursor hollow" aria-hidden="true"></span></span><span class="qs-time">${running ? elapsed(t.startedAt) : esc(c.line.toUpperCase())}</span></div>
+        <p class="th-act">${esc(c.line)}</p>
+        <span class="th-meta">${lv} run${running ? ` · started ${at}` : ''}</span></div>
+        ${['queued', 'provisioning', 'running'].includes(t.state) ? '<button type="button" class="btn2" data-act="stop" data-key="act:stop"><span><b>PAUSE</b><small>stop this turn</small></span></button>' : ''}</div></div>`
+    }
+    const detail = c.action?.detail ?? (t.state === 'failed' && t.error ? t.error.split('\n')[0] : null)
+    const who = t.state === 'failed' ? `petree · the ${lv} turn failed` : t.state === 'cancelled' ? `you · paused the ${lv} turn` : `agent · end of the ${lv} turn`
+    const open = c.prs.filter((p) => p.pr === 'open' && thUrl(p.url))
+    return `<div class="frame need"><div>
+      <span class="ym-tag th-big">${PLAY}YOUR MOVE!<span class="cursor" aria-hidden="true"></span></span>
+      <p class="th-act">${esc(c.action?.label ?? c.line)}</p>${detail ? `<p class="th-say">${esc(detail)}</p>` : ''}
+      <div class="th-meta"><span>${who} · ${age(t.updatedAt)}</span>${pending ? `<span>${pending} note${pending === 1 ? '' : 's'} will be included</span>` : ''}
+        ${open.map((p) => `<a class="th-link" href="${esc(p.url)}" target="_blank" rel="noopener noreferrer">Open PR #${esc(p.number ?? '?')} ↗</a>`).join('')}
+        <button type="button" class="th-link desk" data-jump>Jump to your choices</button></div></div></div>`
+  }
+
+  function thDocsHtml(t, c) {
+    const docs = thDocList(t), at = thStages.indexOf(t.stage), questing = c.group === 'questing'
+    // While a turn runs, show the latest document it builds on (spec §5.1c).
+    const shown = questing ? docs.slice(0, at + 1).reverse().find((d) => d.md) : docs[at]
+    const lv = thLv[t.stage], run = t.state === 'running' && t.startedAt ? `${mins(t.startedAt)} min` : null
+    const banner = !questing ? '' : `<div class="th-run"><b>${shown
+      ? (run ? `A new ${lv} turn is running (${run}).` : `A new ${lv} turn is coming: ${esc(c.line)}.`)
+      : (run ? `Working on the ${t.stage}… started ${run} ago` : `${esc(c.line)}…`)}</b>${shown
+      ? `<span>Below is the ${shown.name.toLowerCase()} it builds on. The new ${docs[at].name.toLowerCase()} replaces it when the turn ends.</span>` : ''}</div>`
+    const head = shown?.md ? shown : docs[at]
+    const now = `<div class="th-doch${questing ? ' was' : ''}"><h2 class="th-h" id="thDocH">${head.name}</h2>${shown?.md
+      ? `<code>${esc(shown.path)}${shown.stage !== t.stage ? ` · from ${thLv[shown.stage]}` : ''} · ${thNum(thWords(shown.md))} words</code>` : ''}</div>
+      <div class="frame doc"><div>${banner}${shown?.md ? thBlock('doc:' + shown.stage, shown.name, shown.path, shown.md)
+        : questing ? '' : `<p class="th-none">No ${head.name.toLowerCase()} for this turn.</p>`}</div></div>`
+    const old = docs.slice(0, shown?.md ? docs.indexOf(shown) : at).filter((d) => d.md).map((d) =>
+      `<details class="th-det" data-old="${d.stage}"${thOldOpen.has(d.stage) ? ' open' : ''}><summary><b>${d.name} · ${thLv[d.stage]}</b><small>${esc(thFirst(d.md))}</small></summary>
+        <div class="th-det-body">${thBlock('doc:' + d.stage, d.name, d.path, d.md)}</div></details>`).join('')
+    return [now, old]
+  }
+
+  // Spec §5.1(b) button table; rows follow cardFor's order so the panel and the buttons agree.
+  function thMoves(t, c) {
+    const B = (act, word, sub, more) => ({ act, word, sub, ...more })
+    const retry = (sub) => B('retry', 'RETRY STAGE', sub)
+    const over = B('drop', 'GAME OVER', 'drop to the bin')
+    if (t.bin) return {}
+    if (c.group === 'questing') return { primary: B('queue', 'QUEUE NOTE', 'sent with the next turn'), queue: true,
+      help: "The running turn won't see it. It is sent with the next turn, together with any other queued notes." }
+    if (t.state === 'waiting-for-you') {
+      const inv = t.stage === 'investigate'
+      return {
+        primary: B('next', `CONTINUE${PLAY}`, inv ? 'approve findings · write spec' : 'approve spec · start build', { stage: inv ? 'spec' : 'build' }),
+        skip: inv, secondary: retry(inv ? 'send note · redo findings' : 'send note · rewrite spec'),
+        quiet: [B('done', 'QUEST COMPLETE', 'end here · keep the findings'), over],
+        help: `Optional. It goes with the button you press: CONTINUE takes it into the ${inv ? 'spec' : 'build'}, RETRY STAGE ${inv ? 'redoes the findings' : 'rewrites the spec'} with it.`,
+      }
+    }
+    if (t.state === 'failed') return { primary: B('resume', 'RETRY STAGE', `re-run the ${t.stage} turn`), quiet: [over],
+      help: 'Optional. With a note, RETRY STAGE starts a fresh turn with it; without one it re-runs the failed turn.' }
+    if (t.state === 'cancelled') return { primary: B('resume', 'RESUME', `re-run the ${t.stage} turn`), secondary: retry('send note · new turn'), quiet: [over],
+      help: 'Optional. RESUME re-runs the paused turn; RETRY STAGE starts a new one with your note.' }
+    if (t.state === 'done' && t.stage === 'build') {
+      const d = Object.entries(t.delivery), rework = retry('send note · rework build')
+      const help = 'Optional. It goes with RETRY STAGE, which reworks the build.'
+      const need = d.filter(([, x]) => x.ahead > 0 && !x.target && !x.pr)
+      const stale = d.filter(([, x]) => x.pr === 'open' && x.prHead !== x.head)
+      if (need.length) return { primary: B('pr', 'SHIP IT', 'open PR on GitHub/Azure', { repos: need }), secondary: rework, quiet: [over], help }
+      if (stale.length) return { primary: B('push', 'SHIP IT', `push update to PR #${stale[0][1].number}`, { repos: stale }), secondary: rework, quiet: [over], help }
+      if (d.some(([, x]) => x.pr === 'open')) return { secondary: rework, quiet: [over], help }
+      if (!d.some(([, x]) => x.ahead > 0)) return { secondary: retry('send reply'), quiet: [B('done', 'QUEST COMPLETE', 'end here · keep the answer'), over],
+        reply: !!c.action?.detail, help: 'The party asked you something: write your reply, then RETRY STAGE sends it.' }
+    }
+    return { secondary: retry('send note · new turn'), quiet: [over] }
+  }
+
+  const thBtn = (b, kind, i) => {
+    const data = `data-act="${b.act}"${b.stage ? ` data-stage="${b.stage}"` : ''} data-key="act:${b.act}"`
+    if (kind === 'go') return `<button type="button" class="btn-start th-go" ${data}><span class="stack"><b class="w30">${b.word}</b><span class="sub">${esc(b.sub)}</span></span></button>`
+    if (kind === 'two') return `<button type="button" class="btn2" ${data}><span><b>${b.word}</b><small>${esc(b.sub)}</small></span></button>`
+    return `<button type="button" class="th-quiet${i ? '' : ' push'}" ${data}><b>${b.word}</b><small>${esc(b.sub)}</small></button>`
+  }
+  const thBtns = (m, pending) => (m.primary ? thBtn(m.primary, 'go') : '')
+    + (m.skip ? '<button type="button" class="th-link" data-act="next" data-stage="build" data-key="act:skip">skip to CRAFT</button>' : '')
+    + (m.secondary ? thBtn(m.secondary, 'two') : '')
+    + (m.queue ? `<span class="th-q">${pending} note${pending === 1 ? '' : 's'} queued</span>` : '')
+    + (m.quiet ?? []).map((b, i) => thBtn(b, 'quiet', i)).join('')
+
+  const thShow = (on) => ['thPanel', 'thDoc', 'thOld', 'thMove', 'thDetails'].forEach((id) => { $(id).hidden = !on })
+
+  function thOpen(id) {
+    selected = id; thTask = null; thInfo = { spec: '', findings: '', suggestions: [] }
+    thOldOpen.clear(); thLiveKey = null; thReplied = false
+    $('threadView').querySelectorAll('#thDetails details').forEach((d) => { d.open = false; d.querySelector('.th-det-body').innerHTML = '' })
+    thNote.value = localStorage.getItem(thDraftKey()) || ''
+    setText($('thErr'), ''); setText($('thOut'), ''); setText($('thLive'), '')
+    thShow(false)
+    paint($('thId'), '')
+    paint($('thHead'), '<p class="hint">loading…</p>')
+    renderThread()
+  }
+
+  async function renderThread() {
+    const id = selected
+    let t, info = thInfo
+    try {
+      const [a, b] = await Promise.all([fetch('/api/tasks/' + encodeURIComponent(id)), fetch(`/api/tasks/${encodeURIComponent(id)}/thread`)])
+      if (a.status === 404 && id === selected) {
+        thShow(false)
+        return paint($('thHead'), '<h1 class="ptitle" id="thTitle">Quest not found</h1><p class="hint">No quest has this id. It may have been removed.</p>')
+      }
+      if (!a.ok) return
+      t = await a.json()
+      if (b.ok) info = await b.json()
+    } catch { return } // the offline banner says so; the last page stays
+    if (id !== selected || view !== 'thread') return
+    thTask = t; thInfo = info
+    const c = t.card
+    thShow(true)
+    $('thMove').hidden = !!t.bin
+    paint($('thId'), `thread id <code>${esc(t.id)}</code><button type="button" class="copy" data-copy="${encodeURIComponent(t.id)}" data-key="copy-id" aria-label="Copy thread id">${thCopyIcon}</button>`)
+    paint($('thHead'), thHeadHtml(t, c))
+    paint($('thPanel'), thPanelHtml(t, c))
+    const [now, old] = thDocsHtml(t, c)
+    paint($('thDoc'), now); paint($('thOld'), old)
+    thMove = thMoves(t, c)
+    setText($('thHelp'), (thMove.help ?? 'Optional. It goes with the button you press.') + ' Your draft is kept if you leave this page.')
+    paint($('thBtns'), thBtns(thMove, t.comments.filter((x) => !x.consumed).length))
+    const prompt = t.turns[0]?.prompt ?? t.prompt, n = thInfo.suggestions.length
+    const lines = prompt.split('\n').length
+    setText($('thPromptN'), `${lines} LINE${lines === 1 ? '' : 'S'}`)
+    setText($('thPromptQ'), `“${thFirst(prompt)}…”`)
+    setText($('thRunsN'), String(t.turns.length + 1))
+    $('thNotesDet').hidden = !n
+    setText($('thNotesN'), String(n))
+    thMeasure($('threadView'))
+    // Announce state changes only, not the minute ticks of a running turn.
+    const key = [t.state, t.stage, t.bin].join()
+    if (thLiveKey && key !== thLiveKey) setText($('thLive'), t.bin ? `${qnum(c.q)}: ${c.reason ?? t.bin}`
+      : `${qnum(c.q)}: ${c.group === 'questing' ? 'questing, ' + c.line : 'your move, ' + (c.action?.label ?? c.line)}`)
+    thLiveKey = key
+    if (thMove.reply && !thReplied) { thReplied = true; thNote.focus({ preventScroll: true }) }
+  }
+
+  thNote.addEventListener('input', () => {
+    if (thNote.value) localStorage.setItem(thDraftKey(), thNote.value)
+    else localStorage.removeItem(thDraftKey())
+  })
+
+  async function thAct(b) {
+    const t = thTask, act = b.dataset.act, note = thNote.value.trim()
+    if (!t) return
+    const err = b.closest('dialog') ? $('viewerErr') : $('thErr')
+    setText($('thErr'), ''); setText($('viewerErr'), ''); setText($('thOut'), '')
+    if (!note && (act === 'queue' || (act === 'retry' && !t.comments.some((x) => !x.consumed)))) {
+      if (thDialog.open) thDialog.close()
+      setText($('thErr'), 'Write a note first: say what the party should change.')
+      return thNote.focus()
+    }
+    if (act === 'stop' && !confirm('Pause this quest? The running turn stops; RESUME runs it again.')) return
+    const post = async (path, body) => {
+      const r = await fetch(`/api/tasks/${encodeURIComponent(t.id)}/${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body ?? {}) })
+      const out = await r.json().catch(() => ({}))
+      if (!r.ok) throw new Error(out.error === 'restore first' ? 'This quest is in the GAME OVER bin: CONTINUE? restores it first.' : out.error || `petree answered ${r.status}`)
+      return out
+    }
+    const withNote = ['next', 'retry', 'queue'].includes(act) || (act === 'resume' && note)
+    b.disabled = true
+    try {
+      if (act === 'pr' || act === 'push') {
+        // Per repo (spec §8): successes are recorded, failures stay on screen and the button stays for them.
+        const res = await Promise.all(thMove.primary.repos.map(([repo, d]) => post(act, { repo, target: d.target ?? `petree/${t.id}` })
+          .then((o) => ({ repo, ...o }), (e) => ({ repo, ok: false, output: e.message }))))
+        setText(err, res.filter((r) => !r.ok).map((r) => `${r.repo}: ${String(r.output || r.error || 'failed').trim().split('\n').slice(-2).join(' ')}`).join('\n'))
+        $('thOut').innerHTML = res.filter((r) => r.ok).map((r) => `${esc(r.repo)}: ${thUrl(r.url)
+          ? `<a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer">PR opened ↗</a>` : act === 'pr' ? 'pushed' : 'update pushed'}`).join(' · ')
+      } else if (withNote && act !== 'queue') await post('next', { prompt: note, ...(b.dataset.stage && { stage: b.dataset.stage }) })
+      else if (act === 'queue') await post('comments', { text: note })
+      else await post(act) // resume, stop, drop, done, restore
+      if (withNote) { thNote.value = ''; localStorage.removeItem(thDraftKey()) }
+      if (thDialog.open && !err.textContent) thDialog.close()
+    } catch (e) {
+      setText(err, e instanceof TypeError ? 'petree not reachable — try again' : e.message)
+    } finally { b.disabled = false }
+    refresh()
+  }
+
+  // Details render only when opened, so the poll never resets what is being read.
+  async function thDetail(d) {
+    const t = thTask, id = selected, body = d.querySelector('.th-det-body'), kind = d.dataset.det
+    if (!t) return
+    if (kind === 'prompt') body.innerHTML = thBlock('prompt', 'ORIGINAL PROMPT', 'first turn', t.turns[0]?.prompt ?? t.prompt, false)
+    else if (kind === 'runs') body.innerHTML = [...t.turns, { ...t, endedAt: null }].map((r, i) => `<div class="th-runs">
+        <div class="th-runh"><span class="th-k">${thLv[r.stage]}</span><b>Turn ${i + 1}</b><small>${r.endedAt ? 'ended ' + age(r.endedAt) : 'current turn'} · ${thNum(r.tokensUsed)} tokens</small></div>
+        <span class="th-k">PROMPT</span>${thBlock(`run:${i}:p`, `TURN ${i + 1} PROMPT`, thLv[r.stage], r.prompt, false)}
+        <span class="th-k">RESULT</span>${r.result ? thBlock(`run:${i}:r`, `TURN ${i + 1} RESULT`, thLv[r.stage], r.result) : '<p class="th-none">no result recorded</p>'}</div>`).join('')
+    else if (kind === 'info') body.innerHTML = `<dl class="th-info">
+        <div><dt>MODEL</dt><dd>${esc(t.model || 'default')}</dd></div>
+        <div><dt>PARTY MODE</dt><dd>${t.party ? 'on' : 'off'}</dd></div>
+        <div><dt>AUTO-PLAY</dt><dd>${t.autoPlay ? 'on' : 'off'}</dd></div>
+        <div><dt>TOKENS</dt><dd>${thNum(t.tokensUsed)} / ${thNum(t.tokenBudget)}</dd></div>
+        <div><dt>SESSION</dt><dd class="mono">${esc(t.sessionId || '—')} ${t.sessionId ? copyBtn(t.sessionId) : ''}</dd></div>
+        <div><dt>CREATED</dt><dd>${esc(new Date(t.createdAt).toLocaleString())}</dd></div>
+        <div><dt>UPDATED</dt><dd>${esc(new Date(t.updatedAt).toLocaleString())}</dd></div>
+        ${t.error ? `<div><dt>LAST ERROR</dt><dd class="err">${esc(t.error)}</dd></div>` : ''}</dl>`
+    else if (kind === 'notes') thNotes(body)
+    else {
+      body.innerHTML = '<p class="hint">loading…</p>'
+      try {
+        const r = await fetch(`/api/tasks/${encodeURIComponent(id)}/${kind === 'log' ? 'logs' : 'diff'}`)
+        if (!r.ok) throw new Error()
+        const out = kind === 'log' ? await r.text() : await r.json()
+        if (id !== selected) return
+        body.innerHTML = kind === 'log'
+          ? `<div class="logscroll">${renderActivity(out, t)}</div><a class="th-link" href="/api/tasks/${encodeURIComponent(id)}/logs" target="_blank" rel="noopener">open raw log</a>`
+          : thChanges(out)
+      } catch { body.innerHTML = '<p class="nq-err" role="alert">Couldn’t load this — petree not reachable.</p>' }
+    }
+    thMeasure(body)
+  }
+
+  // Details › Changes: the former Changes tab, unchanged.
+  const thChanges = (repos) => repos.map((r) => !r.hasChanges
+    ? `<div class="repoChange"><strong>${esc(r.repo)}</strong> <span class="muted">— no changes for this task</span></div>`
+    : `<div class="repoChange" style="margin-bottom:16px">
+        <div><strong>${esc(r.repo)}</strong> <span class="muted mono">${esc(r.branch)} vs ${esc(r.baseBranch)}</span></div>
+        ${localBlock(r)}
+        <dt>review locally</dt>
+        <div class="cmd"><span>${esc(r.reviewCommand)}</span>${copyBtn(r.reviewCommand)}</div>
+        <dt>summary</dt><pre class="diff" style="max-height:none">${esc(r.stat)}</pre>
+        <dt>diff</dt>
+        <div><button class="copy" data-copy="${encodeURIComponent(r.patch)}">copy diff</button></div>
+        <pre class="diff">${esc(r.patch)}</pre>
+        <dt>push</dt>
+        <div class="field">
+          <input class="mono" data-target aria-label="${esc(`Branch to push ${r.repo} to`)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line)">
+          <button data-push="${esc(r.repo)}">Push branch</button>
+          <span class="pushout muted" data-out></span>
+        </div>
+      </div>`).join('')
+
+  async function thPush(btn) {
+    const box = btn.closest('.repoChange'), out = box.querySelector('[data-out]')
+    out.textContent = 'pushing…'
+    try {
+      const res = await (await fetch(`/api/tasks/${encodeURIComponent(selected)}/push`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: btn.dataset.push, target: box.querySelector('[data-target]').value }),
+      })).json()
+      // Validation failures (400s) come back as { error }, not { output }.
+      out.textContent = res.ok ? '✓ ' + (res.output || 'pushed').split('\n')[0] : '✗ ' + (res.output || res.error || 'failed').split('\n').slice(-2).join(' ')
+    } catch { out.textContent = '✗ petree not reachable' }
+    refresh()
+  }
+
+  // Details › Note suggestions: the former Notes tab; errors now show inline.
+  function thNotes(body) {
+    const id = selected
+    body.innerHTML = thInfo.suggestions.map((s) => {
+      const summary = (s.text.split('\n').find((l) => l.trim()) || '').replace(/^#+\s*/, '').slice(0, 100)
+      return `<div class="card note" style="padding:12px" data-repo="${esc(s.repo)}" data-exists="${s.exists}" data-orig="${esc(s.topic)}">
+        <div><strong>${esc(s.repo)}</strong>${s.exists ? ' <span class="badge waiting-for-you">replaces existing note</span>' : ''}</div>
+        <dt>topic</dt><input class="note-topic mono" aria-label="Topic" value="${esc(s.topic)}" style="width:100%;padding:6px;border:1px solid var(--line)">
+        <dt>summary (one line)</dt><input class="note-summary" aria-label="Summary" value="${esc(summary)}" style="width:100%;padding:6px;border:1px solid var(--line)">
+        <dt>text</dt><textarea class="note-text" aria-label="Note text" style="min-height:8rem">${esc(s.text)}</textarea>
+        <div class="field" style="margin-top:8px"><button class="primary" data-note-accept>Accept</button><button data-note-drop>Drop</button></div>
+        <p class="nq-err" role="alert"></p>
+      </div>`
+    }).join('')
+    body.querySelectorAll('.note').forEach((card) => {
+      const post = (action, payload) => fetch(`/api/tasks/${encodeURIComponent(id)}/notes/${action}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: card.dataset.repo, ...payload }),
+      })
+      const done = async (res) => {
+        if (!res.ok) { card.querySelector('.nq-err').textContent = (await res.json().catch(() => ({}))).error || 'failed'; return }
+        await renderThread(); thNotes(body)
+      }
+      const topic = () => card.querySelector('.note-topic').value
+      card.querySelector('[data-note-accept]').addEventListener('click', async () => {
+        const t = topic()
+        const renamed = t !== card.dataset.orig
+        // exists is known only for the original topic; a renamed one may collide silently
+        const msg = renamed ? `If a note "${t}" already exists it will be replaced. Continue?`
+          : card.dataset.exists === 'true' ? `Replace the existing note ${t}?` : ''
+        if (msg && !confirm(msg)) return
+        const res = await post('accept', { topic: t, text: card.querySelector('.note-text').value, summary: card.querySelector('.note-summary').value })
+        // accept only clears the suggestion under the edited topic; clear the original too
+        if (res.ok && renamed) await post('drop', { topic: card.dataset.orig })
+        done(res)
+      })
+      card.querySelector('[data-note-drop]').addEventListener('click', async () => done(await post('drop', { topic: card.dataset.orig })))
+    })
+  }
+
+  // ---- reader popup (spec §5.1d, design §4.8) ----
+  function thRead(key, opener) {
+    const r = thReads[key], t = thTask
+    if (!r || !t) return
+    thOpener = opener
+    $('viewerEmb').innerHTML = emblemHtml(t)
+    $('viewerTitle').textContent = `${qnum(t.card.q)} · ${r.title}`
+    $('viewerSub').innerHTML = `${esc(t.card.topic)}${r.path ? ` · <code>${esc(r.path)}</code>` : ''}`
+    $('viewerLen').textContent = `${thNum(r.words)} WORDS · ${Math.max(1, Math.round(r.words / 230))} MIN`
+    const body = $('viewerBody')
+    body.className = r.md ? 'rd-doc md' : 'rd-doc'
+    body.innerHTML = r.html
+    const hs = [...body.querySelectorAll('h1, h2, h3')]
+    hs.forEach((h, i) => { h.id = 'rd-h' + i })
+    $('viewerToc').hidden = hs.length < 2
+    $('viewerScroll').classList.toggle('toc', hs.length >= 2)
+    $('viewerToc').innerHTML = '<span class="th-k">CONTENTS</span>' + hs.map((h, i) => `<button type="button" data-toc="${i}"><i>${i + 1}</i>${esc(h.textContent)}</button>`).join('')
+    // On the gate document the gate buttons repeat, sharing the page's note draft.
+    const gate = key === 'doc:' + t.stage && t.state === 'waiting-for-you' && !t.bin
+    $('viewerFoot').hidden = !gate
+    $('viewerBtns').innerHTML = gate ? thBtns(thMove, 0) : ''
+    setText($('viewerErr'), '')
+    thDialog.showModal()
+    $('viewerScroll').scrollTop = 0
+  }
+  $('viewerClose').addEventListener('click', () => thDialog.close())
+  thDialog.addEventListener('click', (e) => { if (e.target === thDialog) thDialog.close() }) // backdrop
+  thDialog.addEventListener('close', () => {
+    // A repaint may have replaced the opener; its twin carries the same data-key.
+    const k = thOpener?.dataset.key
+    ;(thOpener?.isConnected ? thOpener : k && document.querySelector(`[data-key="${CSS.escape(k)}"]`))?.focus()
+    thOpener = null
+  })
+  $('viewerToc').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-toc]')
+    if (b) document.getElementById('rd-h' + b.dataset.toc)?.scrollIntoView({ block: 'start' })
+  })
+
+  document.addEventListener('click', (e) => {
+    const act = e.target.closest('#threadView [data-act], #viewerOverlay [data-act]')
+    if (act) return thAct(act)
+    const t = e.target.closest('#threadView [data-read], #threadView [data-jump], #threadView [data-push]')
+    if (!t) return
+    if (t.dataset.read) thRead(t.dataset.read, t)
+    else if (t.dataset.push) thPush(t)
+    else { thNote.scrollIntoView({ block: 'center' }); thNote.focus() }
+  })
+  $('threadView').addEventListener('toggle', (e) => {
+    const d = e.target
+    if (d.dataset?.old) thOldOpen[d.open ? 'add' : 'delete'](d.dataset.old)
+    if (d.open && d.dataset?.det) thDetail(d)
+    else if (d.open) thMeasure(d)
+  }, true)
 
   // ---- new quest (#/new, spec §5.1f) ----
   const CLASSES = [['SAGE', 'Opus', 'opus', 'deep thinking, slower'], ['KNIGHT', 'Sonnet', 'sonnet', 'balanced, all-round'], ['ROGUE', 'Haiku', 'haiku', 'quick and cheap']]
@@ -1422,285 +2003,7 @@
     }
   })
 
-  // full-document viewer, opened from the Spec/Findings summaries. It lives outside
-  // #tabbody, so the 3s poll re-render doesn't touch it.
-  const viewerOverlay = $('viewerOverlay')
-  function openViewer(title, md) {
-    $('viewerTitle').textContent = title
-    $('viewerBody').innerHTML = renderMarkdown(md)
-    viewerOverlay.hidden = false
-  }
-  const closeViewer = () => { viewerOverlay.hidden = true }
-  $('viewerClose').addEventListener('click', closeViewer)
-  viewerOverlay.addEventListener('click', (e) => { if (e.target === viewerOverlay) closeViewer() })
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !viewerOverlay.hidden) closeViewer() })
-  $('tabbody').addEventListener('click', (e) => {
-    if (e.target.closest('[data-open-full]')) openViewer(tab, tab === 'Spec' ? threadInfo.spec : threadInfo.findings)
-  })
-  function renderTabs() {
-    $('tabs').innerHTML = selected
-      ? tabsFor().map((n) => `<button class="${n === tab ? 'active' : ''}" data-tab="${n}">${n}</button>`).join('') : ''
-  }
-  $('tabs').addEventListener('click', (e) => {
-    const b = e.target.closest('button[data-tab]'); if (!b) return; tab = b.dataset.tab; renderBody()
-  })
-
-  // First ~400 chars, cut at a word boundary
-  const summarize = (md, max = 400) =>
-    md.length <= max ? md : md.slice(0, max).replace(/\s+\S*$/, '') + '…'
-
-  async function renderBody() {
-    const body = $('tabbody')
-    if (!selected) return
-    const res = await fetch('/api/tasks/' + encodeURIComponent(selected))
-    if (!res.ok) {
-      $('threadHead').innerHTML = '<h1 class="ptitle">Quest not found</h1>'
-      $('tabs').innerHTML = ''; body.innerHTML = '<p class="muted">No quest has this id. It may have been removed.</p>'
-      return
-    }
-    const t = await res.json()
-    $('threadHead').innerHTML = `<div class="t-id">${emblemHtml(t)}<span class="q40">${qnum(t.card.q)}</span></div><h1 class="t-title">${esc(t.card.topic)}</h1>`
-    const th = await fetch('/api/tasks/' + selected + '/thread')
-    if (th.ok) threadInfo = await th.json()
-    if (!tabsFor().includes(tab)) tab = 'Overview'
-    renderTabs()
-    if (tab === 'Spec' || tab === 'Findings') {
-      const md = tab === 'Spec' ? threadInfo.spec : threadInfo.findings
-      const short = summarize(md)
-      body.innerHTML = `<div class="result">${renderMarkdown(short)}</div>` + (short === md ? ''
-        : `<div class="field" style="margin-top:10px"><button data-open-full>Open full ${tab.toLowerCase()} ↗</button></div>`)
-    } else if (tab === 'Notes') {
-      body.innerHTML = threadInfo.suggestions.map((s, i) => {
-        const summary = (s.text.split('\n').find((l) => l.trim()) || '').replace(/^#+\s*/, '').slice(0, 100)
-        return `<div class="card note" style="margin-bottom:8px;padding:12px" data-repo="${esc(s.repo)}" data-exists="${s.exists}" data-orig="${esc(s.topic)}">
-          <div><strong>${esc(s.repo)}</strong>${s.exists ? ' <span class="badge waiting-for-you">replaces existing note</span>' : ''}</div>
-          <dt>topic</dt><input class="note-topic mono" value="${esc(s.topic)}" style="width:100%;padding:6px;border:1px solid var(--line)">
-          <dt>summary (one line)</dt><input class="note-summary" value="${esc(summary)}" style="width:100%;padding:6px;border:1px solid var(--line)">
-          <dt>text</dt><textarea class="note-text" style="min-height:8rem">${esc(s.text)}</textarea>
-          <div class="field" style="margin-top:8px"><button class="primary" data-note-accept>Accept</button><button data-note-drop>Drop</button></div>
-        </div>`
-      }).join('')
-      body.querySelectorAll('.note').forEach((card) => {
-        const post = (action, payload) => fetch('/api/tasks/' + selected + '/notes/' + action, {
-          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo: card.dataset.repo, ...payload }),
-        })
-        const done = async (res) => {
-          if (!res.ok) { alert((await res.json()).error || 'failed'); return }
-          renderBody()
-        }
-        const topic = () => card.querySelector('.note-topic').value
-        card.querySelector('[data-note-accept]').addEventListener('click', async () => {
-          const t = topic()
-          const renamed = t !== card.dataset.orig
-          // exists is known only for the original topic; a renamed one may collide silently
-          const msg = renamed ? `If a note "${t}" already exists it will be replaced. Continue?`
-            : card.dataset.exists === 'true' ? `Replace the existing note ${t}?` : ''
-          if (msg && !confirm(msg)) return
-          const res = await post('accept', { topic: t, text: card.querySelector('.note-text').value, summary: card.querySelector('.note-summary').value })
-          // accept only clears the suggestion under the edited topic; clear the original too
-          if (res.ok && renamed) await post('drop', { topic: card.dataset.orig })
-          done(res)
-        })
-        card.querySelector('[data-note-drop]').addEventListener('click', async () => done(await post('drop', { topic: card.dataset.orig })))
-      })
-    } else if (tab === 'Overview') {
-      const resume = ['paused-limit', 'paused-rate-limit', 'failed', 'cancelled'].includes(t.state)
-        ? `<select id="resumeModel">
-            ${['default', 'haiku', 'sonnet', 'opus'].map((m) => `<option value="${m}" ${(t.model || 'default') === m ? 'selected' : ''}>${m}</option>`).join('')}
-          </select>
-          <button data-resume="${esc(t.id)}">resume</button>` : ''
-      const stop = ['queued', 'provisioning', 'running'].includes(t.state)
-        ? `<button data-stop="${esc(t.id)}">stop</button>` : ''
-      body.innerHTML = `<dl>
-        <dt>stage / state</dt><dd><span class="badge stage">${esc(t.stage)}</span> <span class="badge ${esc(t.state)}">${esc(t.state)}</span> ${resume} ${stop}</dd>
-        <dt>id</dt><dd class="mono">${esc(t.id)} ${copyBtn(t.id)}</dd>
-        <dt>current turn</dt><dd>${esc(t.prompt)}</dd>
-        <dt>repos</dt><dd>${esc(t.repos.join(', '))}</dd>
-        <dt>model</dt><dd>${esc(t.model || 'default')}</dd>
-        <dt>tokens</dt><dd>${esc(t.tokensUsed)} / ${esc(t.tokenBudget)}</dd>
-        <dt>session</dt><dd class="mono">${esc(t.sessionId || '—')} ${t.sessionId ? copyBtn(t.sessionId) : ''}</dd>
-        <dt>created / updated</dt><dd class="mono">${esc(t.createdAt)} · ${esc(t.updatedAt)}</dd>
-        ${t.error ? `<dt>${t.state === 'failed' ? 'failed:' : 'note:'}</dt><dd class="err">${esc(t.error)}</dd>` : ''}
-        ${(t.turns || []).length ? `<dt>turns</dt><dd>${t.turns.map((turn, i) => `<div>${i + 1}. <span class="badge stage">${esc(turn.stage)}</span> ${esc(turn.prompt.split('\n')[0].slice(0, 80))}</div>`).join('')}</dd>` : ''}
-        <dt>comments</dt><dd>${(t.comments || []).map((c) => `<div class="comment${c.consumed ? '' : ' pending'}">
-          <span class="muted small mono">${esc(c.at)}${c.consumed ? '' : ' · will be included in the next turn'}</span>
-          <div>${esc(c.text)}</div></div>`).join('') || '<span class="muted">none</span>'}
-          <div style="margin-top:8px"><textarea id="commentText" placeholder="add a comment — included in the next turn"></textarea>
-          <button data-comment="${esc(t.id)}">Add comment</button></div></dd>
-      </dl>
-        ${t.state === 'waiting-for-you' ? `
-        <div class="card" data-gate-card style="margin-top:16px;padding:12px">
-          <dt>review the ${esc(t.stage)} stage, then decide</dt>
-          <textarea id="gatePrompt" placeholder="optional note for the next turn"></textarea>
-          <div class="field" style="margin-top:8px">
-            ${t.stage === 'investigate' ? `<button class="primary" data-gate="spec" data-id="${esc(t.id)}">Approve → spec</button>` : ''}
-            ${t.stage !== 'build' ? `<button class="primary" data-gate="build" data-id="${esc(t.id)}">Approve → build</button>` : ''}
-            <button data-gate="" data-id="${esc(t.id)}">Continue this stage</button>
-            <button data-stop="${esc(t.id)}" style="margin-left:auto">Drop</button>
-          </div>
-        </div>` : ''}
-        ${['done', 'failed', 'cancelled'].includes(t.state) ? `
-        <div class="card" style="margin-top:16px;padding:12px">
-          <dt>next prompt</dt>
-          <textarea id="nextPrompt" placeholder="follow-up prompt — continues this thread's session, branch and workspace"></textarea>
-          <div class="field" style="margin-top:8px">
-            <label class="k">model</label>
-            <select id="nextModel">
-              ${['default', 'haiku', 'sonnet', 'opus'].map((m) => `<option value="${m}" ${(t.model || 'default') === m ? 'selected' : ''}>${m}</option>`).join('')}
-            </select>
-            <button class="primary" data-next="${esc(t.id)}" style="margin-left:auto">Continue thread</button>
-          </div>
-        </div>` : ''}`
-    } else if (tab === 'Result') {
-      const history = (t.turns || []).map((turn, i) => `
-        <details class="card" style="margin-bottom:8px;padding:8px">
-          <summary class="muted">turn ${i + 1} — ${esc(turn.prompt.split('\n')[0].slice(0, 80))} <span class="small">(${esc(turn.tokensUsed)} tokens)</span></summary>
-          <dt>prompt</dt><dd>${esc(turn.prompt)}</dd>
-          <dt>result</dt>
-          <div class="result">${turn.result ? renderMarkdown(turn.result) : '<p class="muted">no result recorded</p>'}</div>
-        </details>`).join('')
-      if (t.state !== 'done' || !t.result) {
-        body.innerHTML = history + '<p class="muted">No result yet.</p>'
-      } else {
-        // Once rendered for this task, the poll loop stops re-entering this branch (see
-        // refresh()) — like Changes, the PR target input and in-flight request here would
-        // otherwise get reset/detached out from under the user every 3s.
-        resultShownFor = selected
-        body.innerHTML = history + `<div><button class="copy" data-copy="${encodeURIComponent(t.result)}">copy markdown</button></div>
-          <div class="result">${renderMarkdown(t.result)}</div>
-          <div class="card" id="prSection" style="margin-top:16px;padding:12px"><p class="muted">loading repos…</p></div>`
-        const repos = await (await fetch('/api/tasks/' + selected + '/diff')).json()
-        const prSection = $('prSection')
-        prSection.innerHTML = repos.map((r) => `<div style="margin-bottom:10px"><strong>${esc(r.repo)}</strong>${localBlock(r)}
-            ${r.hasChanges ? `<div class="field" style="margin:6px 0">
-              <input class="mono" data-pr-target="${esc(r.repo)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line)">
-              <button data-pr="${esc(r.repo)}">Create PR</button>
-              <span class="prout muted" data-prout="${esc(r.repo)}"></span>
-            </div>` : '<p class="muted small">No changes to open a PR for.</p>'}</div>`).join('')
-        prSection.querySelectorAll('[data-pr]').forEach((btn) => btn.addEventListener('click', async () => {
-          const repo = btn.dataset.pr
-          const sel = CSS.escape(repo)
-          const target = prSection.querySelector(`[data-pr-target="${sel}"]`).value
-          const out = prSection.querySelector(`[data-prout="${sel}"]`)
-          out.textContent = 'creating…'
-          const res = await (await fetch('/api/tasks/' + selected + '/pr', {
-            method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo, target }),
-          })).json()
-          out.innerHTML = res.ok
-            ? `✓ <a href="${esc(res.url)}" target="_blank" rel="noopener noreferrer">${esc(res.url)}</a>`
-            : '✗ ' + esc((res.output || res.error || 'failed').split('\n').slice(-2).join(' '))
-        }))
-      }
-    } else if (tab === 'Log') {
-      const logs = await (await fetch('/api/tasks/' + selected + '/logs')).text()
-      // The poll re-renders this tab every 3s, so carry the reading position and
-      // any expanded details across renders — otherwise the log scrolls itself
-      // back to the top under the user mid-read.
-      const prev = body.querySelector('.logscroll')
-      const at = prev ? prev.scrollTop : 0
-      const atEnd = prev ? prev.scrollHeight - prev.scrollTop - prev.clientHeight < 40 : true
-      const wasOpen = new Set([...body.querySelectorAll('.ev-more[open]')].map(detailKey))
-      body.innerHTML = `<div class="logbar">
-          <div class="seg-ctl">${['Activity', 'Raw'].map((v) => `<button class="${v === logView ? 'on' : ''}" data-logview="${v}">${v}</button>`).join('')}</div>
-          <label class="follow"><input type="checkbox" id="followLog" ${followLog ? 'checked' : ''}> follow</label>
-        </div>
-        <div class="logscroll">${logView === 'Raw' ? `<pre class="log">${esc(logs)}</pre>` : renderActivity(logs, t)}</div>`
-      body.querySelectorAll('.ev-more').forEach((d) => { if (wasOpen.has(detailKey(d))) d.open = true })
-      const scroller = body.querySelector('.logscroll')
-      scroller.scrollTop = followLog && atEnd ? scroller.scrollHeight : at
-      body.querySelectorAll('[data-logview]').forEach((b) => b.addEventListener('click', () => {
-        logView = b.dataset.logview; localStorage.setItem('petree-logview', logView); renderBody()
-      }))
-      $('followLog').addEventListener('change', (e) => {
-        followLog = e.target.checked
-        localStorage.setItem('petree-logfollow', followLog ? 'on' : 'off')
-        if (followLog) scroller.scrollTop = scroller.scrollHeight
-      })
-    } else if (tab === 'Changes') {
-      body.innerHTML = '<p class="muted">loading changes…</p>'
-      const repos = await (await fetch('/api/tasks/' + selected + '/diff')).json()
-      body.innerHTML = repos.map((r) => {
-        if (!r.hasChanges) return `<div class="repoChange"><strong>${esc(r.repo)}</strong> <span class="muted">— no changes for this task</span></div>`
-        const cmd = r.reviewCommand
-        return `<div class="repoChange" style="margin-bottom:16px">
-          <div><strong>${esc(r.repo)}</strong> <span class="muted mono">${esc(r.branch)} vs ${esc(r.baseBranch)}</span></div>
-          ${localBlock(r)}
-          <dt>review locally</dt>
-          <div class="cmd"><span>${esc(cmd)}</span>${copyBtn(cmd)}</div>
-          <dt>summary</dt><pre class="diff" style="max-height:none">${esc(r.stat)}</pre>
-          <dt>diff</dt>
-          <div><button class="copy" data-copy="${encodeURIComponent(r.patch)}">copy diff</button></div>
-          <pre class="diff">${esc(r.patch)}</pre>
-          <dt>push</dt>
-          <div class="field">
-            <input class="mono" data-target="${esc(r.repo)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line)">
-            <button data-push="${esc(r.repo)}">Push branch</button>
-            <span class="pushout muted" data-out="${esc(r.repo)}"></span>
-          </div>
-        </div>`
-      }).join('')
-      body.querySelectorAll('[data-push]').forEach((btn) => btn.addEventListener('click', async () => {
-        const repo = btn.dataset.push
-        const sel = CSS.escape(repo)
-        const target = body.querySelector(`[data-target="${sel}"]`).value
-        const out = body.querySelector(`[data-out="${sel}"]`)
-        out.textContent = 'pushing…'
-        const res = await (await fetch('/api/tasks/' + selected + '/push', {
-          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ repo, target }),
-        })).json()
-        // Validation failures (400s) come back as { error }, not { output } — fall back to it
-        // so the user sees the actual reason instead of a generic "failed".
-        out.textContent = res.ok ? '✓ ' + (res.output || 'pushed').split('\n')[0] : '✗ ' + (res.output || res.error || 'failed').split('\n').slice(-2).join(' ')
-      }))
-    }
-    document.querySelectorAll('[data-resume]').forEach((b) => b.addEventListener('click', async () => {
-      await fetch('/api/tasks/' + b.dataset.resume + '/resume', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ model: $('resumeModel').value }),
-      }); refresh(true)
-    }))
-    document.querySelectorAll('[data-stop]').forEach((b) => b.addEventListener('click', async () => {
-      const gate = b.closest('[data-gate-card]')
-      if (!confirm(gate ? 'Drop this thread? It can be continued later.' : 'Stop this thread? This will kill it.')) return
-      await fetch('/api/tasks/' + b.dataset.stop + '/stop', { method: 'POST' }); refresh(true)
-    }))
-    document.querySelectorAll('[data-comment]').forEach((b) => b.addEventListener('click', async () => {
-      const ta = $('commentText')
-      if (!ta.value.trim()) return
-      const res = await fetch('/api/tasks/' + b.dataset.comment + '/comments', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: ta.value }),
-      })
-      if (!res.ok) { alert((await res.json()).error || 'comment failed'); return }
-      refresh(true)
-    }))
-    document.querySelectorAll('[data-gate]').forEach((b) => b.addEventListener('click', async () => {
-      const body = { prompt: $('gatePrompt').value }
-      if (b.dataset.gate) body.stage = b.dataset.gate
-      const res = await fetch('/api/tasks/' + b.dataset.id + '/next', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-      })
-      if (!res.ok) { alert((await res.json()).error || 'failed'); return }
-      resultShownFor = null
-      refresh(true)
-    }))
-    document.querySelectorAll('[data-next]').forEach((b) => b.addEventListener('click', async () => {
-      const ta = $('nextPrompt')
-      if (!ta.value.trim()) { alert('enter a follow-up prompt'); return }
-      const res = await fetch('/api/tasks/' + b.dataset.next + '/next', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ prompt: ta.value, model: $('nextModel').value }),
-      })
-      if (!res.ok) { alert((await res.json()).error || 'follow-up failed'); return }
-      resultShownFor = null
-      refresh(true)
-    }))
-    const nextTa = $('nextPrompt')
-    if (nextTa) nextTa.addEventListener('keydown', (e) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); document.querySelector('[data-next]').click() }
-    })
-  }
-
-  async function refresh(switched = false) {
+  async function refresh() {
     try {
       const res = await fetch('/api/tasks')
       if (!res.ok) throw new Error(String(res.status))
@@ -1711,15 +2014,7 @@
       return
     }
     renderInbox()
-    if (view !== 'thread' || !selected) return
-    // Result is live only until its done-result (with PR controls) has been rendered
-    // once; Changes renders on tab entry only. Both keep inputs from resetting under the user.
-    const resultLive = tab === 'Result' && resultShownFor !== selected
-    // Don't re-render under the user's caret, or over unsent drafts.
-    const active = document.activeElement
-    const typing = active && $('tabbody').contains(active) && ['TEXTAREA', 'INPUT', 'SELECT'].includes(active.tagName)
-    const drafting = !switched && ['commentText', 'gatePrompt', 'nextPrompt'].some((id) => document.getElementById(id)?.value)
-    if (!typing && !drafting && (['Overview', 'Spec', 'Findings', 'Log'].includes(tab) || resultLive)) await renderBody()
+    if (view === 'thread' && selected) await renderThread()
   }
   route()
   setInterval(refresh, 3000); refresh()

@@ -17,6 +17,7 @@ function task(over: Partial<TaskRecord> = {}): TaskRecord {
     state: 'waiting-for-you', sessionId: null, tokensUsed: 0, tokenBudget: 1,
     timeoutMinutes: 30, error: null, result: null, model: null, turns: [], createdAt: '', updatedAt: '',
     restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'investigate', comments: [], delivery: {}, party: true, autoPlay: false,
+    seq: 21, bin: null, binReason: null, binnedAt: null, archivedAt: null,
     ...over,
   }
 }
@@ -62,7 +63,13 @@ describe('cardFor', () => {
     expect(cardFor(task({ state: 'cancelled' }), null, cfg)).toMatchObject({
       line: 'Paused by you', group: 'your-move', action: { label: 'Paused — resume or send a note' },
     })
-    expect(cardFor(task({ state: 'paused-limit' }), null, cfg)).toMatchObject({ group: 'game-over', reason: 'out of tokens' })
+  })
+
+  it('takes bin, reason and Q-number from the columns, with no action', () => {
+    const binned = task({ state: 'paused-limit', bin: 'game-over', binReason: 'out of tokens' })
+    expect(cardFor(binned, status, cfg)).toMatchObject({ q: 21, group: 'game-over', reason: 'out of tokens', line: 'out of tokens', action: null })
+    const hof = task({ state: 'done', stage: 'build', bin: 'hall-of-fame', binReason: 'merged · PR #7' })
+    expect(cardFor(hof, null, cfg)).toMatchObject({ group: 'hall-of-fame', reason: 'merged · PR #7', action: null })
   })
 
   it('finished build: Reply only when the agent asks something', () => {

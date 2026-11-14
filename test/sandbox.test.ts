@@ -18,6 +18,7 @@ const task: TaskRecord = {
   state: 'provisioning', sessionId: null, tokensUsed: 0, tokenBudget: 500000,
   timeoutMinutes: 30, error: null, result: null, model: null, turns: [], createdAt: '', updatedAt: '',
   restarts: 0, retryAt: null, startedAt: null, logOffset: 0, stage: 'build', comments: [], delivery: {}, party: true, autoPlay: false,
+  seq: 1, bin: null, binReason: null, binnedAt: null, archivedAt: null,
 }
 
 describe('buildSandboxCommands', () => {

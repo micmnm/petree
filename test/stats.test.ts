@@ -97,13 +97,13 @@ describe('accumulation', () => {
 describe('repoUsage', () => {
   const cfg = { home: '/h', defaults: {}, repos: { demo: { tags: [] }, idle: { tags: [] } }, allowClone: [] } as unknown as PetreeConfig
   const now = new Date('2026-11-14T12:00:00Z')
-  const base = { prompt: 'p', mode: 'unattended', sessionId: null, tokensUsed: 0, tokenBudget: 1, timeoutMinutes: 1, error: null, result: null, model: null, restarts: 0, retryAt: null, startedAt: null, logOffset: 0, comments: [], delivery: {}, party: true, autoPlay: false, turnStats: null }
+  const base = { prompt: 'p', mode: 'unattended', sessionId: null, tokensUsed: 0, tokenBudget: 1, timeoutMinutes: 1, error: null, result: null, model: null, restarts: 0, retryAt: null, startedAt: null, logOffset: 0, comments: [], delivery: {}, party: true, autoPlay: false, turnStats: null, seq: 1, bin: null, binReason: null, binnedAt: null, archivedAt: null }
   const task = (over: Partial<TaskRecord>) => ({ ...base, id: 'x', repos: ['demo'], state: 'running', stage: 'investigate', turns: [], createdAt: '2026-11-13T00:00:00Z', updatedAt: '2026-11-13T00:00:00Z', ...over }) as TaskRecord
   const s = (over: Partial<TurnStats>) => ({ ...emptyStats(), ...over })
 
   it('aggregates fixture rows per repo', () => {
     const rows = [
-      task({ id: 'a', state: 'paused-limit', stage: 'spec', turnStats: s({ wallMs: 60, turns: 4, model: 'opus' }), turns: [{ prompt: '', result: null, tokensUsed: 0, endedAt: '2026-10-01T00:00:00Z', stage: 'investigate', stats: s({ wallMs: 999, turns: 2, model: 'opus' }) }] }),
+      task({ id: 'a', state: 'paused-limit', bin: 'game-over', binReason: 'out of tokens', stage: 'spec', turnStats: s({ wallMs: 60, turns: 4, model: 'opus' }), turns: [{ prompt: '', result: null, tokensUsed: 0, endedAt: '2026-10-01T00:00:00Z', stage: 'investigate', stats: s({ wallMs: 999, turns: 2, model: 'opus' }) }] }),
       task({ id: 'b', stage: 'build', createdAt: '2026-09-25T00:00:00Z', updatedAt: '2026-11-02T00:00:00Z', turnStats: s({ wallMs: 40, turns: 6, model: 'haiku' }) }),
       task({ id: 'c', repos: ['demo', 'idle'], createdAt: '2026-01-01T00:00:00Z' }),
     ]

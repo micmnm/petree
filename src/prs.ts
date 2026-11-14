@@ -72,7 +72,7 @@ export async function pollPrs(store: TaskStore, cfg: PetreeConfig, onlyId?: stri
   // A thread pruned mid-poll makes setDelivery throw; nothing to record then.
   const set = (id: string, repo: string, patch: Partial<Delivery>) => { try { store.setDelivery(id, repo, patch) } catch { /* gone */ } }
   for (const t of store.list()) {
-    if ((onlyId && t.id !== onlyId) || t.stage !== 'build' || t.state === 'running') continue
+    if ((onlyId && t.id !== onlyId) || t.archivedAt || t.stage !== 'build' || t.state === 'running') continue
     for (const [repo, d] of Object.entries(t.delivery)) {
       if (d.ahead <= 0 || d.pr === 'merged' || d.pr === 'closed') continue
       const host = prHost(cfg.repos[repo]?.url ?? '')
@@ -83,6 +83,19 @@ export async function pollPrs(store: TaskStore, cfg: PetreeConfig, onlyId?: stri
         set(t.id, repo, { untracked: reason(host.kind === 'github' ? 'gh' : 'az', err) })
       }
     }
+    binByPrs(store, t.id)
+  }
+}
+
+// Every repo with commits merged → hall of fame; none open and one closed → game over (spec §5.4).
+function binByPrs(store: TaskStore, id: string): void {
+  const t = store.get(id)
+  if (!t || t.bin) return
+  const shipped = Object.values(t.delivery).filter((d) => d.ahead > 0)
+  if (shipped.length && shipped.every((d) => d.pr === 'merged')) {
+    store.bin(id, 'hall-of-fame', `merged · PR ${shipped.map((d) => `#${d.number}`).join(', ')}`)
+  } else if (shipped.some((d) => d.pr === 'closed') && !shipped.some((d) => d.pr === 'open')) {
+    store.bin(id, 'game-over', 'PR closed without merge')
   }
 }
 

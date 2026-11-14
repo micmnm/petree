@@ -146,6 +146,13 @@ export function makeLauncher(cfg: PetreeConfig, store: TaskStore, opts: Launcher
         safely(() => store.setDelivery(task.id, repo, { ahead: repoStatus(dir, cfg.repos[repo]?.defaultBranch ?? 'main').ahead, head }))
       } catch { /* nothing to record */ }
     }
+    // A finished build that changed nothing and asks nothing is complete (spec §5.6).
+    const after = store.get(task.id)
+    if (after && !after.bin && after.stage === 'build' && after.state === 'done'
+      && task.repos.every((r) => after.delivery[r] && after.delivery[r].ahead <= 0)
+      && !readThreadStatus(workDir, after.startedAt)?.needsYou) {
+      safely(() => store.bin(task.id, 'hall-of-fame', 'finished · no code changes'))
+    }
     // The task is already in a terminal state by now (done/failed/paused), so this
     // can't go through transition() — patch the error field directly, appending to
     // whatever's already there rather than clobbering it.

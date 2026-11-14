@@ -10,6 +10,7 @@ beforeEach(() => {
   store = new TaskStore(join(mkdtempSync(join(tmpdir(), 'petree-db-')), 'petree.db'))
 })
 
+const DAY = 24 * 60 * 60 * 1000
 const input = { prompt: 'do it', repos: ['demo'], tokenBudget: 1000, timeoutMinutes: 30 }
 
 describe('TaskStore', () => {
@@ -208,75 +209,126 @@ describe('TaskStore retention settings & prune', () => {
     raw.close()
   }
 
-  it('defaults to 3 days / 5 per repo group and persists updates', () => {
-    expect(store.getSettings()).toEqual({ maxAgeDays: 3, maxPerRepoGroup: 5 })
-    expect(store.updateSettings({ maxAgeDays: 7 })).toEqual({ maxAgeDays: 7, maxPerRepoGroup: 5 })
-    expect(store.updateSettings({ maxPerRepoGroup: 10 })).toEqual({ maxAgeDays: 7, maxPerRepoGroup: 10 })
+  function backdateBin(file: string, id: string, daysAgo: number): void {
+    const raw = new Database(file)
+    raw.prepare('UPDATE tasks SET binned_at = ? WHERE id = ?').run(new Date(Date.now() - daysAgo * DAY).toISOString(), id)
+    raw.close()
+  }
+
+  it('defaults to 14 / 3 days and persists updates', () => {
+    expect(store.getSettings()).toEqual({ binDays: 14, hallOfFameDays: 3 })
+    expect(store.updateSettings({ binDays: 7 })).toEqual({ binDays: 7, hallOfFameDays: 3 })
+    expect(store.updateSettings({ hallOfFameDays: 10 })).toEqual({ binDays: 7, hallOfFameDays: 10 })
   })
 
-  it('prunes finished tasks older than maxAgeDays, leaving active tasks alone', () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'petree-prune-age-')), 'db')
+  it('sweeps game-over after binDays and hall-of-fame after hallOfFameDays, never deleting rows', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'petree-sweep-')), 'db')
     const s = new TaskStore(file)
-    const old = s.create(input)
-    finish(s, old.id)
-    backdate(file, old.id, 4)
-    const recent = s.create(input)
-    finish(s, recent.id)
-    const stillRunning = s.create(input)
-    s.transition(stillRunning.id, 'provisioning')
-    s.transition(stillRunning.id, 'running')
-    backdate(file, stillRunning.id, 4)
-
-    const result = s.prune()
-    expect(result.removedByAge).toBe(1)
-    expect(s.get(old.id)).toBeUndefined()
-    expect(s.get(recent.id)).toBeDefined()
-    expect(s.get(stillRunning.id)?.state).toBe('running')
-  })
-
-  it('trims excess finished tasks per repo group, oldest first, keeping active ones', () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'petree-prune-limit-')), 'db')
-    const s = new TaskStore(file)
-    s.updateSettings({ maxAgeDays: 365, maxPerRepoGroup: 2 })
-    const ids: string[] = []
-    for (let i = 0; i < 4; i++) {
+    const mk = (kind: 'game-over' | 'hall-of-fame', daysAgo: number) => {
       const t = s.create(input)
       finish(s, t.id)
-      backdate(file, t.id, 4 - i)
-      ids.push(t.id)
+      s.bin(t.id, kind, 'r')
+      backdateBin(file, t.id, daysAgo)
+      return t.id
     }
-    const running = s.create(input)
-    s.transition(running.id, 'provisioning')
-    s.transition(running.id, 'running')
+    const goOld = mk('game-over', 15), goNew = mk('game-over', 13)
+    const hofOld = mk('hall-of-fame', 4), hofNew = mk('hall-of-fame', 2)
+    const unbinned = s.create(input)
+    finish(s, unbinned.id)
+    backdate(file, unbinned.id, 30)
 
-    // group total is 5 (4 finished + 1 running) vs a cap of 2, so the 3 oldest
-    // finished tasks are trimmed; the running task counts toward the cap but
-    // can never itself be removed
-    const result = s.prune()
-    expect(result.removedByLimit).toBe(3)
-    expect(s.get(ids[0])).toBeUndefined()
-    expect(s.get(ids[1])).toBeUndefined()
-    expect(s.get(ids[2])).toBeUndefined()
-    expect(s.get(ids[3])).toBeDefined()
-    expect(s.get(running.id)?.state).toBe('running')
+    expect(s.sweep()).toBe(2)
+    expect([goOld, goNew, hofOld, hofNew, unbinned.id].map((id) => !!s.get(id)!.archivedAt))
+      .toEqual([true, false, true, false, false])
+    expect(s.list()).toHaveLength(5)
+    expect(s.sweep()).toBe(0)
   })
 
-  it('treats repo groups as the exact, order-independent set of repos on a task', () => {
-    const file = join(mkdtempSync(join(tmpdir(), 'petree-prune-groups-')), 'db')
-    const s = new TaskStore(file)
-    s.updateSettings({ maxAgeDays: 365, maxPerRepoGroup: 1 })
-    const solo = s.create({ ...input, repos: ['demo'] })
-    finish(s, solo.id)
-    const pair = s.create({ ...input, repos: ['demo', 'other'] })
-    finish(s, pair.id)
-    const pairReordered = s.create({ ...input, repos: ['other', 'demo'] })
-    finish(s, pairReordered.id)
+  it('archived threads cannot be restored', () => {
+    const t = store.create(input)
+    finish(store, t.id)
+    store.bin(t.id, 'game-over', 'dropped by you')
+    store.updateSettings({ binDays: 1 })
+    expect(store.sweep(new Date(Date.now() + 2 * DAY))).toBe(1)
+    expect(() => store.restore(t.id)).toThrow()
+  })
+})
 
-    s.prune()
-    expect(s.get(solo.id)).toBeDefined()
-    // pair and pairReordered belong to the same group (order-independent) — only the newer survives
-    expect(s.get(pair.id)).toBeUndefined()
-    expect(s.get(pairReordered.id)).toBeDefined()
+describe('TaskStore bins and identity', () => {
+  const toRunning = (id: string) => { store.transition(id, 'provisioning'); store.transition(id, 'running') }
+
+  it('bin/unbin set and clear the bin fields', () => {
+    const t = store.create(input)
+    const b = store.bin(t.id, 'hall-of-fame', 'finished · findings kept')
+    expect(b).toMatchObject({ bin: 'hall-of-fame', binReason: 'finished · findings kept' })
+    expect(b.binnedAt).toBeTruthy()
+    expect(store.unbin(t.id)).toMatchObject({ bin: null, binReason: null, binnedAt: null })
+  })
+
+  it('transition into paused-limit bins game-over "out of tokens"; failed is not binned', () => {
+    const t = store.create(input)
+    toRunning(t.id)
+    expect(store.transition(t.id, 'paused-limit')).toMatchObject({ bin: 'game-over', binReason: 'out of tokens' })
+    const f = store.create(input)
+    toRunning(f.id)
+    expect(store.transition(f.id, 'failed', { error: 'x' }).bin).toBeNull()
+  })
+
+  it('restore: paused-limit resets tokens and requeues; other states only unbin', () => {
+    const t = store.create(input)
+    toRunning(t.id)
+    store.addUsage(t.id, 900)
+    store.transition(t.id, 'paused-limit')
+    expect(store.restore(t.id)).toMatchObject({ state: 'queued', tokensUsed: 0, bin: null })
+
+    const g = store.create(input)
+    toRunning(g.id)
+    store.transition(g.id, 'waiting-for-you')
+    store.bin(g.id, 'game-over', 'dropped by you')
+    expect(store.restore(g.id)).toMatchObject({ state: 'waiting-for-you', bin: null })
+  })
+
+  it('restore refuses unbinned and hall-of-fame threads', () => {
+    const t = store.create(input)
+    expect(() => store.restore(t.id)).toThrow()
+    store.bin(t.id, 'hall-of-fame', 'r')
+    expect(() => store.restore(t.id)).toThrow()
+  })
+
+  it('assigns unique increasing seq at create', () => {
+    const seqs = [store.create(input), store.create(input), store.create(input)].map((t) => t.seq)
+    expect(seqs).toEqual([1, 2, 3])
+  })
+
+  it('migration backfills seq by created_at and applies the upgrade rule', () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'petree-mig-')), 'db')
+    const raw = new Database(file)
+    raw.exec(`CREATE TABLE tasks (
+      id TEXT PRIMARY KEY, prompt TEXT NOT NULL, repos TEXT NOT NULL,
+      mode TEXT NOT NULL DEFAULT 'unattended', state TEXT NOT NULL,
+      session_id TEXT, tokens_used INTEGER NOT NULL DEFAULT 0,
+      token_budget INTEGER NOT NULL, timeout_minutes INTEGER NOT NULL,
+      error TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, result TEXT, model TEXT)`)
+    const ins = raw.prepare(`INSERT INTO tasks (id,prompt,repos,state,token_budget,timeout_minutes,created_at,updated_at)
+      VALUES (?, 'p', '["demo"]', ?, 1, 1, ?, ?)`)
+    const ago = (d: number) => new Date(Date.now() - d * DAY).toISOString()
+    ins.run('b', 'done', ago(10), ago(10))
+    ins.run('a', 'failed', ago(20), ago(20))
+    ins.run('c', 'cancelled', ago(2), ago(1))
+    ins.run('d', 'failed', ago(2), ago(1))
+    ins.run('e', 'paused-limit', ago(2), ago(1))
+    raw.close()
+
+    const s = new TaskStore(file)
+    expect(['a', 'b', 'c', 'd', 'e'].map((id) => s.get(id)!.seq)).toEqual([1, 2, 3, 4, 5])
+    expect(s.get('a')!.archivedAt).toBeTruthy()
+    expect(s.get('b')!.archivedAt).toBeTruthy()
+    expect(s.get('c')).toMatchObject({ bin: 'game-over', binReason: 'dropped by you', archivedAt: null })
+    expect(s.get('d')).toMatchObject({ bin: null, archivedAt: null })
+    expect(s.get('e')).toMatchObject({ bin: 'game-over', binReason: 'out of tokens' })
+    expect(s.create(input).seq).toBe(6)
+    // a second open must not re-run the one-off upgrade
+    expect(new TaskStore(file).get('d')).toMatchObject({ bin: null })
   })
 })
 

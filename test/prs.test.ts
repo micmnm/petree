@@ -112,6 +112,34 @@ describe('pollPrs', () => {
     expect(store.get(id)!.delivery.demo.untracked).toBeUndefined()
   })
 
+  it('bins hall-of-fame when every repo with commits merged', async () => {
+    const { store, id } = seed({ demo: { ahead: 1, head: 'h' }, local: { ahead: 0, head: 'h' } })
+    await pollPrs(store, cfg, undefined, merged)
+    expect(store.get(id)).toMatchObject({ bin: 'hall-of-fame', binReason: 'merged · PR #1' })
+  })
+
+  it('keeps the thread unbinned while a PR is open or another repo is unshipped', async () => {
+    const { store, id } = seed({ demo: { ahead: 1, head: 'h' }, local: { ahead: 1, head: 'h' } })
+    await pollPrs(store, cfg, undefined, merged)
+    expect(store.get(id)!.bin).toBeNull()
+  })
+
+  it('bins game-over when a PR closed and none is open', async () => {
+    const { store, id } = seed({ demo: { ahead: 1, head: 'h' } })
+    await pollPrs(store, cfg, undefined, answer([{ url: 'u', number: 3, state: 'CLOSED', headRefOid: 'h' }]))
+    expect(store.get(id)).toMatchObject({ bin: 'game-over', binReason: 'PR closed without merge' })
+  })
+
+  it('skips archived threads', async () => {
+    const { store, id } = seed({ demo: { ahead: 1, head: 'h' } })
+    store.bin(id, 'game-over', 'r')
+    store.updateSettings({ binDays: 1 })
+    store.sweep(new Date(Date.now() + 2 * 86_400_000))
+    let calls = 0
+    await pollPrs(store, cfg, undefined, async () => { calls++; return '[]' })
+    expect(calls).toBe(0)
+  })
+
   it('uses the first stderr line for other CLI failures', async () => {
     const { store, id } = seed({ demo: { ahead: 1, head: 'h' } })
     await pollPrs(store, cfg, undefined, async () => { throw Object.assign(new Error('x'), { stderr: '\nnot logged in\nmore' }) })

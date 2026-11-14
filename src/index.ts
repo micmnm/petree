@@ -25,8 +25,8 @@ void recover(store, launcher, {
   setInterval(() => void scheduler.tick(), 2000)
 })
 
-store.prune()
-setInterval(() => store.prune(), 60_000)
+store.sweep()
+setInterval(() => store.sweep(), 60_000)
 
 void pollPrs(store, cfg)
 setInterval(() => void pollPrs(store, cfg), 5 * 60_000)

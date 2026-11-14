@@ -304,6 +304,34 @@ describe('makeLauncher', () => {
     expect(store.get(task.id)!.delivery).toEqual({ demo: { ahead: 1, head } })
   })
 
+  it('bins a build with no commits and no question to hall-of-fame; commits or a question keep it in play', async () => {
+    const run = async (exec?: string, status?: string) => {
+      const { home, cfg, store, task } = setup()
+      mkdirSync(join(home, 'logs'), { recursive: true })
+      process.env.WD = join(home, 'work', task.id)
+      const write = [exec, status && `fs.mkdirSync(process.env.WD+'/_thread',{recursive:true});fs.writeFileSync(process.env.WD+'/_thread/status.txt',${JSON.stringify(status)});`]
+        .filter(Boolean).join('')
+      process.env.FAKE_CONTAINER_EXEC = JSON.stringify([process.execPath, '-e',
+        `const fs=require('fs');${write}console.log(JSON.stringify({type:'result',subtype:'success',result:'r'}))`])
+      try {
+        await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('ok', `petree-${t.id}`) })(task)
+      } finally {
+        delete process.env.FAKE_CONTAINER_EXEC
+        delete process.env.WD
+      }
+      return store.get(task.id)!
+    }
+    expect(await run()).toMatchObject({ state: 'done', bin: 'hall-of-fame', binReason: 'finished · no code changes' })
+    expect((await run(`fs.writeFileSync(process.env.WD+'/demo/a.txt','x');`)).bin).toBeNull()
+    expect((await run(undefined, 'topic: t\nstatus: s\nneeds-you: which db?\n')).bin).toBeNull()
+  })
+
+  it('does not bin a failed turn', async () => {
+    const { cfg, store, task } = setup()
+    await makeLauncher(cfg, store, { buildCommands: (t) => shimCommands('crash', `petree-${t.id}`) })(task)
+    expect(store.get(task.id)).toMatchObject({ state: 'failed', bin: null })
+  })
+
   it('records no delivery when the repo is unreadable after the turn', async () => {
     const { home, cfg, store, task } = setup()
     mkdirSync(join(home, 'logs'), { recursive: true })

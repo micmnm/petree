@@ -51,7 +51,14 @@ export interface TaskRecord {
   party: boolean
   autoPlay: boolean
   turnStats?: TurnStats | null
+  seq: number
+  bin: Bin | null
+  binReason: string | null
+  binnedAt: string | null
+  archivedAt: string | null
 }
+
+export type Bin = 'game-over' | 'hall-of-fame'
 
 // Per-repo ship state (spec §5.4); ahead/head are set at turn end, the rest by /push, /pr and PR polling.
 export interface Delivery {
@@ -67,14 +74,11 @@ export interface Delivery {
   untracked?: string
 }
 
-// States a task must reach before it becomes eligible for automatic
-// clearing — a queued/running/paused task is never pruned, regardless of
-// age or how many other tasks share its repo group.
-const PRUNABLE_STATES: TaskState[] = ['done', 'failed', 'cancelled']
+const DAY_MS = 24 * 60 * 60 * 1000
 
 export interface RetentionSettings {
-  maxAgeDays: number
-  maxPerRepoGroup: number
+  binDays: number
+  hallOfFameDays: number
 }
 
 // States a turn can be archived from, then requeued with a follow-up prompt
@@ -127,6 +131,8 @@ function rowToTask(r: any): TaskRecord {
     stage: r.stage, comments: JSON.parse(r.comments ?? '[]'),
     delivery: JSON.parse(r.delivery ?? '{}'),
     party: r.party !== 0, autoPlay: r.auto_play === 1,
+    seq: r.seq ?? 0, bin: r.bin ?? null, binReason: r.bin_reason ?? null,
+    binnedAt: r.binned_at ?? null, archivedAt: r.archived_at ?? null,
     createdAt: r.created_at, updatedAt: r.updated_at,
     restarts: r.restarts ?? 0, retryAt: r.retry_at ?? null,
     startedAt: r.started_at ?? null, logOffset: r.log_offset ?? 0,
@@ -160,6 +166,11 @@ export class TaskStore {
     if (!cols.includes('party')) this.db.exec('ALTER TABLE tasks ADD COLUMN party INTEGER NOT NULL DEFAULT 1')
     if (!cols.includes('auto_play')) this.db.exec('ALTER TABLE tasks ADD COLUMN auto_play INTEGER NOT NULL DEFAULT 0')
     if (!cols.includes('turn_stats')) this.db.exec('ALTER TABLE tasks ADD COLUMN turn_stats TEXT')
+    for (const c of ['bin TEXT', 'binned_at TEXT', 'bin_reason TEXT', 'archived_at TEXT', 'seq INTEGER']) {
+      if (!cols.includes(c.split(' ')[0])) this.db.exec(`ALTER TABLE tasks ADD COLUMN ${c}`)
+    }
+    if (!cols.includes('seq')) this.backfillSeq()
+    if (!cols.includes('bin')) this.upgradeRetention()
 
     this.db.exec(`CREATE TABLE IF NOT EXISTS settings (
       id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -168,14 +179,38 @@ export class TaskStore {
       updated_at TEXT NOT NULL)`)
     this.db.prepare(`INSERT OR IGNORE INTO settings (id, max_age_days, max_per_repo_group, updated_at)
       VALUES (1, 3, 5, ?)`).run(new Date().toISOString())
+    // max_age_days / max_per_repo_group are no longer read.
+    const scols = (this.db.prepare('PRAGMA table_info(settings)').all() as { name: string }[]).map((c) => c.name)
+    if (!scols.includes('bin_days')) this.db.exec('ALTER TABLE settings ADD COLUMN bin_days INTEGER NOT NULL DEFAULT 14')
+    if (!scols.includes('hall_of_fame_days')) this.db.exec('ALTER TABLE settings ADD COLUMN hall_of_fame_days INTEGER NOT NULL DEFAULT 3')
+  }
+
+  private backfillSeq(): void {
+    this.db.transaction(() => {
+      const ids = this.db.prepare('SELECT id FROM tasks ORDER BY created_at, rowid').all() as { id: string }[]
+      const set = this.db.prepare('UPDATE tasks SET seq = ? WHERE id = ?')
+      ids.forEach(({ id }, i) => set.run(i + 1, id))
+    })()
+  }
+
+  // One-off on first run with the bin columns (spec §5.6): old finished rows are
+  // archived, younger paused ones binned, so the first inbox isn't flooded.
+  private upgradeRetention(): void {
+    const now = new Date().toISOString()
+    const cutoff = new Date(Date.now() - 3 * DAY_MS).toISOString()
+    this.db.prepare(`UPDATE tasks SET archived_at = ?
+      WHERE state IN ('done', 'failed', 'cancelled', 'paused-limit') AND updated_at < ?`).run(now, cutoff)
+    this.db.prepare(`UPDATE tasks SET bin = 'game-over', binned_at = ?,
+        bin_reason = CASE state WHEN 'paused-limit' THEN 'out of tokens' ELSE 'dropped by you' END
+      WHERE archived_at IS NULL AND state IN ('cancelled', 'paused-limit')`).run(now)
   }
 
   create(input: { prompt: string; repos: string[]; tokenBudget: number; timeoutMinutes: number; model?: string | null; stage?: Stage; party?: boolean; autoPlay?: boolean }): TaskRecord {
     const now = new Date().toISOString()
     const id = randomUUID().slice(0, 8)
     this.db.prepare(`INSERT INTO tasks
-      (id, prompt, repos, mode, state, token_budget, timeout_minutes, model, stage, party, auto_play, created_at, updated_at)
-      VALUES (?, ?, ?, 'unattended', 'queued', ?, ?, ?, ?, ?, ?, ?, ?)`)
+      (id, prompt, repos, mode, state, token_budget, timeout_minutes, model, stage, party, auto_play, created_at, updated_at, seq)
+      VALUES (?, ?, ?, 'unattended', 'queued', ?, ?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(seq), 0) + 1 FROM tasks))`)
       .run(id, input.prompt, JSON.stringify(input.repos), input.tokenBudget, input.timeoutMinutes, input.model ?? null,
         input.stage ?? 'investigate', input.party === false ? 0 : 1, input.autoPlay ? 1 : 0, now, now)
     return this.get(id)!
@@ -205,7 +240,34 @@ export class TaskStore {
       .run(to, patch.error !== undefined ? patch.error : t.error,
         patch.model !== undefined ? patch.model : t.model, new Date().toISOString(),
         clearBackoff ? 1 : 0, clearBackoff ? 1 : 0, id)
+    if (to === 'paused-limit') return this.bin(id, 'game-over', 'out of tokens')
     return this.get(id)!
+  }
+
+  bin(id: string, kind: Bin, reason: string): TaskRecord {
+    const now = new Date().toISOString()
+    this.db.prepare('UPDATE tasks SET bin = ?, binned_at = ?, bin_reason = ?, updated_at = ? WHERE id = ?')
+      .run(kind, now, reason, now, id)
+    return this.get(id)!
+  }
+
+  unbin(id: string): TaskRecord {
+    this.db.prepare('UPDATE tasks SET bin = NULL, binned_at = NULL, bin_reason = NULL, updated_at = ? WHERE id = ?')
+      .run(new Date().toISOString(), id)
+    return this.get(id)!
+  }
+
+  // CONTINUE?: game-over and not archived only. A paused-limit thread gets one more token budget.
+  restore(id: string): TaskRecord {
+    return this.db.transaction(() => {
+      const t = this.get(id)
+      if (!t) throw new Error(`no task ${id}`)
+      if (t.bin !== 'game-over' || t.archivedAt) throw new Error('cannot restore')
+      this.unbin(id)
+      if (t.state !== 'paused-limit') return this.get(id)!
+      this.db.prepare('UPDATE tasks SET tokens_used = 0 WHERE id = ?').run(id)
+      return this.resume(id)
+    })()
   }
 
   // Re-run the same prompt/turn in place, optionally on a different model.
@@ -337,60 +399,28 @@ export class TaskStore {
   }
 
   getSettings(): RetentionSettings {
-    const r = this.db.prepare('SELECT max_age_days, max_per_repo_group FROM settings WHERE id = 1')
-      .get() as { max_age_days: number; max_per_repo_group: number }
-    return { maxAgeDays: r.max_age_days, maxPerRepoGroup: r.max_per_repo_group }
+    const r = this.db.prepare('SELECT bin_days, hall_of_fame_days FROM settings WHERE id = 1')
+      .get() as { bin_days: number; hall_of_fame_days: number }
+    return { binDays: r.bin_days, hallOfFameDays: r.hall_of_fame_days }
   }
 
   updateSettings(patch: Partial<RetentionSettings>): RetentionSettings {
     const cur = this.getSettings()
     const next: RetentionSettings = {
-      maxAgeDays: patch.maxAgeDays ?? cur.maxAgeDays,
-      maxPerRepoGroup: patch.maxPerRepoGroup ?? cur.maxPerRepoGroup,
+      binDays: patch.binDays ?? cur.binDays,
+      hallOfFameDays: patch.hallOfFameDays ?? cur.hallOfFameDays,
     }
-    this.db.prepare('UPDATE settings SET max_age_days = ?, max_per_repo_group = ?, updated_at = ? WHERE id = 1')
-      .run(next.maxAgeDays, next.maxPerRepoGroup, new Date().toISOString())
+    this.db.prepare('UPDATE settings SET bin_days = ?, hall_of_fame_days = ?, updated_at = ? WHERE id = 1')
+      .run(next.binDays, next.hallOfFameDays, new Date().toISOString())
     return next
   }
 
-  delete(id: string): void {
-    this.db.prepare('DELETE FROM tasks WHERE id = ?').run(id)
-  }
-
-  // Clears finished tasks (done/failed/cancelled only — active tasks are never
-  // touched) that are either older than maxAgeDays, or are excess beyond
-  // maxPerRepoGroup within their repo group (the exact set of repos a task
-  // runs against). Excess is trimmed oldest-first.
-  prune(): { removedByAge: number; removedByLimit: number } {
-    const settings = this.getSettings()
-    const cutoff = new Date(Date.now() - settings.maxAgeDays * 24 * 60 * 60 * 1000).toISOString()
-    const placeholders = PRUNABLE_STATES.map(() => '?').join(',')
-
-    const aged = this.db.prepare(`SELECT id FROM tasks WHERE created_at < ? AND state IN (${placeholders})`)
-      .all(cutoff, ...PRUNABLE_STATES) as { id: string }[]
-    for (const { id } of aged) this.delete(id)
-
-    const remaining = this.db.prepare('SELECT id, repos, state, created_at FROM tasks')
-      .all() as { id: string; repos: string; state: TaskState; created_at: string }[]
-    const groups = new Map<string, typeof remaining>()
-    for (const row of remaining) {
-      const key = JSON.stringify((JSON.parse(row.repos) as string[]).slice().sort())
-      const group = groups.get(key)
-      if (group) group.push(row); else groups.set(key, [row])
-    }
-    let removedByLimit = 0
-    for (const rows of groups.values()) {
-      let excess = rows.length - settings.maxPerRepoGroup
-      if (excess <= 0) continue
-      const oldestFirst = rows.filter((r) => PRUNABLE_STATES.includes(r.state))
-        .sort((a, b) => a.created_at.localeCompare(b.created_at))
-      for (const row of oldestFirst) {
-        if (excess <= 0) break
-        this.delete(row.id)
-        excess--
-        removedByLimit++
-      }
-    }
-    return { removedByAge: aged.length, removedByLimit }
+  // Archives binned threads past their window; rows are never deleted (ponytail: grow forever, add a hard delete if the DB ever matters).
+  sweep(now: Date = new Date()): number {
+    const { binDays, hallOfFameDays } = this.getSettings()
+    const before = (days: number) => new Date(now.getTime() - days * DAY_MS).toISOString()
+    return this.db.prepare(`UPDATE tasks SET archived_at = ? WHERE archived_at IS NULL
+      AND ((bin = 'game-over' AND binned_at < ?) OR (bin = 'hall-of-fame' AND binned_at < ?))`)
+      .run(now.toISOString(), before(binDays), before(hallOfFameDays)).changes
   }
 }

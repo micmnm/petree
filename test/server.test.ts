@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { Server } from 'node:http'
+import Database from 'better-sqlite3'
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import type { PetreeConfig } from '../src/config.js'
 import type { Launcher } from '../src/launcher.js'
@@ -97,6 +98,7 @@ describe('API', () => {
     store.transition(t.id, 'provisioning')
     store.transition(t.id, 'running')
     store.transition(t.id, 'paused-limit')
+    store.unbin(t.id)
     const ok = await fetch(`${base}/api/tasks/${t.id}/resume`, { method: 'POST' })
     expect((await ok.json()).state).toBe('queued')
     const t2 = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
@@ -124,6 +126,7 @@ describe('API', () => {
     store.transition(t.id, 'provisioning')
     store.transition(t.id, 'running')
     store.transition(t.id, 'paused-limit')
+    store.unbin(t.id)
     const res = await fetch(`${base}/api/tasks/${t.id}/resume`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ model: 'opus' }),
@@ -139,6 +142,7 @@ describe('API', () => {
     store.transition(t.id, 'provisioning')
     store.transition(t.id, 'running')
     store.transition(t.id, 'paused-limit')
+    store.unbin(t.id)
     const res = await fetch(`${base}/api/tasks/${t.id}/resume`, { method: 'POST' })
     const body = await res.json()
     expect(res.status).toBe(200)
@@ -152,6 +156,7 @@ describe('API', () => {
     store.transition(t.id, 'provisioning')
     store.transition(t.id, 'running')
     store.transition(t.id, 'paused-limit')
+    store.unbin(t.id)
     const res = await fetch(`${base}/api/tasks/${t.id}/resume`, {
       method: 'POST', headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ model: 'gpt-4' }),
@@ -311,6 +316,15 @@ describe('API', () => {
     expect(unknown.status).toBe(400)
   })
 
+  it('bins hall-of-fame when a push lands on an untracked host', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1, stage: 'build' })
+    seedWorkRepo(home, t.id, 'demo')
+    store.setDelivery(t.id, 'demo', { ahead: 1, head: 'h' })
+    const res = await post(`/api/tasks/${t.id}/push`, { repo: 'demo', target: `petree/${t.id}` })
+    expect((await res.json()).ok).toBe(true)
+    expect(store.get(t.id)).toMatchObject({ bin: 'hall-of-fame', binReason: 'pushed · merge not tracked' })
+  })
+
   it('rejects refspec and HEAD tricks that would target the base branch', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
     seedWorkRepo(home, t.id, 'demo')
@@ -374,44 +388,104 @@ describe('API', () => {
 
   it('returns default retention settings and updates them, validating input', async () => {
     const got = await (await fetch(`${base}/api/settings`)).json()
-    expect(got).toEqual({ maxAgeDays: 3, maxPerRepoGroup: 5 })
+    expect(got).toEqual({ binDays: 14, hallOfFameDays: 3 })
     const updated = await fetch(`${base}/api/settings`, {
       method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ maxAgeDays: 7, maxPerRepoGroup: 2 }),
+      body: JSON.stringify({ binDays: 7, hallOfFameDays: 2 }),
     })
     expect(updated.status).toBe(200)
     const body = await updated.json()
-    expect(body.maxAgeDays).toBe(7)
-    expect(body.maxPerRepoGroup).toBe(2)
+    expect(body.binDays).toBe(7)
+    expect(body.hallOfFameDays).toBe(2)
     const bad = await fetch(`${base}/api/settings`, {
       method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ maxAgeDays: 0 }),
+      body: JSON.stringify({ binDays: 0 }),
     })
     expect(bad.status).toBe(400)
   })
 
-  it('prunes excess finished tasks per repo group via PUT /api/settings and POST /api/prune', async () => {
-    for (let i = 0; i < 3; i++) {
-      const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
-      store.transition(t.id, 'provisioning')
-      store.transition(t.id, 'running')
-      store.transition(t.id, 'done')
-    }
-    const res = await fetch(`${base}/api/settings`, {
-      method: 'PUT', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ maxPerRepoGroup: 1 }),
-    })
-    const body = await res.json()
-    expect(body.removedByLimit).toBe(2)
-    expect((await (await fetch(`${base}/api/tasks`)).json())).toHaveLength(1)
-
+  it('archives past-window bins via POST /api/prune and hides them unless ?archived=1', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
-    store.transition(t.id, 'provisioning')
-    store.transition(t.id, 'running')
-    store.transition(t.id, 'done')
-    const pruneRes = await fetch(`${base}/api/prune`, { method: 'POST' })
-    expect((await pruneRes.json()).removedByLimit).toBe(1)
-    expect((await (await fetch(`${base}/api/tasks`)).json())).toHaveLength(1)
+    store.bin(t.id, 'hall-of-fame', 'r')
+    await fetch(`${base}/api/settings`, {
+      method: 'PUT', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ hallOfFameDays: 1 }),
+    })
+    // not past the window yet
+    expect((await (await fetch(`${base}/api/prune`, { method: 'POST' })).json()).archived).toBe(0)
+    const raw = new Database(join(home, 'db'))
+    raw.prepare('UPDATE tasks SET binned_at = ? WHERE id = ?').run(new Date(Date.now() - 2 * 86_400_000).toISOString(), t.id)
+    raw.close()
+    expect((await (await fetch(`${base}/api/prune`, { method: 'POST' })).json()).archived).toBe(1)
+    expect(await (await fetch(`${base}/api/tasks`)).json()).toHaveLength(0)
+    expect(await (await fetch(`${base}/api/tasks?archived=1`)).json()).toHaveLength(1)
+    expect((await fetch(`${base}/api/tasks/${t.id}`)).status).toBe(200)
+  })
+
+  const post = (path: string, body: unknown = {}) =>
+    fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  const mk = (...states: Parameters<TaskStore['transition']>[1][]) => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    for (const s of states) store.transition(t.id, s)
+    return t.id
+  }
+
+  it('drop bins game-over from gate, done, failed, cancelled and queued; 409 when running or already binned', async () => {
+    for (const path of [['provisioning', 'running', 'waiting-for-you'], ['provisioning', 'running', 'done'],
+      ['provisioning', 'running', 'failed'], ['provisioning', 'cancelled'], []] as const) {
+      const id = mk(...path)
+      const res = await post(`/api/tasks/${id}/drop`)
+      expect(res.status).toBe(200)
+      expect(await res.json()).toMatchObject({ bin: 'game-over', binReason: 'dropped by you' })
+      expect((await (await fetch(`${base}/api/tasks/${id}`)).json()).card).toMatchObject({ group: 'game-over', reason: 'dropped by you' })
+    }
+    const id = mk('provisioning', 'running')
+    expect((await post(`/api/tasks/${id}/drop`)).status).toBe(409)
+    expect(store.get(id)!.bin).toBeNull()
+    const binned = mk('provisioning', 'running', 'done')
+    store.bin(binned, 'game-over', 'x')
+    expect((await post(`/api/tasks/${binned}/drop`)).status).toBe(409)
+    expect((await post('/api/tasks/nope/drop')).status).toBe(404)
+  })
+
+  it('done bins hall-of-fame from gate and no-commit done; 409 otherwise', async () => {
+    const gate = mk('provisioning', 'running', 'waiting-for-you')
+    const ok = await post(`/api/tasks/${gate}/done`)
+    expect(await ok.json()).toMatchObject({ state: 'waiting-for-you', bin: 'hall-of-fame', binReason: 'finished · findings kept' })
+    const noCommits = mk('provisioning', 'running', 'done')
+    expect((await post(`/api/tasks/${noCommits}/done`)).status).toBe(200)
+    const withCommits = mk('provisioning', 'running', 'done')
+    store.setDelivery(withCommits, 'demo', { ahead: 1, head: 'abc' })
+    expect((await post(`/api/tasks/${withCommits}/done`)).status).toBe(409)
+    expect((await post(`/api/tasks/${mk()}/done`)).status).toBe(409)
+    expect((await post(`/api/tasks/${gate}/done`)).status).toBe(409)
+  })
+
+  it('restore: unbins a dropped gate thread, resets an out-of-tokens one, 409 for hall-of-fame and unbinned', async () => {
+    const gate = mk('provisioning', 'running', 'waiting-for-you')
+    await post(`/api/tasks/${gate}/drop`)
+    expect(await (await post(`/api/tasks/${gate}/restore`)).json()).toMatchObject({ state: 'waiting-for-you', bin: null })
+
+    const limit = mk('provisioning', 'running')
+    store.addUsage(limit, 50)
+    store.transition(limit, 'paused-limit')
+    expect(await (await post(`/api/tasks/${limit}/restore`)).json()).toMatchObject({ state: 'queued', tokensUsed: 0, bin: null })
+
+    const hof = mk()
+    store.bin(hof, 'hall-of-fame', 'r')
+    expect((await post(`/api/tasks/${hof}/restore`)).status).toBe(409)
+    expect((await post(`/api/tasks/${mk()}/restore`)).status).toBe(409)
+    expect((await post('/api/tasks/nope/restore')).status).toBe(404)
+  })
+
+  it('rejects /next, /resume and /comments on binned threads with "restore first"', async () => {
+    const id = mk('provisioning', 'running', 'waiting-for-you')
+    store.bin(id, 'game-over', 'dropped by you')
+    for (const [path, body] of [['next', { prompt: 'x' }], ['resume', {}], ['comments', { text: 'x' }]] as const) {
+      const res = await post(`/api/tasks/${id}/${path}`, body)
+      expect(res.status).toBe(409)
+      expect(await res.json()).toEqual({ error: 'restore first' })
+    }
   })
 
   it('reads and writes repos.yaml, applying edits to the running config in place', async () => {
@@ -517,6 +591,13 @@ describe('API', () => {
       const del = await send('DELETE', `/api/repos/demo?hash=${await hashOf()}`)
       expect(del.status).toBe(409)
       expect(disk()).toBe(FILE)
+    })
+
+    it('ignores binned threads when checking whether a repo is in use', async () => {
+      const t = await (await send('POST', '/api/tasks', { prompt: 'x', repos: ['demo'] })).json()
+      store.bin(t.id, 'game-over', 'dropped by you')
+      const del = await send('DELETE', `/api/repos/demo?hash=${await hashOf()}`)
+      expect(del.status).toBe(200)
     })
   })
 

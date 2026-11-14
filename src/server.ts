@@ -93,30 +93,32 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       autoPlay,
     })
     void scheduler.tick()
-    store.prune()
+    store.sweep()
     res.status(201).json(task)
   })
 
   const withCard = (t: TaskRecord) =>
     ({ ...t, card: cardFor(t, readThreadStatus(join(cfg.home, 'work', t.id), t.startedAt), cfg) })
 
-  app.get('/api/tasks', (_req, res) => { res.json(store.list().map(withCard)) })
+  app.get('/api/tasks', (req, res) => {
+    res.json(store.list().filter((t) => req.query.archived === '1' || !t.archivedAt).map(withCard))
+  })
 
   app.get('/api/settings', (_req, res) => { res.json(store.getSettings()) })
 
   app.put('/api/settings', (req, res) => {
-    const { maxAgeDays, maxPerRepoGroup } = (req.body ?? {}) as { maxAgeDays?: number; maxPerRepoGroup?: number }
-    for (const [name, v] of [['maxAgeDays', maxAgeDays], ['maxPerRepoGroup', maxPerRepoGroup]] as const) {
+    const { binDays, hallOfFameDays } = (req.body ?? {}) as { binDays?: number; hallOfFameDays?: number }
+    for (const [name, v] of [['binDays', binDays], ['hallOfFameDays', hallOfFameDays]] as const) {
       if (v !== undefined && (!Number.isInteger(v) || v < 1)) {
         res.status(400).json({ error: `${name} must be a positive integer` })
         return
       }
     }
-    const settings = store.updateSettings({ maxAgeDays, maxPerRepoGroup })
-    res.json({ ...settings, ...store.prune() })
+    const settings = store.updateSettings({ binDays, hallOfFameDays })
+    res.json({ ...settings, archived: store.sweep() })
   })
 
-  app.post('/api/prune', (_req, res) => { res.json(store.prune()) })
+  app.post('/api/prune', (_req, res) => { res.json({ archived: store.sweep() }) })
 
   app.get('/api/repos', async (_req, res) => {
     const usage = repoUsage(store.list(), cfg)
@@ -243,8 +245,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     if (!Object.hasOwn(cfg.repos, name)) { res.sendStatus(404); return }
     const text = readReposText()
     if (!hashOk(res, text, req.query.hash, true)) return
-    // ponytail: "in use" = any non-terminal thread; refine once bins/archive land (§5.6)
-    if (store.list().some((t) => t.repos.includes(name) && !['done', 'failed', 'cancelled'].includes(t.state))) {
+    if (store.list().some((t) => t.repos.includes(name) && !t.bin && !t.archivedAt && !['done', 'failed', 'cancelled'].includes(t.state))) {
       res.status(409).json({ error: `repo ${name} is used by an active thread` })
       return
     }
@@ -311,7 +312,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     res.json(out)
   })
 
-  app.post('/api/tasks/:id/push', (req, res) => {
+  app.post('/api/tasks/:id/push', async (req, res) => {
     if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) { res.sendStatus(400); return }
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
@@ -323,7 +324,13 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     const pushed = pushBranch(repoDir, t.id, norm)
     if (pushed.ok) {
       store.setDelivery(t.id, repo as string, { target: norm, prHead: headSha(repoDir) })
-      void pollPrs(store, cfg, t.id)
+      await pollPrs(store, cfg, t.id)
+      // Merge can't be tracked once every pushed repo sits on an untracked host (§5.6).
+      const after = store.get(t.id)!
+      const shipped = Object.values(after.delivery).filter((d) => d.ahead > 0)
+      if (!after.bin && shipped.length && shipped.every((d) => d.untracked && d.target)) {
+        store.bin(t.id, 'hall-of-fame', 'pushed · merge not tracked')
+      }
     }
     res.json(pushed)
   })
@@ -348,6 +355,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       res.sendStatus(404)
       return
     }
+    if (t.bin) { res.status(409).json({ error: 'restore first' }); return }
     const { model } = (req.body ?? {}) as { model?: string }
     if (model !== undefined && !MODELS.includes(model)) {
       res.status(400).json({ error: `unknown model: ${model}` })
@@ -378,7 +386,8 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
   app.post('/api/tasks/:id/next', (req, res) => {
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
-    const { prompt = '', model, stage } = (req.body ?? {}) as { prompt?: string; model?: string; stage?: Stage }
+    if (t.bin) { res.status(409).json({ error: 'restore first' }); return }
+    const { prompt = '', model, stage } =(req.body ?? {}) as { prompt?: string; model?: string; stage?: Stage }
     if (typeof prompt !== 'string') {
       res.status(400).json({ error: 'prompt must be a string' })
       return
@@ -415,7 +424,9 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
 
   app.post('/api/tasks/:id/comments', (req, res) => {
     if (!/^[0-9a-f-]{8,36}$/.test(req.params.id)) { res.sendStatus(400); return }
-    if (!store.get(req.params.id)) { res.sendStatus(404); return }
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    if (t.bin) { res.status(409).json({ error: 'restore first' }); return }
     const { text } = (req.body ?? {}) as { text?: string }
     if (typeof text !== 'string' || !text.trim()) {
       res.status(400).json({ error: 'text is required' })
@@ -490,6 +501,45 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       return
     }
     res.json(store.get(t.id))
+  })
+
+  // GAME OVER: settled threads are only binned; a live one is stopped first.
+  app.post('/api/tasks/:id/drop', async (req, res) => {
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    if (t.bin) { res.status(409).json({ error: 'already binned' }); return }
+    if (t.state === 'queued') {
+      store.transition(t.id, 'cancelled')
+    } else if (t.state === 'provisioning' || t.state === 'running') {
+      if (!await launcher.stop(t.id)) { res.status(409).json({ error: 'task has no active process to stop' }); return }
+    } else if (!['waiting-for-you', 'done', 'failed', 'cancelled'].includes(t.state)) {
+      res.status(409).json({ error: `cannot drop from state ${t.state}` })
+      return
+    }
+    res.json(store.bin(t.id, 'game-over', 'dropped by you'))
+  })
+
+  // QUEST COMPLETE: findings or answer were the point; counts as a victory.
+  app.post('/api/tasks/:id/done', (req, res) => {
+    const t = store.get(req.params.id)
+    if (!t) { res.sendStatus(404); return }
+    const noCommits = !Object.values(t.delivery).some((d) => d.ahead > 0)
+    if (t.bin || !(t.state === 'waiting-for-you' || (t.state === 'done' && noCommits))) {
+      res.status(409).json({ error: `cannot complete from state ${t.bin ? 'binned' : t.state}` })
+      return
+    }
+    res.json(store.bin(t.id, 'hall-of-fame', 'finished · findings kept'))
+  })
+
+  // CONTINUE?
+  app.post('/api/tasks/:id/restore', (req, res) => {
+    if (!store.get(req.params.id)) { res.sendStatus(404); return }
+    try {
+      res.json(store.restore(req.params.id))
+      void scheduler.tick()
+    } catch {
+      res.status(409).json({ error: 'only a game-over thread that is not archived can be restored' })
+    }
   })
 
   app.get('/', (_req, res) => {

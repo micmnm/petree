@@ -9,6 +9,7 @@ export type Step = Stage | 'pr' | 'merged'
 export interface ProgressStep { step: Step; mark: 'done' | 'current' | 'skipped' | 'todo'; tone?: 'running' | 'needs-you' | 'failed' }
 
 export interface Card {
+  q: number
   topic: string
   summary: string
   line: string
@@ -77,11 +78,7 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
     case 'provisioning': line = 'Preparing workspace'; break
     case 'running': line = `Running ${level} · ${mins}m`; break
     case 'paused-rate-limit': line = 'Waiting out a rate limit'; break
-    case 'paused-limit':
-      // ponytail: derived here; the bin column will own this later.
-      reason = line = 'out of tokens'
-      group = 'game-over'
-      break
+    case 'paused-limit': line = 'Out of tokens'; break
     case 'cancelled':
       line = 'Paused by you'
       group = 'your-move'
@@ -107,7 +104,16 @@ export function cardFor(task: TaskRecord, status: ThreadStatus | null, cfg: Petr
       break
   }
 
+  // Bins win over engine state (spec §5.2.2).
+  if (task.bin) {
+    group = task.bin
+    action = null
+    reason = task.binReason ?? undefined
+    line = reason ?? line
+  }
+
   return {
+    q: task.seq,
     topic: status?.topic || threadTitle(task),
     summary: status?.status || line,
     line,

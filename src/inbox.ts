@@ -1,4 +1,4 @@
-import { turnMinutes, type PetreeConfig } from './config.js'
+import { turnMinutes, type PetreeConfig, repoHostKind } from './config.js'
 import { answerText, interviewPhase } from './interview.js'
 import type { Questionnaire } from './interview.js'
 import type { ThreadStatus } from './notes.js'
@@ -58,13 +58,33 @@ function progressFor(task: TaskRecord): ProgressStep[] {
 
 function prLabel(task: TaskRecord, cfg: PetreeConfig): string | null {
   const entries = Object.entries(task.delivery)
+
+  // Extract unique hosts from repos with commits to ship
+  const getHostInfo = (): { hostSuffix: string; hasMultipleHosts: boolean } => {
+    const hosts = new Set(
+      entries
+        .filter(([repo, d]) => d.ahead > 0)
+        .map(([repo]) => repoHostKind(cfg.repos[repo]?.url ?? ''))
+        .filter(h => h !== 'unknown')
+    )
+    if (hosts.size > 1) {
+      return { hostSuffix: ` (${Array.from(hosts).sort().join('+')})`, hasMultipleHosts: true }
+    }
+    return { hostSuffix: '', hasMultipleHosts: false }
+  }
+
   // A target without a PR on a tracked host means the push landed but PR creation failed.
   const tracked = (repo: string) => prHost(cfg.repos[repo]?.url ?? '').kind !== 'untracked'
-  if (entries.some(([repo, d]) => d.ahead > 0 && !d.pr && (!d.target || tracked(repo)))) return 'Open the PR'
+  const { hostSuffix, hasMultipleHosts } = getHostInfo()
+  if (entries.some(([repo, d]) => d.ahead > 0 && !d.pr && (!d.target || tracked(repo)))) return `Open the PR${hostSuffix}`
   const open = entries.filter(([, d]) => d.pr === 'open')
   const stale = open.find(([, d]) => d.prHead !== d.head)
-  if (stale) return `Push the update to PR #${stale[1].number}`
+  if (stale) return `Push the update to PR #${stale[1].number}${hostSuffix}`
   if (!open[0]) return null
+  // When there are multiple hosts, show combined host format instead of single host name
+  if (hasMultipleHosts) {
+    return `Merge PR #${open[0][1].number} on${hostSuffix}`
+  }
   const host = prHost(cfg.repos[open[0][0]]?.url ?? '').kind === 'azure' ? 'Azure DevOps' : 'GitHub'
   return `Merge PR #${open[0][1].number} on ${host}`
 }

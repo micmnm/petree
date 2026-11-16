@@ -760,7 +760,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
 
   // Browser modules the dashboard imports. Allowlisted by name — never a path
   // taken from the request.
-  for (const name of ['markdown.js', 'activity.js']) {
+  for (const name of ['markdown.js', 'activity.js', 'options-state.js']) {
     app.get(`/${name}`, (_req, res) => {
       const file = join(dirname(fileURLToPath(import.meta.url)), name)
       res.set('Cache-Control', 'no-cache').type('application/javascript').send(readFileSync(file, 'utf8'))

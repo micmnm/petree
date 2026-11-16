@@ -30,6 +30,8 @@ const BUILD_BASE = [
   'approve with no text), implement `/work/_thread/spec.md`, or `/work/_thread/findings.md`',
   'if there is no spec. Do not ask interactive questions: make a reasonable call and',
   'list open questions in your final message.',
+  'Your run ends with your final message: never send it while anything you started is',
+  'still running in the background. Wait for every result first, and finish the whole plan.',
 ]
 
 // Dropped when PARTY MODE is off (the Task/Agent tools are disallowed too).

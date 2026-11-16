@@ -311,6 +311,13 @@ describe('API', () => {
     expect(await res.text()).toContain('renderActivity')
   })
 
+  it('serves the options-state module as javascript', async () => {
+    const res = await fetch(`${base}/options-state.js`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toContain('javascript')
+    expect(await res.text()).toContain('parseOptionsHash')
+  })
+
   it('lists repos for the selector', async () => {
     const repos = await (await fetch(`${base}/api/repos`)).json()
     expect(repos).toContainEqual({

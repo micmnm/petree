@@ -115,13 +115,13 @@ describe('buildSandboxCommands', () => {
     expect(prompt).toContain('## Stage: build')
   })
 
-  it('disallows the subagent tools only when PARTY MODE is off', () => {
+  it('always disallows wakeup tools, and the subagent tools only when PARTY MODE is off', () => {
     const on = buildSandboxCommands(task, cfg, '/w', 't').create
-    expect(on).not.toContain('--disallowedTools')
+    const j = on.indexOf('--disallowedTools')
+    expect(on.slice(j, j + 4)).toEqual(['--disallowedTools', 'ScheduleWakeup', 'CronCreate', '--output-format'])
     const off = buildSandboxCommands({ ...task, party: false }, cfg, '/w', 't').create
     const i = off.indexOf('--disallowedTools')
-    expect(off.slice(i, i + 3)).toEqual(['--disallowedTools', 'Task', 'Agent'])
-    expect(off[i + 3]).toBe('--output-format')
+    expect(off.slice(i, i + 6)).toEqual(['--disallowedTools', 'ScheduleWakeup', 'CronCreate', 'Task', 'Agent', '--output-format'])
   })
 
   it('omits --model when the task model is null', () => {

@@ -95,7 +95,9 @@ export function buildSandboxCommands(
     image,
     'claude', '-p', composePrompt(task, cfg, home.setup),
     ...(modelArg ? ['--model', modelArg] : []),
-    ...(task.party ? [] : ['--disallowedTools', 'Task', 'Agent']),
+    // A `-p` run ends with its turn, so a scheduled wakeup never fires and the
+    // background work it was waiting on is lost with the container.
+    '--disallowedTools', 'ScheduleWakeup', 'CronCreate', ...(task.party ? [] : ['Task', 'Agent']),
     '--output-format', 'stream-json', '--verbose',
     '--dangerously-skip-permissions',
     ...home.flags,

@@ -1731,7 +1731,20 @@
       const help = 'Optional. It goes with RETRY STAGE, which reworks the build.'
       const need = d.filter(([, x]) => x.ahead > 0 && !x.target && !x.pr)
       const stale = d.filter(([, x]) => x.pr === 'open' && x.prHead !== x.head)
-      if (need.length) return { primary: B('pr', 'SHIP IT', 'open PR on GitHub/Azure', { repos: need }), secondary: rework, quiet: [over], help }
+      const hostLabel = (repoNames) => {
+        const kinds = new Set(
+          repoNames
+            .map((name) => repoOf(name)?.hostKind)
+            .filter((k) => k === 'github' || k === 'azure')
+        )
+        if (!kinds.size) return ''
+        if (kinds.size === 1) return kinds.has('github') ? 'GitHub' : 'Azure'
+        return 'GitHub/Azure ⚠️'
+      }
+      if (need.length) {
+        const label = hostLabel(need.map(([repo]) => repo))
+        return { primary: B('pr', 'SHIP IT', label ? `open PR on ${label}` : 'open PR', { repos: need }), secondary: rework, quiet: [over], help }
+      }
       if (stale.length) return { primary: B('push', 'SHIP IT', `push update to PR #${stale[0][1].number}`, { repos: stale }), secondary: rework, quiet: [over], help }
       if (d.some(([, x]) => x.pr === 'open')) return { secondary: rework, quiet: [over], help }
       if (!d.some(([, x]) => x.ahead > 0)) return { secondary: retry('send reply'), quiet: [B('done', 'QUEST COMPLETE', 'end here · keep the answer'), over],

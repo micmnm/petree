@@ -115,15 +115,15 @@ describe('API', () => {
     expect(task.repos).toEqual(['azure1'])
   })
 
-  it('rejects thread mixing GitHub and Azure repos', async () => {
+  it('accepts thread mixing GitHub and Azure repos', async () => {
     const res = await fetch(`${base}/api/tasks`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ prompt: 'test', repos: ['github1', 'azure1'] }),
     })
-    expect(res.status).toBe(400)
-    const error = await res.json()
-    expect(error.error).toBe('cannot mix GitHub and Azure repos in one thread')
+    expect(res.status).toBe(201)
+    const task = await res.json()
+    expect(task.repos).toEqual(['github1', 'azure1'])
   })
 
   it('accepts thread with multiple GitHub repos', async () => {
@@ -316,6 +316,27 @@ describe('API', () => {
       name: 'demo', defaultBranch: 'main', image: 'sandbox-node', defaultModel: null,
       instructions: '', setup: [], build: [], test: [], run: ['npm start'], tags: [], path: null, local: null,
       usage: expect.objectContaining({ quests: 0, weekly: Array(8).fill(0) }),
+      hostKind: 'unknown',
+    })
+  })
+
+  it('GET /api/repos includes hostKind per repo', async () => {
+    const repos = await (await fetch(`${base}/api/repos`)).json()
+    const githubRepos = repos.filter((r: { name: string }) => r.name.startsWith('github'))
+    const azureRepos = repos.filter((r: { name: string }) => r.name.startsWith('azure'))
+    const unknownRepos = repos.filter((r: { name: string }) => r.name === 'unknown')
+
+    githubRepos.forEach((r: { hostKind?: string; url?: string }) => {
+      expect(r.hostKind).toBe('github')
+      expect(r.url).toBeUndefined()
+    })
+    azureRepos.forEach((r: { hostKind?: string; url?: string }) => {
+      expect(r.hostKind).toBe('azure')
+      expect(r.url).toBeUndefined()
+    })
+    unknownRepos.forEach((r: { hostKind?: string; url?: string }) => {
+      expect(r.hostKind).toBe('unknown')
+      expect(r.url).toBeUndefined()
     })
   })
 

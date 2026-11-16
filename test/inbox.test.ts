@@ -159,17 +159,17 @@ describe('cardFor progress', () => {
   })
 
   it.each([
-    ['unshipped commits', { demo: { ahead: 1, head: 'a' } }, 'Open the PR', 'Build finished'],
-    ['PR head behind local head', { demo: { ...open, head: 'b' } }, 'Push the update to PR #7', 'PR #7 open — waiting for merge'],
+    ['unshipped commits', { demo: { ahead: 1, head: 'a' } }, 'Open the PR on GitHub', 'Build finished'],
+    ['PR head behind local head', { demo: { ...open, head: 'b' } }, 'Push the update to PR #7 on GitHub', 'PR #7 open — waiting for merge'],
     ['open PR on GitHub', { demo: open }, 'Merge PR #7 on GitHub', 'PR #7 open — waiting for merge'],
-    ['open PR on Azure', { az: { ...open, url: 'https://dev.azure.com/o/p/_git/r/pullrequest/7' } }, 'Merge PR #7 on Azure DevOps', 'PR #7 open — waiting for merge'],
+    ['open PR on Azure', { az: { ...open, url: 'https://dev.azure.com/o/p/_git/r/pullrequest/7' } }, 'Merge PR #7 on Azure', 'PR #7 open — waiting for merge'],
   ])('PR action and line: %s', (_n, d, label, line) => {
     const c = cardFor(built(d), null, cfg)
     expect(c).toMatchObject({ group: 'your-move', action: { label }, line })
   })
 
   it('offers the PR again when the push landed but PR creation failed, unless the host is untracked', () => {
-    expect(cardFor(built({ demo: { ahead: 1, head: 'a', target: 'feat' } }), null, cfg).action?.label).toBe('Open the PR')
+    expect(cardFor(built({ demo: { ahead: 1, head: 'a', target: 'feat' } }), null, cfg).action?.label).toBe('Open the PR on GitHub')
     const local = { ...cfg, repos: { ...cfg.repos, local: { tags: [], url: 'file:///x' } } } as unknown as PetreeConfig
     expect(cardFor(built({ local: { ahead: 1, head: 'a', target: 'feat', untracked: 'unsupported host' } }), null, local).action).toBeNull()
   })
@@ -193,37 +193,44 @@ describe('prLabel with multi-host repos', () => {
       github: { tags: [], url: 'https://github.com/org/repo.git' },
       azure: { tags: [], url: 'https://dev.azure.com/org/project/_git/repo' },
       github2: { tags: [], url: 'https://github.com/org/repo2.git' },
+      untracked: { tags: [], url: 'file:///local/repo' },
     },
     allowClone: [],
   } as unknown as PetreeConfig
 
   const built = (delivery: TaskRecord['delivery']) => task({ stage: 'build', state: 'done', delivery, repos: Object.keys(delivery) as any })
 
-  it('single-host task shows label unchanged', () => {
+  it('single GitHub repo shows host label', () => {
     const d = { github: { ahead: 1, head: 'a' } }
     const c = cardFor(built(d), null, cfgMultiHost)
-    expect(c.action?.label).toBe('Open the PR')
+    expect(c.action?.label).toBe('Open the PR on GitHub')
   })
 
-  it('multi-host task with different hosts shows combined hosts in label', () => {
-    const d = {
-      github: { ahead: 1, head: 'a' },
-      azure: { ahead: 1, head: 'b' },
-    }
+  it('single Azure repo shows host label', () => {
+    const d = { azure: { ahead: 1, head: 'a' } }
     const c = cardFor(built(d), null, cfgMultiHost)
-    expect(c.action?.label).toBe('Open the PR (azure+github)')
+    expect(c.action?.label).toBe('Open the PR on Azure')
   })
 
-  it('multi-host task with all GitHub repos shows label unchanged', () => {
+  it('multiple GitHub repos shows single host label', () => {
     const d = {
       github: { ahead: 1, head: 'a' },
       github2: { ahead: 1, head: 'b' },
     }
     const c = cardFor(built(d), null, cfgMultiHost)
-    expect(c.action?.label).toBe('Open the PR')
+    expect(c.action?.label).toBe('Open the PR on GitHub')
   })
 
-  it('multi-host for "Merge PR" label appends combined hosts', () => {
+  it('mixed GitHub and Azure repos shows combined host label with warning', () => {
+    const d = {
+      github: { ahead: 1, head: 'a' },
+      azure: { ahead: 1, head: 'b' },
+    }
+    const c = cardFor(built(d), null, cfgMultiHost)
+    expect(c.action?.label).toBe('Open the PR on GitHub/Azure ⚠️')
+  })
+
+  it('multi-host merge PR with mixed hosts shows combined label', () => {
     const gh = 'https://github.com/org/repo/pull/1'
     const az = 'https://dev.azure.com/org/project/_git/repo/pullrequest/2'
     const d = {
@@ -231,19 +238,35 @@ describe('prLabel with multi-host repos', () => {
       azure: { ahead: 1, head: 'b', url: az, number: 2, pr: 'open' as const, prHead: 'b' },
     }
     const c = cardFor(built(d), null, cfgMultiHost)
-    expect(c.action?.label).toBe('Merge PR #1 on (azure+github)')
+    expect(c.action?.label).toBe('Merge PR #1 on GitHub/Azure ⚠️')
   })
 
-  it('multi-host for "Push the update" label appends combined hosts', () => {
+  it('multi-host push update with mixed hosts shows combined label', () => {
     const gh = 'https://github.com/org/repo/pull/1'
     const az = 'https://dev.azure.com/org/project/_git/repo/pullrequest/2'
     const d = {
       github: { ahead: 1, head: 'a', url: gh, number: 1, pr: 'open' as const, prHead: 'a', target: 'feat' },
       azure: { ahead: 1, head: 'b', url: az, number: 2, pr: 'open' as const, prHead: 'b', target: 'feat' },
     }
-    const c = cardFor(built(d), null, cfgMultiHost)
     // When there's a stale PR (prHead !== head), it uses "Push the update" label
-    const c2 = cardFor(built({ ...d, github: { ...d.github, head: 'c' } } as any), null, cfgMultiHost)
-    expect(c2.action?.label).toBe('Push the update to PR #1 (azure+github)')
+    const c = cardFor(built({ ...d, github: { ...d.github, head: 'c' } } as any), null, cfgMultiHost)
+    expect(c.action?.label).toBe('Push the update to PR #1 on GitHub/Azure ⚠️')
+  })
+
+  it('untracked host mixed with recognized hosts ignores untracked', () => {
+    const d = {
+      github: { ahead: 1, head: 'a' },
+      untracked: { ahead: 1, head: 'b' },
+    }
+    const c = cardFor(built(d), null, cfgMultiHost)
+    expect(c.action?.label).toBe('Open the PR on GitHub')
+  })
+
+  it('only untracked hosts shows no host label', () => {
+    const d = {
+      untracked: { ahead: 1, head: 'a' },
+    }
+    const c = cardFor(built(d), null, cfgMultiHost)
+    expect(c.action?.label).toBe('Open the PR')
   })
 })

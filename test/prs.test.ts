@@ -3,7 +3,7 @@ import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { PetreeConfig } from '../src/config.js'
-import { createPullRequest, findPr, pollPrs, prHost, prNumber } from '../src/prs.js'
+import { createPullRequest, findPr, hostKindOf, hostLabel, pollPrs, prHost, prNumber } from '../src/prs.js'
 import type { Run } from '../src/prs.js'
 import { TaskStore } from '../src/store.js'
 import type { Delivery } from '../src/store.js'
@@ -26,6 +26,54 @@ describe('prHost', () => {
     expect(prNumber('https://github.com/o/r/pull/12')).toBe(12)
     expect(prNumber('https://dev.azure.com/o/p/_git/r/pullrequest/34')).toBe(34)
     expect(prNumber('https://example.com/x')).toBeUndefined()
+  })
+})
+
+describe('hostKindOf', () => {
+  it('returns github for GitHub URLs', () => {
+    expect(hostKindOf('https://github.com/o/r.git')).toBe('github')
+    expect(hostKindOf('git@github.com:o/r')).toBe('github')
+  })
+
+  it('returns azure for Azure URLs', () => {
+    expect(hostKindOf('https://dev.azure.com/org/proj/_git/repo')).toBe('azure')
+    expect(hostKindOf('https://org.visualstudio.com/proj/_git/repo')).toBe('azure')
+  })
+
+  it('returns unknown for unrecognized hosts', () => {
+    expect(hostKindOf('file:///tmp/repo')).toBe('unknown')
+    expect(hostKindOf('https://gitlab.com/o/r')).toBe('unknown')
+    expect(hostKindOf('')).toBe('unknown')
+  })
+})
+
+describe('hostLabel', () => {
+  it('returns empty string for no recognized hosts', () => {
+    expect(hostLabel([])).toBe('')
+    expect(hostLabel(['unknown'])).toBe('')
+    expect(hostLabel(['unknown', 'unknown'])).toBe('')
+  })
+
+  it('returns GitHub for GitHub-only', () => {
+    expect(hostLabel(['github'])).toBe('GitHub')
+    expect(hostLabel(['github', 'github'])).toBe('GitHub')
+  })
+
+  it('returns Azure for Azure-only', () => {
+    expect(hostLabel(['azure'])).toBe('Azure')
+    expect(hostLabel(['azure', 'azure'])).toBe('Azure')
+  })
+
+  it('returns combined label for mixed hosts', () => {
+    expect(hostLabel(['github', 'azure'])).toBe('GitHub/Azure ⚠️')
+    expect(hostLabel(['azure', 'github'])).toBe('GitHub/Azure ⚠️')
+    expect(hostLabel(['github', 'azure', 'github'])).toBe('GitHub/Azure ⚠️')
+  })
+
+  it('ignores unknown hosts in mixed recognized hosts', () => {
+    expect(hostLabel(['github', 'unknown'])).toBe('GitHub')
+    expect(hostLabel(['azure', 'unknown'])).toBe('Azure')
+    expect(hostLabel(['github', 'azure', 'unknown'])).toBe('GitHub/Azure ⚠️')
   })
 })
 

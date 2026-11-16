@@ -17,7 +17,7 @@ export interface RepoConfig {
   /** Free-form labels (e.g. work, personal) used to filter repos in the dashboard. */
   tags: string[]
   defaultModel: string | null
-  /** Host path of the user's own checkout, used only for the unpushed/dirty warning; never mounted. */
+  /** Host path of the user's own checkout: feeds the unpushed/dirty warning and the diff panel's fetch/cherry-pick commands; never mounted. */
   path?: string | null
 }
 

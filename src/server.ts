@@ -712,11 +712,13 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
     const noCommits = !Object.values(t.delivery).some((d) => d.ahead > 0)
-    if (t.bin || !(t.state === 'waiting-for-you' || (t.state === 'done' && noCommits))) {
+    const hasOpenPr = Object.values(t.delivery).some((d) => d.pr === 'open')
+    const takenLocally = t.state === 'done' && !noCommits && !hasOpenPr
+    if (t.bin || !(t.state === 'waiting-for-you' || (t.state === 'done' && noCommits) || takenLocally)) {
       res.status(409).json({ error: `cannot complete from state ${t.bin ? 'binned' : t.state}` })
       return
     }
-    res.json(store.bin(t.id, 'hall-of-fame', 'finished · findings kept'))
+    res.json(store.bin(t.id, 'hall-of-fame', takenLocally ? 'finished · taken locally' : 'finished · findings kept'))
   })
 
   // CONTINUE?

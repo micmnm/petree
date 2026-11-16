@@ -6,10 +6,10 @@ import {
   claudeMounts, listing, pluginAllowlist, sandboxReport, scanClaudeHome, settingsOf, settingsYaml, syncClaudeHome,
   validateSettings, writeMcpFile,
 } from './claude-home.js'
-import { parseConfigText, resolveModel, repoHostKind } from './config.js'
+import { parseConfigText, resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
 import { ensureGitConfig, localCheckout, repoStatus, diffBranch, commitLog, pushBranch, taskBranch, headSha } from './gitops.js'
-import { openPr, pollPrs } from './prs.js'
+import { openPr, pollPrs, hostKindOf } from './prs.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
@@ -124,12 +124,6 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
         res.status(400).json({ error: `unknown repo: ${r}` })
         return
       }
-    }
-    const repoHosts = repos.map(r => repoHostKind(cfg.repos[r].url))
-    const uniqueHosts = new Set(repoHosts.filter(h => h !== 'unknown'))
-    if (uniqueHosts.size > 1) {
-      res.status(400).json({ error: 'cannot mix GitHub and Azure repos in one thread' })
-      return
     }
     try {
       pickImage(repos, cfg)
@@ -278,6 +272,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
           path: r.path ?? null,
           local: r.path ? await localCheckout(r.path) : null,
           usage: usage[name],
+          hostKind: hostKindOf(r.url),
         })),
       ),
     )

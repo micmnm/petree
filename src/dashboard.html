@@ -810,6 +810,9 @@
   .mono { font-family: var(--mono); }
   dl { margin: 0; } dt { color: var(--muted); font-size: .78rem; margin-top: 10px; } dd { margin: 2px 0 0; }
   pre.diff { max-height: 46vh; background: #16160f; color: #e6e6d8; padding: 12px; overflow: auto; font-family: var(--mono); font-size: .82rem; }
+  pre.diff .add { color: #8fd19e; } pre.diff .del { color: #e38b8b; }
+  pre.diff .hunk, pre.diff .file-header { color: #9a9a8a; }
+  .commitlog { margin: 4px 0; }
   .err { color: var(--need); white-space: pre-wrap; font-family: var(--mono); }
   .copy { font-size: .72rem; padding: 2px 8px; margin-left: 6px; }
   .cmd { display: flex; align-items: center; gap: 6px; background: var(--inset); border: 1px solid var(--line); padding: 6px 8px; font-family: var(--mono); font-size: .8rem; overflow-x: auto; }
@@ -2124,18 +2127,54 @@
     thMeasure(body)
   }
 
-  // Details › Changes: the former Changes tab, unchanged.
+  // Headline counts for one /diff entry: commit count straight from r.ahead, file/+/- parsed
+  // from r.stat (`git diff --stat` output) the same way the server's commitStat parses `git show --shortstat`.
+  function thDiffHeadline(r) {
+    const stat = String(r.stat || '')
+    const files = Number(/(\d+) files? changed/.exec(stat)?.[1] ?? 0)
+    const add = Number(/(\d+) insertions?\(\+\)/.exec(stat)?.[1] ?? 0)
+    const del = Number(/(\d+) deletions?\(-\)/.exec(stat)?.[1] ?? 0)
+    return `${thNum(r.ahead)} commit${r.ahead === 1 ? '' : 's'} · ${thNum(files)} file${files === 1 ? '' : 's'} · +${thNum(add)} −${thNum(del)}`
+  }
+  // Read-only commit list, newest first — no copy button, it's not meant to be pasted anywhere.
+  const thCommitList = (r) => (r.commits && r.commits.length)
+    ? r.commits.map((c) => `<div class="mono small">${esc(c.sha)}  ${esc(c.subject)}</div>`).join('')
+    : '<div class="muted small">no commits</div>'
+  // Two copy-pasteable commands to pull the thread's branch into the user's own checkout, or — when
+  // no `path:` is configured for the repo — a hint instead of broken/empty command rows.
+  function thTakeLocally(r) {
+    if (r.fetch && r.cherryPick) {
+      return `<div class="cmd"><span>1. fetch: ${esc(r.fetch)}</span>${copyBtn(r.fetch)}</div>
+        <div class="cmd" style="margin-top:4px"><span>2. cherry-pick: ${esc(r.cherryPick)}</span>${copyBtn(r.cherryPick)}</div>`
+    }
+    return `<div class="muted small">${esc(r.pathHint || '')}</div>`
+  }
+  // +/- coloring for a diff patch: classify each line by its leading marker, escape, then wrap.
+  function thDiffLineClass(line) {
+    if (line.startsWith('diff --git') || line.startsWith('index ') || line.startsWith('+++') || line.startsWith('---')) return 'file-header'
+    if (line.startsWith('@@')) return 'hunk'
+    if (line.startsWith('+')) return 'add'
+    if (line.startsWith('-')) return 'del'
+    return null
+  }
+  const thColorDiff = (patch) => String(patch).split('\n').map((line) => {
+    const cls = thDiffLineClass(line), escaped = esc(line)
+    return cls ? `<span class="${cls}">${escaped}</span>` : escaped
+  }).join('\n')
+
+  // Details › Changes: overview + commit list + take-it-locally commands, then the unchanged summary/diff/push.
   const thChanges = (repos) => repos.map((r) => !r.hasChanges
     ? `<div class="repoChange"><strong>${esc(r.repo)}</strong> <span class="muted">— no changes for this task</span></div>`
     : `<div class="repoChange" style="margin-bottom:16px">
         <div><strong>${esc(r.repo)}</strong> <span class="muted mono">${esc(r.branch)} vs ${esc(r.baseBranch)}</span></div>
         ${localBlock(r)}
-        <dt>review locally</dt>
-        <div class="cmd"><span>${esc(r.reviewCommand)}</span>${copyBtn(r.reviewCommand)}</div>
+        <dt>overview</dt><div class="mono small">${thDiffHeadline(r)}</div>
+        <dt>commits</dt><div class="commitlog">${thCommitList(r)}</div>
+        <dt>take it locally</dt>${thTakeLocally(r)}
         <dt>summary</dt><pre class="diff" style="max-height:none">${esc(r.stat)}</pre>
         <dt>diff</dt>
         <div><button class="copy" data-copy="${encodeURIComponent(r.patch)}">copy diff</button></div>
-        <pre class="diff">${esc(r.patch)}</pre>
+        <pre class="diff">${thColorDiff(r.patch)}</pre>
         <dt>push</dt>
         <div class="field">
           <input class="mono" data-target aria-label="${esc(`Branch to push ${r.repo} to`)}" value="${esc(r.branch)}" style="padding:6px;border:1px solid var(--line)">

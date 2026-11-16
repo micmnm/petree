@@ -467,16 +467,55 @@ describe('API', () => {
     expect(health).toEqual({ reachable: false })
   })
 
-  it('returns a per-repo diff with a review command', async () => {
+  it('returns a per-repo diff with fetch/cherry-pick commands and a commit list', async () => {
     const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
-    seedWorkRepo(home, t.id, 'demo')
+    cfgRepos.demo.path = '/home/user/demo'
+    const bare = seedWorkRepo(home, t.id, 'demo')
+    // seedWorkRepo makes one commit beyond base; add a second so ahead > 1 is exercised too.
+    const workDir = join(home, 'work', t.id, 'demo')
+    writeFileSync(join(workDir, 'change2.txt'), 'y\n')
+    execFileSync('git', ['-C', workDir, 'add', '-A'])
+    execFileSync('git', ['-C', workDir, '-c', 'user.email=p@p', '-c', 'user.name=p', 'commit', '-m', `petree ${t.id}: y`])
     const res = await fetch(`${base}/api/tasks/${t.id}/diff`)
     const arr = await res.json()
     expect(arr[0].repo).toBe('demo')
     expect(arr[0].hasChanges).toBe(true)
     expect(arr[0].branch).toBe(`petree/${t.id}`)
     expect(arr[0].patch).toContain('change.txt')
-    expect(arr[0].reviewCommand).toContain(`petree/${t.id}`)
+    expect(arr[0].ahead).toBe(2)
+    expect(arr[0].commits).toHaveLength(2)
+    for (const c of arr[0].commits) {
+      expect(c.sha.length).toBeGreaterThan(0)
+      expect(c.subject.length).toBeGreaterThan(0)
+    }
+    expect(arr[0].fetch).toContain(`+petree/${t.id}:petree/${t.id}`)
+    expect(arr[0].fetch).toContain('/home/user/demo')
+    expect(arr[0].cherryPick).toContain(`petree/${t.id}~2..petree/${t.id}`)
+    expect(arr[0].pathHint).toBeNull()
+    expect(arr[0].folder).toBe(join(home, 'work', t.id, 'demo'))
+    expect(arr[0].run).toEqual(['npm start'])
+    void bare
+  })
+
+  it('returns null fetch/cherryPick with a pathHint when the repo has no path configured', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    seedWorkRepo(home, t.id, 'demo')
+    const res = await fetch(`${base}/api/tasks/${t.id}/diff`)
+    const arr = await res.json()
+    expect(arr[0].hasChanges).toBe(true)
+    expect(arr[0].fetch).toBeNull()
+    expect(arr[0].cherryPick).toBeNull()
+    expect(arr[0].pathHint).toBeTruthy()
+  })
+
+  it('returns the new diff fields in the no-work-dir shape too', async () => {
+    const t = store.create({ prompt: 'p', repos: ['demo'], tokenBudget: 1, timeoutMinutes: 1 })
+    const res = await fetch(`${base}/api/tasks/${t.id}/diff`)
+    const arr = await res.json()
+    expect(arr[0]).toMatchObject({
+      repo: 'demo', hasChanges: false, stat: '', patch: '', ahead: 0, commits: [],
+      fetch: null, cherryPick: null, pathHint: null,
+    })
     expect(arr[0].folder).toBe(join(home, 'work', t.id, 'demo'))
     expect(arr[0].run).toEqual(['npm start'])
   })

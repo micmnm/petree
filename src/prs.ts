@@ -14,6 +14,7 @@ const defaultRun: Run = async (cmd, args, cwd) =>
 
 export type AzureHost = { kind: 'azure'; org: string; project: string; repo: string }
 export type PrHost = { kind: 'github'; slug: string } | AzureHost | { kind: 'untracked'; reason: string }
+export type HostKind = 'github' | 'azure' | 'unknown'
 
 const GITHUB = /^(?:\w+:\/\/)?(?:[^@/]+@)?github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?\/?$/
 const AZURE = /^https?:\/\/(?:[^@/]+@)?dev\.azure\.com\/([^/]+)\/([^/]+)\/_git\/([^/]+?)\/?$/
@@ -25,6 +26,19 @@ export function prHost(url: string): PrHost {
   const az = AZURE.exec(url) ?? AZURE_VS.exec(url)
   if (az) return { kind: 'azure', org: decodeURIComponent(az[1]), project: decodeURIComponent(az[2]), repo: decodeURIComponent(az[3]) }
   return { kind: 'untracked', reason: 'unsupported host' }
+}
+
+export const hostKindOf = (url: string): HostKind => {
+  const k = prHost(url).kind
+  return k === 'untracked' ? 'unknown' : k
+}
+
+// Empty string when no recognized host; caller decides what that means for its base text.
+export function hostLabel(kinds: HostKind[]): string {
+  const known = new Set(kinds.filter((k): k is 'github' | 'azure' => k !== 'unknown'))
+  if (known.size === 0) return ''
+  if (known.size === 1) return known.has('github') ? 'GitHub' : 'Azure'
+  return 'GitHub/Azure ⚠️'
 }
 
 // GitHub `/pull/N` and Azure `/pullrequest/N` web URLs.

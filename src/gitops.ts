@@ -133,6 +133,20 @@ export function diffBranch(repoDir: string, baseBranch: string): { stat: string;
   }
 }
 
+// One-line log of the thread's own commits, newest first.
+export function commitLog(repoDir: string, baseBranch: string): { sha: string; subject: string }[] {
+  const base = `origin/${baseBranch}`
+  try {
+    const out = git(repoDir, ['log', '--no-ext-diff', `--format=%h%x09%s`, `${base}..HEAD`])
+    return out.trim() ? out.trim().split('\n').map((line) => {
+      const [sha, subject] = line.split('\t')
+      return { sha, subject }
+    }) : []
+  } catch {
+    return []
+  }
+}
+
 // git's push output echoes the remote URL (e.g. "To https://x-access-token:TOKEN@host/repo.git"),
 // which can carry embedded credentials — strip URLs before this reaches the API response.
 export function scrubUrls(text: string): string {

@@ -6,10 +6,10 @@ import {
   claudeMounts, listing, pluginAllowlist, sandboxReport, scanClaudeHome, settingsOf, settingsYaml, syncClaudeHome,
   validateSettings, writeMcpFile,
 } from './claude-home.js'
-import { parseConfigText, resolveModel, repoHostKind } from './config.js'
+import { parseConfigText, resolveModel } from './config.js'
 import type { PetreeConfig } from './config.js'
-import { ensureGitConfig, localCheckout, repoStatus, diffBranch, pushBranch, taskBranch, headSha } from './gitops.js'
-import { openPr, pollPrs } from './prs.js'
+import { ensureGitConfig, localCheckout, repoStatus, diffBranch, commitLog, pushBranch, taskBranch, headSha } from './gitops.js'
+import { openPr, pollPrs, hostKindOf } from './prs.js'
 import type { Launcher } from './launcher.js'
 import type { Scheduler } from './scheduler.js'
 import { cardFor } from './inbox.js'
@@ -124,12 +124,6 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
         res.status(400).json({ error: `unknown repo: ${r}` })
         return
       }
-    }
-    const repoHosts = repos.map(r => repoHostKind(cfg.repos[r].url))
-    const uniqueHosts = new Set(repoHosts.filter(h => h !== 'unknown'))
-    if (uniqueHosts.size > 1) {
-      res.status(400).json({ error: 'cannot mix GitHub and Azure repos in one thread' })
-      return
     }
     try {
       pickImage(repos, cfg)
@@ -279,6 +273,7 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
           path: r.path ?? null,
           local: r.path ? await localCheckout(r.path) : null,
           usage: usage[name],
+          hostKind: hostKindOf(r.url),
         })),
       ),
     )
@@ -476,13 +471,28 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
       const folder = repoDir
       const run = cfg.repos[repo]?.run ?? []
       if (!existsSync(repoDir)) {
-        return { repo, branch, baseBranch, hasChanges: false, stat: '', patch: '', reviewCommand: '', folder, run }
+        return {
+          repo, branch, baseBranch, hasChanges: false, stat: '', patch: '', ahead: 0,
+          commits: [], fetch: null, cherryPick: null, pathHint: null, folder, run,
+        }
       }
       ensureGitConfig(repoDir, cfg.repos[repo]?.url ?? '')
       const st = repoStatus(repoDir, baseBranch)
       const d = st.hasChanges ? diffBranch(repoDir, baseBranch) : { stat: '', patch: '' }
-      const reviewCommand = `git -C <your-repo> fetch ${repoDir} ${branch} && git checkout ${branch}`
-      return { repo, branch, baseBranch, hasChanges: st.hasChanges, stat: d.stat, patch: d.patch, reviewCommand, folder, run }
+      const commits = st.hasChanges ? commitLog(repoDir, baseBranch) : []
+      const localPath = cfg.repos[repo]?.path
+      const noPath = st.hasChanges && !localPath
+      const fetch = st.hasChanges && localPath
+        ? `git -C ${localPath} fetch ${repoDir} +${branch}:${branch}` : null
+      const cherryPick = st.hasChanges && localPath
+        ? `git -C ${localPath} cherry-pick ${branch}~${st.ahead}..${branch}` : null
+      const pathHint = noPath
+        ? `set path: for ${repo} in ~/.petree/repos.yaml to get copy-paste fetch/cherry-pick commands`
+        : null
+      return {
+        repo, branch, baseBranch, hasChanges: st.hasChanges, stat: d.stat, patch: d.patch,
+        ahead: st.ahead, commits, fetch, cherryPick, pathHint, folder, run,
+      }
     })
     res.json(out)
   })
@@ -713,11 +723,13 @@ export function makeApp(cfg: PetreeConfig, store: TaskStore, scheduler: Schedule
     const t = store.get(req.params.id)
     if (!t) { res.sendStatus(404); return }
     const noCommits = !Object.values(t.delivery).some((d) => d.ahead > 0)
-    if (t.bin || !(t.state === 'waiting-for-you' || (t.state === 'done' && noCommits))) {
+    const hasOpenPr = Object.values(t.delivery).some((d) => d.pr === 'open')
+    const takenLocally = t.state === 'done' && !noCommits && !hasOpenPr
+    if (t.bin || !(t.state === 'waiting-for-you' || (t.state === 'done' && noCommits) || takenLocally)) {
       res.status(409).json({ error: `cannot complete from state ${t.bin ? 'binned' : t.state}` })
       return
     }
-    res.json(store.bin(t.id, 'hall-of-fame', 'finished · findings kept'))
+    res.json(store.bin(t.id, 'hall-of-fame', takenLocally ? 'finished · taken locally' : 'finished · findings kept'))
   })
 
   // CONTINUE?

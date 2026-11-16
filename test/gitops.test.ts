@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import {
   taskBranch, createTaskBranch, commitChanges, commitStat, repoStatus, diffBranch, pushBranch, saveGitConfig,
-  ensureGitConfig,
+  ensureGitConfig, commitLog,
 } from '../src/gitops.js'
 
 // a clone-shaped fixture in the work layout (<root>/work/<id>/<repo>): a bare "origin" + a clone on main
@@ -178,5 +178,28 @@ describe('gitops', () => {
     expect(() => diffBranch(repoDir, 'main')).not.toThrow()
     const d = diffBranch(repoDir, 'main')
     expect(d).toEqual({ stat: '', patch: '' })
+  })
+
+  it('commitLog returns no entries when there are no commits beyond base', () => {
+    const { repoDir } = fixture()
+    createTaskBranch(repoDir, 'abc123')
+    expect(commitLog(repoDir, 'main')).toEqual([])
+  })
+
+  it('commitLog lists the thread\'s own commits, newest first', () => {
+    const { repoDir } = fixture()
+    createTaskBranch(repoDir, 'abc123')
+    writeFileSync(join(repoDir, 'a.txt'), 'a\n')
+    commitChanges(repoDir, 'abc123', 'petree abc123: first')
+    writeFileSync(join(repoDir, 'b.txt'), 'b\n')
+    commitChanges(repoDir, 'abc123', 'petree abc123: second')
+    const log = commitLog(repoDir, 'main')
+    expect(log).toHaveLength(2)
+    expect(log[0].subject).toBe('petree abc123: second')
+    expect(log[1].subject).toBe('petree abc123: first')
+    for (const entry of log) {
+      expect(entry.sha.length).toBeGreaterThan(0)
+      expect(entry.subject.length).toBeGreaterThan(0)
+    }
   })
 })

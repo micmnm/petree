@@ -50,6 +50,12 @@
       --h0: #8F9BE6; --h1: #E88A63; --h2: #5EC2BB; --h3: #B98BE0; --h4: #A3C25A; --h5: #8DB4D9; --h6: #C2AE78; --h7: #7FBCE3;
     }
   }
+  /* Pixel scrollbars. Chrome 121+ ignores ::-webkit-scrollbar once scrollbar-color is set, so the standard props are Firefox-only. */
+  ::-webkit-scrollbar { width: 12px; height: 12px; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: var(--inset); }
+  ::-webkit-scrollbar-thumb { background: var(--line-strong); border: 2px solid var(--inset); }
+  ::-webkit-scrollbar-thumb:hover { background: var(--label); }
+  @supports not selector(::-webkit-scrollbar) { * { scrollbar-width: thin; scrollbar-color: var(--line-strong) var(--inset); } }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
   body { margin: 0; background: var(--shell); color: var(--ink); font: 16px/1.5 var(--sans); }

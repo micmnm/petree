@@ -1,30 +1,30 @@
-# Task List: Host-Aware PR Labels
+# Task List: Reorganise the OPTIONS page
 
-## Phase 1: Foundation
+## Wave 1: Foundation (Parallel)
 
-- [ ] Task 1: Add host label helpers to `src/prs.ts` — `hostKindOf()` and `hostLabel()`
+- [x] Task 1: `src/options-state.js` + `test/options-state.test.ts` (route parsing, draft bookkeeping, search index)
+- [x] Task 2: Docs vocabulary edit (`docs/design/handheld-arcade.md`, spec R40)
+- [x] Task 3: `dashboard.html` Phase 1 — sticky SAVE bar, roster search + tag filter (spec R1-R6)
 
-## Phase 2: Refactor Callers (Parallel)
+## Wave 2: Core (depends on 1, 3)
 
-- [ ] Task 2: Update `src/server.ts` — remove validation, add `hostKind` field
-- [ ] Task 3: Update `src/inbox.ts` — rebuild `prLabel` on shared helper
+- [x] Task 4: `dashboard.html` Phase 2 core — routing, draft lifetime, save-bar fan-out fix (spec R7-R19)
 
-## Phase 2 Checkpoint
+## Wave 3: Content (depends on 4)
 
-- [ ] Both `test/server.test.ts` and `test/inbox.test.ts` pass
+- [ ] Task 5: `dashboard.html` Phase 2 content — repos tab, repo page, rules tab, `~/.claude` tab (spec R25-R37)
 
-## Phase 3: Client Updates
+## Wave 4: Search (depends on 1, 5)
 
-- [ ] Task 4: Update `src/dashboard.html` — compute SHIP IT button text
+- [ ] Task 6: `dashboard.html` Phase 2 — global search (spec R20-R24)
 
-## Phase 4: Cleanup
+## Integration Checkpoint
 
-- [ ] Task 5: Delete `repoHostKind` from `src/config.ts` and its tests
+- [ ] Task 7: Lead agent integrates — `npm install`, `npm test`, `npm run typecheck`, syntax-check inline script, fix issues
 
-## Phase 5: Test Updates
+## Optional
 
-- [ ] Task 6: Update `test/server.test.ts` for mixed-host allowance
-- [ ] Task 7: Update `test/inbox.test.ts` for new label wording
+- [ ] Task 8: Code review pass across the full diff
 
 ## Checkpoint: All Tests Pass
 

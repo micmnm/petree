@@ -83,7 +83,8 @@
   .stack { display: flex; flex-direction: column; gap: 1px; text-align: left; }
   .w30 { font: 30px/.8 var(--px); }
   .sub { font-size: 13px; font-weight: 700; line-height: 1.1; }
-  .gear { flex: none; width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--line-strong); background: var(--inset); color: var(--ink); }
+  .gear { position: relative; flex: none; width: 52px; height: 52px; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--line-strong); background: var(--inset); color: var(--ink); }
+  .gear-dot { position: absolute; top: 4px; right: 4px; width: 10px; height: 10px; background: var(--gold-fill); border: 2px solid var(--inset); }
   .offline { width: calc(100% - 48px); max-width: 1112px; margin: 16px auto 0; padding: 10px 14px; background: var(--inset); border: 2px solid var(--line-strong); font-weight: 700; }
   .offline b { font: 400 20px/1 var(--px); margin-right: 8px; }
 
@@ -883,6 +884,10 @@
   .o-tile span { font-size: 14px; font-weight: 700; line-height: 1.25; }
   .o-tile small { font-size: 13px; color: var(--muted); }
   .o-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+  /* roster search + tag filter (phase 1 quick win); box styling mirrors .nq-box/#nqSearch */
+  .o-find { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+  .o-find .nq-box { flex: 1 1 240px; min-width: 200px; }
+  #repoSearch { flex: 1 1 auto; min-width: 0; min-height: 48px; padding: 0; border: 0; outline: none; background: transparent; color: var(--ink); font: 16px var(--sans); }
   .o-picks { display: flex; flex-wrap: wrap; gap: 8px; }
   /* Selection tile (design §4.6): the real input sits hidden inside the label */
   .o-pick { position: relative; display: inline-flex; max-width: 100%; padding: 2px; background: var(--line-strong); clip-path: var(--step); cursor: pointer; }
@@ -971,7 +976,9 @@
   .cl-sync { margin: 0; padding: 10px 12px; background: var(--inset); font-size: 14px; color: var(--muted); }
   .cl-sync b { font: 400 20px/1 var(--px); color: var(--ink); margin-right: 6px; }
   .o-form .o-num input { flex: none; width: 150px; }
-  .o-foot { display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: space-between; gap: 16px 24px; }
+  /* sticky SAVE bar; the negative margins cancel .page's 24 px side / 64 px bottom gutter */
+  .o-foot { position: sticky; bottom: 0; z-index: 5; display: flex; flex-wrap: wrap-reverse; align-items: center; justify-content: space-between; gap: 16px 24px;
+    margin: 0 -24px -64px; padding: 14px 24px; background: var(--screen); border-top: 2px solid var(--line-strong); }
   .o-foot > div { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; }
   .o-rawlink { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 14px; text-decoration: underline; }
   .o-save { display: inline-flex; align-items: center; gap: 12px; min-height: 60px; padding: 6px 24px 6px 18px; border: 0; background: var(--gold-fill); color: var(--on-fill); clip-path: var(--step); }
@@ -987,6 +994,7 @@
     .o-edit > form > div { padding: 14px 12px 16px; }
     .o-acts .o-dismiss { margin-left: 0; }
     .o-save b { font-size: 30px; }
+    .o-foot { margin: 0 -16px -24px; padding: 10px 16px; }
   }
 </style>
 
@@ -1023,6 +1031,7 @@
         <rect x="2" y="8" width="8" height="1"/><rect x="1" y="9" width="10" height="1"/>
         <rect x="1" y="10" width="2" height="1"/><rect x="4" y="10" width="4" height="1"/><rect x="9" y="10" width="2" height="1"/><rect x="4" y="11" width="4" height="1"/>
       </svg>
+      <span class="gear-dot" id="gearDot" role="status" aria-label="Unsaved OPTIONS changes" hidden></span>
     </a>
   </div>
 </header>
@@ -1155,6 +1164,14 @@
       <div class="o-board" id="board"></div>
     </div>
     <div class="o-sort"><span class="o-k" id="sort-h">SORT BY</span><div class="o-picks" id="sortBar" role="radiogroup" aria-labelledby="sort-h"></div></div>
+    <div class="o-find">
+      <div class="nq-box">
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 9 9" shape-rendering="crispEdges" fill="currentColor"><rect x="2" y="0" width="3" height="1"/><rect x="1" y="1" width="1" height="1"/><rect x="5" y="1" width="1" height="1"/><rect x="0" y="2" width="1" height="3"/><rect x="6" y="2" width="1" height="3"/><rect x="1" y="5" width="1" height="1"/><rect x="5" y="5" width="1" height="1"/><rect x="2" y="6" width="3" height="1"/><rect x="6" y="6" width="1" height="1"/><rect x="7" y="7" width="1" height="1"/><rect x="8" y="8" width="1" height="1"/></svg>
+        <input id="repoSearch" type="text" aria-label="Find a repo by name or tag" autocomplete="off" placeholder="find a repo…">
+        <span class="nq-found" id="repoFilterCount" aria-live="polite"></span>
+      </div>
+      <div class="o-picks" id="repoTagBar" role="radiogroup" aria-label="Narrow the roster by tag"></div>
+    </div>
     <div id="roster"></div>
     <div class="strip" aria-hidden="true"></div>
   </div></section>
@@ -1202,8 +1219,10 @@
       <span>EDIT RAW <code>repos.yaml</code> · for power use</span>
     </button>
     <div>
+      <span class="o-msg" id="dirtySummary" role="status"></span>
       <span class="o-msg" id="saveMsg" role="status"></span>
-      <a class="o-quiet" href="#/"><b>BACK</b><small>leave without saving</small></a>
+      <a class="o-quiet" href="#/"><b>BACK</b><small>keeps unsaved edits</small></a>
+      <button type="button" class="o-quiet o-dismiss" id="discardAll" hidden><b>DISCARD ALL</b><small>drop every unsaved edit</small></button>
       <button type="button" class="o-save" id="saveAll">
         <svg aria-hidden="true" width="16" height="16" viewBox="0 0 8 8" shape-rendering="crispEdges" fill="currentColor"><rect x="0" y="0" width="7" height="1"/><rect x="0" y="1" width="1" height="7"/><rect x="7" y="1" width="1" height="7"/><rect x="1" y="7" width="6" height="1"/><rect x="2" y="1" width="4" height="2"/><rect x="2" y="5" width="4" height="2"/></svg>
         <span class="stack"><b>SAVE</b><span class="sub">write repos.yaml and rules</span></span>
@@ -1244,6 +1263,7 @@
 <script type="module">
   import { renderMarkdown } from './markdown.js'
   import { renderActivity } from './activity.js'
+  import { parseOptionsHash, optionsHash, normFields, isDirty, dirtySummary, forwardHash } from './options-state.js'
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
   const $ = (id) => document.getElementById(id)
 
@@ -1456,22 +1476,27 @@
     refresh()
   })
 
-  // ---- router: #/ inbox, #/new, #/t/<id>, #/options; any other #anchor is an inbox section ----
-  let view = 'inbox'
+  // ---- router: #/ inbox, #/new, #/t/<id>, #/options[/...]; any other #anchor is an inbox section ----
+  let view = 'inbox', prevView = null, optRoute = null
   const views = { inbox: $('inbox'), new: $('newView'), thread: $('threadView'), options: $('optionsView') }
   function route() {
     const h = location.hash
     const m = /^#\/t\/(.+)$/.exec(h)
-    view = m ? 'thread' : h === '#/new' ? 'new' : h === '#/options' ? 'options' : 'inbox'
+    optRoute = parseOptionsHash(h)
+    view = m ? 'thread' : h === '#/new' ? 'new' : optRoute ? 'options' : 'inbox'
     for (const [k, el] of Object.entries(views)) el.hidden = k !== view
     if (thDialog.open) thDialog.close()
     if (m) thOpen(decodeURIComponent(m[1]))
     else selected = null
-    // entering Options starts clean: BACK means "leave without saving"
-    if (view === 'options') { drafts = {}; $('saveMsg').textContent = ''; loadSettings(); loadReposYaml(); renderOptions(); loadRepos().then(() => renderOptions()) }
+    // drafts outlive leaving OPTIONS (spec decision 10); only a fresh arrival re-fetches and clears saveMsg
+    if (view === 'options') {
+      if (prevView !== 'options') { $('saveMsg').textContent = ''; loadSettings(); loadReposYaml(); renderOptions(); loadRepos().then(() => renderOptions()) }
+      else renderOptions()
+    }
     if (view === 'new') renderNew()
     const anchor = h.length > 1 && !h.startsWith('#/') && document.getElementById(h.slice(1))
     if (anchor) anchor.scrollIntoView(); else window.scrollTo(0, 0)
+    prevView = view
   }
   addEventListener('hashchange', route)
 
@@ -2535,31 +2560,34 @@
     recent: ['RECENT', (a, b) => (b.usage.lastQuestAt ?? '').localeCompare(a.usage.lastQuestAt ?? '') || a.name.localeCompare(b.name)],
     az: ['A–Z', (a, b) => a.name.localeCompare(b.name)],
   }
-  let drafts = {}, sortBy = 'used'
+  let drafts = {}, sortBy = 'used', repoTag = '' // repoTag: roster tag filter, session-only, never persisted
   // Our own writes, hash before → after, so a draft read earlier doesn't 409 on them.
   const moved = {}
-  const fwd = (h) => { while (h && moved[h]) h = moved[h]; return h }
   const send = (method, body) => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
   const reposYamlText = $('reposYamlText')
   const reposYamlMsg = $('reposYamlMsg')
   const flashReposYamlMsg = (text) => { reposYamlMsg.textContent = text; setTimeout(() => (reposYamlMsg.textContent = ''), 2500) }
   const rules = $('rules').elements
   const LM_KEYS = ['lmStudioBaseUrl', ...LM_TIERS.map((c) => c[2])]
+  const changed = (el) => el.value !== el.defaultValue
+  // Re-entry rule (spec R12): the server value always becomes the new dirty baseline, but a field
+  // the user is mid-edit on (value !== old defaultValue) keeps its typed value.
+  const setField = (el, v) => { const clean = el.value === el.defaultValue; el.defaultValue = v; if (clean) el.value = v }
 
   async function loadSettings() {
     try { days = await (await fetch('/api/settings')).json() } catch { return }
-    rules.binDays.value = rules.binDays.defaultValue = days.binDays
-    rules.hallOfFameDays.value = rules.hallOfFameDays.defaultValue = days.hallOfFameDays
-    for (const k of LM_KEYS) rules[k].value = rules[k].defaultValue = days[k] ?? ''
-    renderInbox(); renderNew()
+    setField(rules.binDays, days.binDays)
+    setField(rules.hallOfFameDays, days.hallOfFameDays)
+    for (const k of LM_KEYS) setField(rules[k], days[k] ?? '')
+    renderInbox(); renderNew(); renderFoot()
   }
   loadSettings()
   async function loadReposYaml() {
     const { content } = await (await fetch('/api/repos-yaml')).json()
-    reposYamlText.value = content
+    setField(reposYamlText, content)
     // defaults: has no GET route; read the numbers from the file (defaultValue marks "unchanged")
     const block = /^defaults:.*\n((?:[ \t]+.*\n?|[ \t]*\n)*)/m.exec(content)?.[1] ?? ''
-    for (const k of DEFAULT_KEYS) rules[k].value = rules[k].defaultValue = new RegExp(`^[ \\t]+${k}:[ \\t]*([\\d.]+)`, 'm').exec(block)?.[1] ?? ''
+    for (const k of DEFAULT_KEYS) setField(rules[k], new RegExp(`^[ \\t]+${k}:[ \\t]*([\\d.]+)`, 'm').exec(block)?.[1] ?? '')
     chLoad()
   }
 
@@ -2573,9 +2601,11 @@
     return chData && { instructions: $('chInstr')?.getAttribute('aria-checked') === 'true', skills: on('chSkill'), plugins: on('chPlugin'), mcp: on('chMcp') }
   }
   async function chLoad() {
+    const keep = chData && chState() // re-entry (spec R12): don't clobber picks made before this load
     try { const r = await fetch('/api/claude-home'); if (!r.ok) return; chData = await r.json() } catch { return }
     chOrig = chNorm(chData.chosen); chReport = null
-    chRender(chData.chosen)
+    chRender(keep ?? chData.chosen)
+    renderFoot()
   }
   const chWarn = (t) => `<span class="cl-warn">${WARN}${t}</span>`
   const chBadge = (t) => `<span class="o-badge">${t}</span>`
@@ -2657,26 +2687,44 @@
       chOrig = chNorm(chData.chosen)
       chRender(keep)
       // SYNC may have dropped gone items from repos.yaml; a stale raw editor would put them back.
-      reposYamlText.value = (await (await fetch('/api/repos-yaml')).json()).content
+      reposYamlText.value = reposYamlText.defaultValue = (await (await fetch('/api/repos-yaml')).json()).content
+      renderFoot()
     } catch { $('rulesMsg').textContent = 'SYNC failed: petree not reachable'; b.disabled = false }
   }
-  $('chBox').addEventListener('change', () => chCounts())
+  $('chBox').addEventListener('change', () => { chCounts(); renderFoot() })
 
-  // Form fields as repos.yaml wants them: lists split and trimmed, empties dropped, tags sorted.
-  const LISTS = ['setup', 'build', 'test', 'run', 'tags']
-  function norm(f) {
-    const out = {}
-    for (const k of Object.keys(f).sort()) {
-      let v = f[k]
-      if (LISTS.includes(k)) {
-        v = [].concat(v ?? []).flatMap((s) => k === 'tags' ? String(s).split(',') : [s]).map((s) => String(s).trim()).filter(Boolean)
-        if (k === 'tags') v = [...new Set(v)].sort()
-      } else if (typeof v === 'string') v = v.trim()
-      if (v != null && v !== '' && !(Array.isArray(v) && !v.length)) out[k] = v
-    }
-    return out
+  const dirty = (key) => key === NEW || isDirty(drafts[key].orig, drafts[key].fields)
+
+  // What SAVE/DISCARD ALL act on, across repos, GAME RULES and ~/.claude. Drives the save-bar
+  // summary (R17), the gear dot (R15) and whether DISCARD ALL/the summary render at all.
+  const rulesDirty = () => [...DEFAULT_KEYS, 'binDays', 'hallOfFameDays', ...LM_KEYS].some((k) => changed(rules[k]))
+  const chDirty = () => { const ch = chState(); return !!ch && chNorm(ch) !== chOrig }
+  function dirtyItems() {
+    const items = Object.keys(drafts).map((key) => ({ name: key === NEW ? 'new repo' : key, dirty: dirty(key) }))
+    if (rulesDirty()) items.push({ name: 'GAME RULES', dirty: true })
+    if (chDirty()) items.push({ name: '~/.claude', dirty: true })
+    return items
   }
-  const dirty = (key) => key === NEW || JSON.stringify(norm(drafts[key].fields)) !== drafts[key].orig
+  let discardConfirm = false
+  function renderFoot() {
+    const items = dirtyItems(), any = items.some((i) => i.dirty)
+    if (!any) discardConfirm = false
+    $('dirtySummary').textContent = dirtySummary(items)
+    $('discardAll').hidden = !any
+    $('discardAll').innerHTML = discardConfirm
+      ? '<b>SURE?</b><small>click again to drop every unsaved edit</small>'
+      : '<b>DISCARD ALL</b><small>drop every unsaved edit</small>'
+    $('discardAll').classList.toggle('sure', discardConfirm)
+    $('gearDot').hidden = !any
+  }
+  function discardAll() {
+    drafts = {}
+    for (const k of [...DEFAULT_KEYS, 'binDays', 'hallOfFameDays', ...LM_KEYS]) rules[k].value = rules[k].defaultValue
+    reposYamlText.value = reposYamlText.defaultValue
+    if (chData) chRender(JSON.parse(chOrig))
+    discardConfirm = false
+    renderOptions()
+  }
 
   // Reads every open form back into its draft, so a re-render never loses typing.
   function sync() {
@@ -2713,13 +2761,34 @@
     return kinds.length ? `<div class="o-cmds">${kinds.map(([k]) => `<div><span class="o-k">${k.toUpperCase()}</span>${r[k].map((c) => `<code>${esc(c)}</code>`).join('')}</div>`).join('')}</div>` : ''
   }
 
-  const rosterRow = (r) => `<article class="o-repo"><div class="o-main">
+  const rosterRow = (r) => `<article class="o-repo" data-repo="${esc(r.name)}"><div class="o-main">
       ${repoHead(r, drafts[r.name] && dirty(r.name) ? '<span class="o-badge gold">EDITED · not saved</span>' : '')}
       <div class="o-stats">${stats(r.usage)}</div>
       <div class="o-meta"><span><span class="o-k">BRANCH</span> <code>${esc(r.defaultBranch)}</code></span><span><span class="o-k">IMAGE</span> <code>${esc(r.image)}</code></span>
         ${r.path ? `<span><span class="o-k">LOCAL</span> <code>${esc(r.path)}</code></span>` : '<span>no local checkout set</span>'}</div>
       ${ocmds(r)}</div>
     <button type="button" class="btn2" data-edit="${esc(r.name)}" aria-label="Edit ${esc(r.name)}"><span><b>EDIT</b><small>change this repo</small></span></button></article>`
+
+  // Pure match predicate — phase 2 lifts this unchanged into options-state.js. No DOM access.
+  function matchesFilter(repo, query, tag) {
+    if (tag && !repo.tags.includes(tag)) return false
+    const q = query.trim().toLowerCase()
+    return !q || repo.name.toLowerCase().includes(q) || repo.tags.some((t) => t.toLowerCase().includes(q))
+  }
+  // Toggles `hidden` on already-rendered rows; never touches #roster's innerHTML, so typing keeps focus/caret.
+  // Open edit forms (`.o-edit`, not `.o-repo`) are untouched even if their repo no longer matches.
+  function applyRepoFilter() {
+    const q = $('repoSearch').value
+    let shown = 0
+    for (const row of $('roster').querySelectorAll('.o-repo[data-repo]')) {
+      const r = allRepos.find((x) => x.name === row.dataset.repo)
+      const match = !!r && matchesFilter(r, q, repoTag)
+      row.hidden = !match
+      if (match) shown++
+    }
+    $('repoFilterCount').textContent = allRepos.length ? `${shown} of ${allRepos.length}` : ''
+    const none = $('rosterNoMatch'); if (none) none.hidden = !(allRepos.length && !shown)
+  }
 
   const errBox = (e) => e ? `<div class="o-err" role="alert"><b>${e.title}</b><span>${esc(e.msg)}</span>${
     e.raw ? '<button type="button" class="o-link" data-raw>edit as raw</button>' : ''}${
@@ -2730,7 +2799,7 @@
   const group = (label, help, tiles, wide) => `<fieldset class="o-field${wide ? ' o-wide' : ''}"><legend class="o-k">${label}</legend><div class="o-picks">${tiles}</div><span class="o-help">${help}</span></fieldset>`
 
   function editForm(key, d, r) {
-    const f = d.fields, on = norm(f), isNew = key === NEW
+    const f = d.fields, on = normFields(f), isNew = key === NEW
     const text = (k) => esc([].concat(f[k] ?? []).join('\n'))
     const input = (k, attrs = '') => `<input name="${k}" value="${esc(f[k] ?? '')}" autocomplete="off" ${attrs}>`
     const tags = [...new Set([...allRepos.flatMap((x) => x.tags), ...(on.tags ?? [])])].sort()
@@ -2782,9 +2851,15 @@
       + tile(sum('lost'), 'Game overs', 'dropped, out of tokens or PR closed') + (quests ? tile(`${Math.round(won / quests * 100)}%`, 'Win rate', `${won} of ${quests} started`) : '')
       + tile(played(sum('monthMs')), 'Time played', 'this month')
     $('rosterCount').textContent = allRepos.length
+    const tags = [...new Set(allRepos.flatMap((r) => r.tags))].sort()
+    if (!tags.includes(repoTag)) repoTag = ''
+    $('repoTagBar').innerHTML = ['', ...tags].map((t) => pick({ name: 'repoTag', value: t, on: t === repoTag, word: t ? esc(t.toUpperCase()) : 'ALL', sm: true })).join('')
     const rows = [...allRepos].sort(SORTS[sortBy][1]).map((r) => drafts[r.name]?.open ? editForm(r.name, drafts[r.name], r) : rosterRow(r)).join('')
     $('roster').innerHTML = (rows || '<div class="calm"><p>No repos yet. Recruit the first one.</p></div>')
+      + '<div class="calm" id="rosterNoMatch" hidden><p>Nothing matches that search or tag.</p></div>'
       + (drafts[NEW] ? editForm(NEW, drafts[NEW]) : '<button type="button" class="o-recruit" data-recruit><b>+ RECRUIT REPO</b><small>add a repo Claude can work in</small></button>')
+    applyRepoFilter()
+    renderFoot()
     if (focus) $('optionsView').querySelector(focus)?.focus()
   }
   const formSel = (key, inner) => inner.split(',').map((s) => `[data-form="${CSS.escape(key)}"] ${s}`).join(',')
@@ -2798,14 +2873,14 @@
       const res = await fetch('/api/repos/' + encodeURIComponent(name))
       if (!res.ok) { say(`Couldn't load ${name} (HTTP ${res.status}).`); return }
       const { fields, hash, editable } = await res.json()
-      drafts[name] = { fields, hash, editable, orig: JSON.stringify(norm(fields)) }
+      drafts[name] = { fields, hash, editable, orig: JSON.stringify(normFields(fields)) }
     }
     drafts[name].open = true
     renderOptions(formSel(name, '[name], button'))
   }
 
   async function dismiss(name) {
-    const d = drafts[name], sent = fwd(d.hash)
+    const d = drafts[name], sent = forwardHash(moved, d.hash)
     const res = await fetch(`/api/repos/${encodeURIComponent(name)}?hash=${sent}`, { method: 'DELETE' })
     const body = await res.json().catch(() => ({}))
     d.confirm = false
@@ -2828,16 +2903,15 @@
     for (const key of [...Object.keys(drafts).filter((k) => k !== NEW), ...(drafts[NEW] ? [NEW] : [])]) {
       const d = drafts[key]
       if (!dirty(key)) { delete drafts[key]; continue }
-      const sent = fwd(d.hash)
+      const sent = forwardHash(moved, d.hash)
       const res = key === NEW
-        ? await fetch('/api/repos', send('POST', { name: d.name, fields: norm(d.fields) }))
-        : await fetch('/api/repos/' + encodeURIComponent(key), send('PUT', { fields: norm(d.fields), hash: sent }))
+        ? await fetch('/api/repos', send('POST', { name: d.name, fields: normFields(d.fields) }))
+        : await fetch('/api/repos/' + encodeURIComponent(key), send('PUT', { fields: normFields(d.fields), hash: sent }))
       const body = await res.json().catch(() => ({}))
       if (!res.ok) { d.open = true; d.err = failure(res.status, body.error); stop = key; break }
       if (sent) moved[sent] = body.hash
       delete drafts[key]; wrote++
     }
-    const changed = (el) => el.value !== el.defaultValue
     // an emptied box means "leave as is": PUT /api/defaults can't unset a key
     const patch = Object.fromEntries(DEFAULT_KEYS.filter((k) => changed(rules[k]) && rules[k].value !== '').map((k) => [k, Number(rules[k].value)]))
     const ch = chState()
@@ -2846,7 +2920,8 @@
       const res = await fetch('/api/defaults', send('PUT', patch))
       if (res.ok) wrote++; else rulesErr = (await res.json().catch(() => ({}))).error || 'defaults not saved'
     }
-    if (['binDays', 'hallOfFameDays', ...LM_KEYS].some((k) => changed(rules[k]))) {
+    // first failure (stop !== null) aborts every remaining write, defaults and settings alike (spec R19)
+    if (stop === null && ['binDays', 'hallOfFameDays', ...LM_KEYS].some((k) => changed(rules[k]))) {
       // an empty LM Studio box clears it (the server reads '' as null)
       const res = await fetch('/api/settings', send('PUT', { binDays: Number(rules.binDays.value), hallOfFameDays: Number(rules.hallOfFameDays.value),
         ...Object.fromEntries(LM_KEYS.map((k) => [k, rules[k].value.trim()])) }))
@@ -2868,6 +2943,9 @@
   }
 
   $('sortBar').addEventListener('change', (e) => { sortBy = e.target.value; renderOptions() })
+  $('repoSearch').addEventListener('input', applyRepoFilter)
+  $('repoTagBar').addEventListener('change', (e) => { repoTag = e.target.value; applyRepoFilter() })
+  $('rules').addEventListener('input', renderFoot)
   $('optionsView').addEventListener('submit', (e) => e.preventDefault())
   $('optionsView').addEventListener('click', async (e) => {
     const b = e.target.closest('button'); if (!b) return
@@ -2880,10 +2958,12 @@
     else if ('reload' in b.dataset) { delete drafts[key]; openEdit(key) }
     else if ('raw' in b.dataset) openRaw(b.dataset.raw === 'toggle')
     else if (b.id === 'saveAll') saveAll()
+    else if (b.id === 'discardAll') { if (discardConfirm) discardAll(); else { discardConfirm = true; renderFoot() } }
     else if (b.id === 'chSyncBtn') chSync()
     else if (b.id === 'chInstr') {
       const on = b.getAttribute('aria-checked') !== 'true'
       b.setAttribute('aria-checked', String(on)); b.querySelector('.sw-w').textContent = on ? 'ON' : 'OFF'
+      renderFoot()
     }
     else if (b.id === 'clearNowBtn') {
       const { archived } = await (await fetch('/api/prune', { method: 'POST' })).json().catch(() => ({}))

@@ -308,8 +308,9 @@ Every screen works at 390 px; no separate app.
 | CONTINUE? | restore from the bin | GAME OVER row |
 | HALL OF FAME | merged threads, last 3 days | inbox |
 | READ ALL ▶ | open the reader popup | clamped blocks |
-| SAVE / BACK / DONE / CANCEL | save settings / leave / close editor keeping edits / undo edits | options |
+| SAVE / BACK / DONE / CANCEL | save settings / leave (edits kept) / close editor keeping edits / undo edits | options |
 | RECRUIT REPO / DISMISS | add a repo / remove it from repos.yaml | options |
+| DISCARD ALL | drop all unsaved edits, confirm twice | options |
 | PARTY | the repos a quest works in | new quest |
 | PARTY MODE | allow subagents | new quest |
 | AUTO-PLAY | skip gates until the PR is open; never merges | new quest |
@@ -320,6 +321,7 @@ Every screen works at 390 px; no separate app.
 | QUEST LOG | timeline of turns, approvals and comments | thread |
 | QUEST STATS | effort and cost | thread |
 | OPTIONS / PARTY ROSTER / GAME RULES | settings / repos / defaults and retention | options |
+| REPOS / RULES / CLAUDE / RAW | repos / defaults / claude config / raw | options |
 | XP, LV, streak | cosmetic counters of merged quests | header, Victory |
 
 Model class names are not level names: SCOUT is a level, so the Haiku class is
